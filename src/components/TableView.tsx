@@ -31,6 +31,13 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
   const [showInsertDialog, setShowInsertDialog] = useState(false);
   const [insertValues, setInsertValues] = useState<Record<string, string>>({});
   const [inserting, setInserting] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [editingRow, setEditingRow] = useState<Record<string, unknown> | null>(null);
+  const [editValues, setEditValues] = useState<Record<string, string>>({});
+  const [updating, setUpdating] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deletingRow, setDeletingRow] = useState<Record<string, unknown> | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     loadTableData();
@@ -102,6 +109,98 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
       setError(err instanceof Error ? err.message : 'Failed to insert row');
     } finally {
       setInserting(false);
+    }
+  };
+
+  const handleOpenEditDialog = (row: Record<string, unknown>) => {
+    setEditingRow(row);
+    // Convert all values to strings for the form
+    const stringValues: Record<string, string> = {};
+    schema.forEach(col => {
+      const value = row[col.name];
+      stringValues[col.name] = value !== null && value !== undefined ? String(value) : '';
+    });
+    setEditValues(stringValues);
+    setShowEditDialog(true);
+  };
+
+  const handleUpdateRow = async () => {
+    if (!editingRow) return;
+    
+    setUpdating(true);
+    setError(null);
+    
+    try {
+      // Build UPDATE query with WHERE clause based on primary keys
+      const pkColumns = schema.filter(col => col.pk > 0);
+      if (pkColumns.length === 0) {
+        throw new Error('Cannot update row: No primary key found');
+      }
+      
+      // Build SET clause for non-PK columns
+      const updateColumns = schema.filter(col => col.pk === 0);
+      const setClause = updateColumns.map(col => {
+        const value = editValues[col.name];
+        if (value === '' || value === null) return `"${col.name}" = NULL`;
+        if (!isNaN(Number(value)) && value.trim() !== '') return `"${col.name}" = ${value}`;
+        return `"${col.name}" = '${value.replace(/'/g, "''")}'`;
+      }).join(', ');
+      
+      // Build WHERE clause based on primary keys
+      const whereClause = pkColumns.map(col => {
+        const value = editingRow[col.name];
+        return `"${col.name}" = ${typeof value === 'number' ? value : `'${String(value).replace(/'/g, "''")}'`}`;
+      }).join(' AND ');
+      
+      const query = `UPDATE "${tableName}" SET ${setClause} WHERE ${whereClause}`;
+      
+      await executeQuery(databaseId, query, [], true);
+      
+      setShowEditDialog(false);
+      setEditingRow(null);
+      setEditValues({});
+      await loadTableData(); // Reload data
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update row');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleOpenDeleteDialog = (row: Record<string, unknown>) => {
+    setDeletingRow(row);
+    setShowDeleteDialog(true);
+  };
+
+  const handleDeleteRow = async () => {
+    if (!deletingRow) return;
+    
+    setDeleting(true);
+    setError(null);
+    
+    try {
+      // Build DELETE query with WHERE clause based on primary keys
+      const pkColumns = schema.filter(col => col.pk > 0);
+      if (pkColumns.length === 0) {
+        throw new Error('Cannot delete row: No primary key found');
+      }
+      
+      const whereClause = pkColumns.map(col => {
+        const value = deletingRow[col.name];
+        return `"${col.name}" = ${typeof value === 'number' ? value : `'${String(value).replace(/'/g, "''")}'`}`;
+      }).join(' AND ');
+      
+      const query = `DELETE FROM "${tableName}" WHERE ${whereClause}`;
+      
+      await executeQuery(databaseId, query, [], true);
+      
+      setShowDeleteDialog(false);
+      setDeletingRow(null);
+      await loadTableData(); // Reload data
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete row');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -289,10 +388,10 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
                         ))}
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-2">
-                            <Button variant="ghost" size="icon">
+                            <Button variant="ghost" size="icon" onClick={() => handleOpenEditDialog(row)} title="Edit row">
                               <Edit className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="icon">
+                            <Button variant="ghost" size="icon" onClick={() => handleOpenDeleteDialog(row)} title="Delete row">
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
@@ -384,6 +483,103 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
                 </>
               ) : (
                 'Insert Row'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Row Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Row in {tableName}</DialogTitle>
+            <DialogDescription>
+              Modify the values for this row. Leave fields empty for NULL values.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            {schema.map((col) => (
+              <div key={col.name} className="space-y-2">
+                <Label htmlFor={`edit-${col.name}`}>
+                  {col.name}
+                  {col.pk > 0 && <span className="text-xs text-muted-foreground ml-2">(Primary Key)</span>}
+                  {col.notnull && !col.pk ? <span className="text-destructive ml-1">*</span> : null}
+                </Label>
+                <div className="flex gap-2 items-center">
+                  <Input
+                    id={`edit-${col.name}`}
+                    name={`edit-${col.name}`}
+                    placeholder="NULL"
+                    value={editValues[col.name] || ''}
+                    onChange={(e) => setEditValues({...editValues, [col.name]: e.target.value})}
+                    disabled={col.pk > 0} // Disable primary keys (can't be modified)
+                  />
+                  <span className="text-xs text-muted-foreground min-w-[60px]">
+                    {col.type}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+          {error && (
+            <p className="text-sm text-destructive">{error}</p>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditDialog(false)} disabled={updating}>
+              Cancel
+            </Button>
+            <Button onClick={handleUpdateRow} disabled={updating}>
+              {updating ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Updating...
+                </>
+              ) : (
+                'Update Row'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Row Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Row</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this row? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          {deletingRow && (
+            <div className="py-4">
+              <p className="text-sm font-medium mb-2">Row details:</p>
+              <div className="bg-muted p-3 rounded-md space-y-1">
+                {schema.filter(col => col.pk > 0).map((col) => (
+                  <div key={col.name} className="text-sm">
+                    <span className="font-medium">{col.name}:</span>{' '}
+                    <span className="text-muted-foreground">{String(deletingRow[col.name])}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {error && (
+            <p className="text-sm text-destructive">{error}</p>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteDialog(false)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteRow} disabled={deleting}>
+              {deleting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                'Delete Row'
               )}
             </Button>
           </DialogFooter>
