@@ -277,6 +277,16 @@ async function executeQueryViaAPI(
     success: boolean;
   };
   
+  console.log('[Queries] D1 API response:', JSON.stringify({
+    success: data.success,
+    resultLength: data.result?.length,
+    firstResult: data.result?.[0] ? {
+      resultsLength: Array.isArray(data.result[0].results) ? data.result[0].results.length : 'not array',
+      meta: data.result[0].meta,
+      success: data.result[0].success
+    } : 'no result'
+  }));
+  
   // REST API returns array of results, take the first one
   return data.result[0];
 }

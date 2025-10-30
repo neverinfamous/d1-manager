@@ -67,8 +67,8 @@ export function CrossDatabaseSearch({ databases }: CrossDatabaseSearchProps) {
               // Execute search
               const response = await api.executeQuery(db.uuid, sql);
               
-              if (response.results && response.results[0]?.results) {
-                const rows = response.results[0].results as Record<string, unknown>[];
+              if (response.results && response.results.length > 0) {
+                const rows = response.results as Record<string, unknown>[];
                 
                 // Process results
                 rows.forEach((row: Record<string, unknown>) => {

@@ -36,26 +36,22 @@ export function QueryConsole({ databaseId, databaseName }: QueryConsoleProps) {
       const response = await executeQuery(databaseId, query);
       const endTime = performance.now();
 
+      // Response is already unwrapped by api.ts: { results: [], meta: {}, success: boolean }
       if (response.results && response.results.length > 0) {
-        const firstResult = response.results[0];
-        const resultsArray = firstResult.results as Record<string, unknown>[] | undefined;
+        const resultsArray = response.results as Record<string, unknown>[];
         
-        // Extract columns from first row or meta
-        const columns = resultsArray && resultsArray.length > 0
-          ? Object.keys(resultsArray[0])
-          : [];
+        // Extract columns from first row
+        const columns = Object.keys(resultsArray[0]);
         
         // Convert results to rows array
-        const rows = resultsArray?.map((row: Record<string, unknown>) =>
+        const rows = resultsArray.map((row: Record<string, unknown>) =>
           columns.map(col => row[col])
-        ) || [];
-        
-        const meta = firstResult.meta as { rows_written?: number; rows_read?: number } | undefined;
+        );
 
         setResult({
           columns,
           rows,
-          rowsAffected: meta?.rows_written || meta?.rows_read,
+          rowsAffected: response.meta?.rows_written || response.meta?.rows_read,
           executionTime: endTime - startTime
         });
       } else {

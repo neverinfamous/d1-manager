@@ -176,8 +176,8 @@ export function QueryBuilder({ databaseId, databaseName }: QueryBuilderProps) {
       setError(null);
       const response = await executeQuery(databaseId, generatedSQL);
 
-      if (response.results && response.results[0]?.results) {
-        const rows = response.results[0].results as Record<string, unknown>[];
+      if (response.results && response.results.length > 0) {
+        const rows = response.results as Record<string, unknown>[];
         setResults(rows);
         if (rows.length > 0) {
           setResultColumns(Object.keys(rows[0]));
