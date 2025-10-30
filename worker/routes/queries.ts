@@ -257,7 +257,7 @@ async function executeQueryViaAPI(
       method: 'POST',
       headers: {
         'X-Auth-Email': env.CF_EMAIL,
-        'Authorization': `Bearer ${env.API_KEY}`,
+        'X-Auth-Key': env.API_KEY,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({ 

@@ -12,7 +12,7 @@ export async function handleDatabaseRoutes(
   
   const cfHeaders = {
     'X-Auth-Email': env.CF_EMAIL,
-    'Authorization': `Bearer ${env.API_KEY}`,
+    'X-Auth-Key': env.API_KEY,
     'Content-Type': 'application/json'
   };
 
