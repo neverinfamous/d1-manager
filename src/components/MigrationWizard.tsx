@@ -124,27 +124,32 @@ export function MigrationWizard({ databases }: MigrationWizardProps) {
             // Get column names
             const cols = Object.keys(data[0]);
             
-            // Build batched INSERT statements (process all rows in one query)
-            const insertStatements = data.map(row => {
-              const values = cols.map(col => {
-                const val = row[col];
-                if (val === null) return 'NULL';
-                if (typeof val === 'number') return String(val);
-                if (typeof val === 'boolean') return val ? '1' : '0';
-                // Properly escape single quotes in strings
-                const strVal = String(val).replace(/'/g, "''");
-                return `'${strVal}'`;
-              }).join(', ');
-              return `INSERT INTO ${table} (${cols.join(', ')}) VALUES (${values});`;
-            }).join('\n');
+            // Insert data row by row (D1 REST API doesn't support batched INSERTs)
+            for (let rowIdx = 0; rowIdx < data.length; rowIdx++) {
+              const row = data[rowIdx];
+              try {
+                const values = cols.map(col => {
+                  const val = row[col];
+                  if (val === null) return 'NULL';
+                  if (typeof val === 'number') return String(val);
+                  if (typeof val === 'boolean') return val ? '1' : '0';
+                  // Properly escape single quotes in strings
+                  const strVal = String(val).replace(/'/g, "''");
+                  return `'${strVal}'`;
+                }).join(', ');
 
-            // Execute all INSERT statements in a single query (skip validation for migration)
-            await executeQuery(
-              targetDb,
-              insertStatements,
-              undefined,
-              true
-            );
+                // Execute INSERT statement (skip validation for migration)
+                await executeQuery(
+                  targetDb,
+                  `INSERT INTO ${table} (${cols.join(', ')}) VALUES (${values});`,
+                  undefined,
+                  true
+                );
+              } catch (err) {
+                console.error(`Failed to insert row ${rowIdx + 1}:`, row, err);
+                // Continue with next row instead of failing entire migration
+              }
+            }
           }
 
           // Update task with row count
