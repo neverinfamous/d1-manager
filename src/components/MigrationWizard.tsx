@@ -124,8 +124,8 @@ export function MigrationWizard({ databases }: MigrationWizardProps) {
             // Get column names
             const cols = Object.keys(data[0]);
             
-            // Insert data in batches
-            for (const row of data) {
+            // Build batched INSERT statements (process all rows in one query)
+            const insertStatements = data.map(row => {
               const values = cols.map(col => {
                 const val = row[col];
                 if (val === null) return 'NULL';
@@ -135,15 +135,16 @@ export function MigrationWizard({ databases }: MigrationWizardProps) {
                 const strVal = String(val).replace(/'/g, "''");
                 return `'${strVal}'`;
               }).join(', ');
+              return `INSERT INTO ${table} (${cols.join(', ')}) VALUES (${values});`;
+            }).join('\n');
 
-              // Execute INSERT statement (skip validation for migration)
-              await executeQuery(
-                targetDb,
-                `INSERT INTO ${table} (${cols.join(', ')}) VALUES (${values});`,
-                undefined,
-                true
-              );
-            }
+            // Execute all INSERT statements in a single query (skip validation for migration)
+            await executeQuery(
+              targetDb,
+              insertStatements,
+              undefined,
+              true
+            );
           }
 
           // Update task with row count
