@@ -108,7 +108,8 @@ export function MigrationWizard({ databases }: MigrationWizardProps) {
             let def = `${col.name} ${col.type || 'TEXT'}`;
             if (col.pk > 0) def += ' PRIMARY KEY';
             if (col.notnull && col.pk === 0) def += ' NOT NULL';
-            if (col.dflt_value) def += ` DEFAULT ${col.dflt_value}`;
+            // Skip default values - they can cause syntax errors and aren't essential for migration
+            // DEFAULT values from PRAGMA often include function calls like datetime('now') which may not transfer correctly
             return def;
           }).join(', ');
 
