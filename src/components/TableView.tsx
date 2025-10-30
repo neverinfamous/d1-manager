@@ -51,6 +51,69 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
     return String(value);
   };
 
+  const handleExportCSV = () => {
+    console.log('[TableView] Export CSV clicked');
+    
+    if (data.length === 0) {
+      console.log('[TableView] No data to export');
+      alert('No data to export');
+      return;
+    }
+
+    try {
+      // Get column names from schema
+      const columns = schema.map(col => col.name);
+      
+      // Create CSV content
+      const csvRows = [];
+      
+      // Add headers
+      csvRows.push(columns.map(col => `"${col}"`).join(','));
+      
+      // Add data rows
+      for (const row of data) {
+        const values = columns.map(col => {
+          const cell = row[col];
+          if (cell === null) return 'NULL';
+          if (cell === undefined) return '';
+          const str = String(cell);
+          // Escape quotes and wrap in quotes if contains comma, quote, or newline
+          if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+            return `"${str.replace(/"/g, '""')}"`;
+          }
+          return str;
+        });
+        csvRows.push(values.join(','));
+      }
+
+      // Create blob and download
+      const csvContent = csvRows.join('\n');
+      console.log('[TableView] CSV content length:', csvContent.length);
+      
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      
+      link.href = url;
+      link.download = `${tableName}_${Date.now()}.csv`;
+      
+      console.log('[TableView] Triggering download:', link.download);
+      
+      document.body.appendChild(link);
+      link.click();
+      
+      // Clean up after a small delay
+      setTimeout(() => {
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        console.log('[TableView] Download cleanup complete');
+      }, 100);
+    } catch (err) {
+      console.error('[TableView] Export CSV error:', err);
+      alert('Failed to export CSV: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -70,9 +133,9 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
           <Button variant="outline" size="icon" onClick={loadTableData}>
             <RefreshCw className="h-4 w-4" />
           </Button>
-          <Button variant="outline">
+          <Button variant="outline" onClick={handleExportCSV} disabled={data.length === 0}>
             <Download className="h-4 w-4 mr-2" />
-            Export
+            Export CSV
           </Button>
           <Button>
             <Plus className="h-4 w-4 mr-2" />
