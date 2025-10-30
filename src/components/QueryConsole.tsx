@@ -157,40 +157,62 @@ export function QueryConsole({ databaseId, databaseName }: QueryConsoleProps) {
   };
 
   const handleExportCSV = () => {
-    if (!result || result.rows.length === 0) return;
-
-    // Create CSV content
-    const csvRows = [];
+    console.log('[QueryConsole] Export CSV clicked');
+    console.log('[QueryConsole] Result:', result);
     
-    // Add headers
-    csvRows.push(result.columns.map(col => `"${col}"`).join(','));
-    
-    // Add data rows
-    for (const row of result.rows) {
-      const values = row.map(cell => {
-        if (cell === null) return 'NULL';
-        if (cell === undefined) return '';
-        const str = String(cell);
-        // Escape quotes and wrap in quotes if contains comma, quote, or newline
-        if (str.includes(',') || str.includes('"') || str.includes('\n')) {
-          return `"${str.replace(/"/g, '""')}"`;
-        }
-        return str;
-      });
-      csvRows.push(values.join(','));
+    if (!result || result.rows.length === 0) {
+      console.log('[QueryConsole] No results to export');
+      return;
     }
 
-    // Create blob and download
-    const csvContent = csvRows.join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `query_results_${Date.now()}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+      // Create CSV content
+      const csvRows = [];
+      
+      // Add headers
+      csvRows.push(result.columns.map(col => `"${col}"`).join(','));
+      
+      // Add data rows
+      for (const row of result.rows) {
+        const values = row.map(cell => {
+          if (cell === null) return 'NULL';
+          if (cell === undefined) return '';
+          const str = String(cell);
+          // Escape quotes and wrap in quotes if contains comma, quote, or newline
+          if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+            return `"${str.replace(/"/g, '""')}"`;
+          }
+          return str;
+        });
+        csvRows.push(values.join(','));
+      }
+
+      // Create blob and download
+      const csvContent = csvRows.join('\n');
+      console.log('[QueryConsole] CSV content length:', csvContent.length);
+      
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      
+      link.href = url;
+      link.download = `query_results_${Date.now()}.csv`;
+      
+      console.log('[QueryConsole] Triggering download:', link.download);
+      
+      document.body.appendChild(link);
+      link.click();
+      
+      // Clean up after a small delay
+      setTimeout(() => {
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        console.log('[QueryConsole] Download cleanup complete');
+      }, 100);
+    } catch (err) {
+      console.error('[QueryConsole] Export CSV error:', err);
+      alert('Failed to export CSV: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    }
   };
 
   return (
