@@ -286,3 +286,100 @@ export const executeQuery = <T = Record<string, unknown>>(
   skipValidation?: boolean
 ) => api.executeQuery<T>(databaseId, query, params, skipValidation)
 
+// Saved queries API
+export interface SavedQuery {
+  id: number
+  name: string
+  description?: string
+  database_id?: string
+  query: string
+  created_at: string
+  updated_at: string
+  user_email: string
+}
+
+export const getSavedQueries = async (databaseId?: string): Promise<SavedQuery[]> => {
+  const url = databaseId 
+    ? `${WORKER_API}/api/saved-queries?database_id=${encodeURIComponent(databaseId)}`
+    : `${WORKER_API}/api/saved-queries`
+  
+  const response = await fetch(url, {
+    method: 'GET',
+    credentials: 'include'
+  })
+  
+  if (!response.ok) {
+    throw new Error(`Failed to fetch saved queries: ${response.status}`)
+  }
+  
+  const data = await response.json() as { result: SavedQuery[], success: boolean }
+  return data.result
+}
+
+export const createSavedQuery = async (
+  name: string,
+  query: string,
+  description?: string,
+  databaseId?: string
+): Promise<SavedQuery> => {
+  const response = await fetch(`${WORKER_API}/api/saved-queries`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    credentials: 'include',
+    body: JSON.stringify({
+      name,
+      query,
+      description,
+      database_id: databaseId
+    })
+  })
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+    throw new Error(error.error || `Failed to save query: ${response.status}`)
+  }
+  
+  const data = await response.json() as { result: SavedQuery, success: boolean }
+  return data.result
+}
+
+export const updateSavedQuery = async (
+  id: number,
+  updates: {
+    name?: string
+    query?: string
+    description?: string
+  }
+): Promise<SavedQuery> => {
+  const response = await fetch(`${WORKER_API}/api/saved-queries/${id}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    credentials: 'include',
+    body: JSON.stringify(updates)
+  })
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+    throw new Error(error.error || `Failed to update query: ${response.status}`)
+  }
+  
+  const data = await response.json() as { result: SavedQuery, success: boolean }
+  return data.result
+}
+
+export const deleteSavedQuery = async (id: number): Promise<void> => {
+  const response = await fetch(`${WORKER_API}/api/saved-queries/${id}`, {
+    method: 'DELETE',
+    credentials: 'include'
+  })
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+    throw new Error(error.error || `Failed to delete query: ${response.status}`)
+  }
+}
+

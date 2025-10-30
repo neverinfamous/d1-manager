@@ -12,7 +12,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { listTables, getTableSchema, executeQuery, type TableInfo, type ColumnInfo } from '@/services/api';
+import { 
+  listTables, 
+  getTableSchema, 
+  executeQuery, 
+  getSavedQueries,
+  createSavedQuery,
+  deleteSavedQuery,
+  type TableInfo, 
+  type ColumnInfo,
+  type SavedQuery as APISavedQuery
+} from '@/services/api';
 
 interface QueryBuilderProps {
   databaseId: string;
@@ -24,13 +34,6 @@ interface QueryCondition {
   column: string;
   operator: string;
   value: string;
-}
-
-interface SavedQuery {
-  id: string;
-  name: string;
-  query: string;
-  createdAt: string;
 }
 
 const OPERATORS = [
@@ -62,8 +65,11 @@ export function QueryBuilder({ databaseId, databaseName }: QueryBuilderProps) {
   const [error, setError] = useState<string | null>(null);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [queryName, setQueryName] = useState('');
-  const [savedQueries, setSavedQueries] = useState<SavedQuery[]>([]);
+  const [queryDescription, setQueryDescription] = useState('');
+  const [savedQueries, setSavedQueries] = useState<APISavedQuery[]>([]);
   const [showSavedQueries, setShowSavedQueries] = useState(false);
+  const [savingQuery, setSavingQuery] = useState(false);
+  const [loadingQueries, setLoadingQueries] = useState(false);
 
   useEffect(() => {
     loadTables();
@@ -103,11 +109,52 @@ export function QueryBuilder({ databaseId, databaseName }: QueryBuilderProps) {
     }
   };
 
-  const loadSavedQueries = () => {
-    // Load from localStorage for now
-    const stored = localStorage.getItem(`d1-saved-queries-${databaseId}`);
-    if (stored) {
-      setSavedQueries(JSON.parse(stored));
+  const loadSavedQueries = async () => {
+    setLoadingQueries(true);
+    try {
+      // First try to load from API
+      const queries = await getSavedQueries(databaseId);
+      setSavedQueries(queries);
+      
+      // Check if we have localStorage data to migrate
+      const localStorageKey = `d1-saved-queries-${databaseId}`;
+      const stored = localStorage.getItem(localStorageKey);
+      if (stored) {
+        try {
+          const localQueries = JSON.parse(stored) as Array<{
+            id: string;
+            name: string;
+            query: string;
+            createdAt: string;
+          }>;
+          
+          // Migrate any localStorage queries that don't exist in the database
+          const existingNames = new Set(queries.map(q => q.name));
+          for (const localQuery of localQueries) {
+            if (!existingNames.has(localQuery.name)) {
+              await createSavedQuery(
+                localQuery.name,
+                localQuery.query,
+                'Migrated from local storage',
+                databaseId
+              );
+            }
+          }
+          
+          // Reload queries after migration and clear localStorage
+          const updatedQueries = await getSavedQueries(databaseId);
+          setSavedQueries(updatedQueries);
+          localStorage.removeItem(localStorageKey);
+          console.log('[QueryBuilder] Migrated localStorage queries to database');
+        } catch (err) {
+          console.error('[QueryBuilder] Failed to migrate localStorage queries:', err);
+        }
+      }
+    } catch (err) {
+      console.error('[QueryBuilder] Failed to load saved queries:', err);
+      setError('Failed to load saved queries');
+    } finally {
+      setLoadingQueries(false);
     }
   };
 
@@ -195,34 +242,46 @@ export function QueryBuilder({ databaseId, databaseName }: QueryBuilderProps) {
     }
   };
 
-  const saveQuery = () => {
+  const saveQuery = async () => {
     if (!queryName.trim() || !generatedSQL) return;
 
-    const newQuery: SavedQuery = {
-      id: String(Date.now()),
-      name: queryName.trim(),
-      query: generatedSQL,
-      createdAt: new Date().toISOString()
-    };
-
-    const updated = [...savedQueries, newQuery];
-    setSavedQueries(updated);
-    localStorage.setItem(`d1-saved-queries-${databaseId}`, JSON.stringify(updated));
-
-    setQueryName('');
-    setShowSaveDialog(false);
+    setSavingQuery(true);
+    setError(null);
+    try {
+      await createSavedQuery(
+        queryName.trim(),
+        generatedSQL,
+        queryDescription.trim() || undefined,
+        databaseId
+      );
+      
+      // Reload saved queries
+      await loadSavedQueries();
+      
+      setQueryName('');
+      setQueryDescription('');
+      setShowSaveDialog(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save query');
+    } finally {
+      setSavingQuery(false);
+    }
   };
 
-  const loadSavedQuery = (query: SavedQuery) => {
+  const loadSavedQuery = (query: APISavedQuery) => {
     setGeneratedSQL(query.query);
     setShowSavedQueries(false);
     // Optionally parse and populate the builder fields
   };
 
-  const deleteSavedQuery = (id: string) => {
-    const updated = savedQueries.filter(q => q.id !== id);
-    setSavedQueries(updated);
-    localStorage.setItem(`d1-saved-queries-${databaseId}`, JSON.stringify(updated));
+  const handleDeleteSavedQuery = async (id: number) => {
+    try {
+      await deleteSavedQuery(id);
+      // Reload saved queries
+      await loadSavedQueries();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete query');
+    }
   };
 
   const formatValue = (value: unknown): string => {
@@ -525,13 +584,29 @@ export function QueryBuilder({ databaseId, databaseName }: QueryBuilderProps) {
                 onChange={(e) => setQueryName(e.target.value)}
               />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="query-description">Description (Optional)</Label>
+              <Input
+                id="query-description"
+                placeholder="What does this query do?"
+                value={queryDescription}
+                onChange={(e) => setQueryDescription(e.target.value)}
+              />
+            </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowSaveDialog(false)}>
+            <Button variant="outline" onClick={() => setShowSaveDialog(false)} disabled={savingQuery}>
               Cancel
             </Button>
-            <Button onClick={saveQuery} disabled={!queryName.trim()}>
-              Save
+            <Button onClick={saveQuery} disabled={!queryName.trim() || savingQuery}>
+              {savingQuery ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Save'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -547,7 +622,12 @@ export function QueryBuilder({ databaseId, databaseName }: QueryBuilderProps) {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2 max-h-96 overflow-y-auto">
-            {savedQueries.length === 0 ? (
+            {loadingQueries ? (
+              <div className="text-center py-8">
+                <Loader2 className="w-8 h-8 animate-spin mx-auto text-muted-foreground" />
+                <p className="text-sm text-muted-foreground mt-2">Loading saved queries...</p>
+              </div>
+            ) : savedQueries.length === 0 ? (
               <p className="text-center text-muted-foreground py-8">No saved queries yet</p>
             ) : (
               savedQueries.map(query => (
@@ -556,11 +636,14 @@ export function QueryBuilder({ databaseId, databaseName }: QueryBuilderProps) {
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <h4 className="font-semibold">{query.name}</h4>
+                        {query.description && (
+                          <p className="text-sm text-muted-foreground mt-1">{query.description}</p>
+                        )}
                         <pre className="text-xs font-mono mt-2 p-2 bg-background rounded overflow-x-auto">
                           {query.query}
                         </pre>
                         <p className="text-xs text-muted-foreground mt-2">
-                          Saved {new Date(query.createdAt).toLocaleString()}
+                          Saved {new Date(query.created_at).toLocaleString()}
                         </p>
                       </div>
                       <div className="flex gap-2 ml-4">
@@ -574,7 +657,7 @@ export function QueryBuilder({ databaseId, databaseName }: QueryBuilderProps) {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => deleteSavedQuery(query.id)}
+                          onClick={() => handleDeleteSavedQuery(query.id)}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>

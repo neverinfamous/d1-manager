@@ -4,6 +4,8 @@ import { getCorsHeaders, handleCorsPreflightRequest, isLocalDevelopment } from '
 import { handleDatabaseRoutes } from './routes/databases';
 import { handleTableRoutes } from './routes/tables';
 import { handleQueryRoutes } from './routes/queries';
+import { handleSavedQueriesRoutes } from './routes/saved-queries';
+import { trackDatabaseAccess } from './utils/database-tracking';
 
 async function handleApiRequest(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
@@ -64,7 +66,17 @@ async function handleApiRequest(request: Request, env: Env): Promise<Response> {
   }
 
   if (url.pathname.startsWith('/api/query/')) {
+    // Track database access when executing queries
+    const pathParts = url.pathname.split('/');
+    const dbId = pathParts[3];
+    if (dbId && !isLocalDev) {
+      await trackDatabaseAccess(dbId, env);
+    }
     return await handleQueryRoutes(request, env, url, corsHeaders, isLocalDev, userEmail);
+  }
+
+  if (url.pathname.startsWith('/api/saved-queries')) {
+    return await handleSavedQueriesRoutes(request, env, url, corsHeaders, isLocalDev, userEmail);
   }
 
   // Serve frontend assets

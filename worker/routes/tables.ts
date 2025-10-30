@@ -1,5 +1,6 @@
 import type { Env, TableInfo } from '../types';
 import { sanitizeIdentifier } from '../utils/helpers';
+import { trackDatabaseAccess } from '../utils/database-tracking';
 
 /**
  * Note: This route handler requires dynamic D1 database access
@@ -32,6 +33,13 @@ export async function handleTableRoutes(
         ...corsHeaders
       }
     });
+  }
+
+  // Track database access (non-blocking)
+  if (!isLocalDev) {
+    trackDatabaseAccess(dbId, env).catch(err => 
+      console.error('[Tables] Database tracking failed:', err)
+    );
   }
 
   try {
