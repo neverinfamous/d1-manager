@@ -20,7 +20,14 @@ async function handleApiRequest(request: Request, env: Env): Promise<Response> {
   // Check if local development
   const isLocalhost = isLocalDevelopment(request);
   
-  // Skip auth for localhost development
+  // Allow static assets without authentication (from Workers Assets binding)
+  // These are served by Cloudflare's edge network and don't need auth
+  if (!url.pathname.startsWith('/api/')) {
+    // Static asset request - let it through to the assets handler
+    return env.ASSETS.fetch(request);
+  }
+  
+  // Skip auth for localhost development API requests
   let userEmail: string | null = null;
   if (isLocalhost) {
     console.log('[Auth] Localhost detected, skipping JWT validation');
