@@ -24,6 +24,7 @@ import { Label } from '@/components/ui/label'
 import { DatabaseView } from './components/DatabaseView'
 import { TableView } from './components/TableView'
 import { QueryConsole } from './components/QueryConsole'
+import { CrossDatabaseSearch } from './components/CrossDatabaseSearch'
 
 type View = 
   | { type: 'list' }
@@ -167,13 +168,18 @@ export default function App() {
                   {databases.length} {databases.length === 1 ? 'database' : 'databases'}
                 </p>
               </div>
-              <Button onClick={() => setShowCreateDialog(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Create Database
-              </Button>
-            </div>
+            <Button onClick={() => setShowCreateDialog(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Create Database
+            </Button>
+          </div>
 
-            {/* Error Message */}
+          {/* Cross-Database Search */}
+          {databases.length > 0 && (
+            <CrossDatabaseSearch databases={databases} />
+          )}
+
+          {/* Error Message */}
             {error && (
               <div className="bg-destructive/10 border border-destructive text-destructive px-4 py-3 rounded-lg mb-6">
                 {error}
