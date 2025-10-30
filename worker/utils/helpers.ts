@@ -3,6 +3,7 @@ import type { Env } from '../types';
 /**
  * Get database size using D1 PRAGMA
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function getDatabaseSize(_databaseId: string, _env: Env): Promise<number> {
   // For now, return 0 - will be implemented when we have dynamic database bindings
   // In production, this would query the specific D1 database
