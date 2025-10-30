@@ -27,7 +27,7 @@ export function MigrationWizard({ databases }: MigrationWizardProps) {
   const [copyData, setCopyData] = useState(true);
   const [dropExisting, setDropExisting] = useState(false);
   const [tasks, setTasks] = useState<MigrationTask[]>([]);
-  const [_migrating, setMigrating] = useState(false);
+  const [, setMigrating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSourceChange = async (dbId: string) => {
@@ -40,7 +40,7 @@ export function MigrationWizard({ databases }: MigrationWizardProps) {
         const tables = await listTables(dbId);
         const tableNames = tables.filter(t => t.type === 'table').map(t => t.name);
         setAvailableTables(tableNames);
-      } catch (_err) {
+      } catch {
         setError('Failed to load tables from source database');
       }
     } else {
@@ -98,7 +98,7 @@ export function MigrationWizard({ databases }: MigrationWizardProps) {
           if (dropExisting) {
             try {
               await executeQuery(targetDb, `DROP TABLE IF EXISTS ${table};`);
-            } catch (_err) {
+            } catch {
               console.warn(`Table ${table} doesn't exist in target, skipping drop`);
             }
           }

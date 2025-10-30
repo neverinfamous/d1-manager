@@ -1,5 +1,5 @@
-import type { Env, TableInfo, ColumnInfo, IndexInfo } from '../types';
-import { sanitizeIdentifier, parseD1Error } from '../utils/helpers';
+import type { Env, TableInfo } from '../types';
+import { sanitizeIdentifier } from '../utils/helpers';
 
 /**
  * Note: This route handler requires dynamic D1 database access
@@ -61,7 +61,7 @@ export async function handleTableRoutes(
       const result = await executeQueryViaAPI(dbId, query, env);
       
       // Filter out system tables
-      const tables = result.results.filter((table: TableInfo) => 
+      const tables = (result.results as TableInfo[]).filter((table: TableInfo) => 
         !table.name.startsWith('sqlite_') && !table.name.startsWith('_cf_')
       );
       
