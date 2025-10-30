@@ -204,10 +204,12 @@ export async function handleTableRoutes(
     });
 
   } catch (err) {
+    // Log full error details on server only
     console.error('[Tables] Error:', err);
+    // Return generic error to client (security: don't expose stack traces)
     return new Response(JSON.stringify({ 
       error: 'Table operation failed',
-      message: parseD1Error(err)
+      message: 'Unable to complete table operation. Please try again.'
     }), { 
       status: 500,
       headers: {

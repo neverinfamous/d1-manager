@@ -238,10 +238,12 @@ export async function handleDatabaseRoutes(
     });
 
   } catch (err) {
+    // Log full error details on server only
     console.error('[Databases] Error:', err);
+    // Return generic error to client (security: don't expose stack traces)
     return new Response(JSON.stringify({ 
       error: 'Database operation failed',
-      message: err instanceof Error ? err.message : String(err)
+      message: 'Unable to complete database operation. Please try again.'
     }), { 
       status: 500,
       headers: {

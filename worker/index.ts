@@ -88,11 +88,13 @@ export default {
     try {
       return await handleApiRequest(request, env);
     } catch (err) {
+      // Log full error details on server only
       console.error('[Worker] Unhandled error:', err);
       const corsHeaders = getCorsHeaders(request);
+      // Return generic error to client (security: don't expose stack traces)
       return new Response(JSON.stringify({ 
         error: 'Internal Server Error',
-        message: err instanceof Error ? err.message : String(err)
+        message: 'An unexpected error occurred. Please try again later.'
       }), { 
         status: 500,
         headers: {

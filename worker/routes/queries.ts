@@ -226,10 +226,12 @@ export async function handleQueryRoutes(
     });
 
   } catch (err) {
+    // Log full error details on server only
     console.error('[Queries] Error:', err);
+    // Return generic error to client (security: don't expose stack traces)
     return new Response(JSON.stringify({ 
       error: 'Query operation failed',
-      message: parseD1Error(err)
+      message: 'Unable to execute query. Please check your SQL syntax and try again.'
     }), { 
       status: 500,
       headers: {
