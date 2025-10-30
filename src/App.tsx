@@ -26,6 +26,7 @@ import { TableView } from './components/TableView'
 import { QueryConsole } from './components/QueryConsole'
 import { CrossDatabaseSearch } from './components/CrossDatabaseSearch'
 import { DatabaseComparison } from './components/DatabaseComparison'
+import { MigrationWizard } from './components/MigrationWizard'
 
 type View = 
   | { type: 'list' }
@@ -42,6 +43,7 @@ export default function App() {
   const [creating, setCreating] = useState(false)
   const [currentView, setCurrentView] = useState<View>({ type: 'list' })
   const [showComparison, setShowComparison] = useState(false)
+  const [showMigration, setShowMigration] = useState(false)
   const { theme, setTheme } = useTheme()
 
   // Load databases on mount
@@ -208,6 +210,38 @@ export default function App() {
                   onClick={() => setShowComparison(false)}
                 >
                   Close Comparison
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Migration Wizard */}
+          {databases.length >= 2 && !showMigration && !showComparison && (
+            <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setShowMigration(true)}>
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Database className="h-5 w-5" />
+                  <CardTitle>Migrate Database</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">
+                  Copy tables and data from one database to another
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {showMigration && databases.length >= 2 && (
+            <Card>
+              <CardContent className="pt-6">
+                <MigrationWizard databases={databases} />
+                <Button
+                  variant="outline"
+                  className="mt-4"
+                  onClick={() => setShowMigration(false)}
+                >
+                  Close Migration Wizard
                 </Button>
               </CardContent>
             </Card>
