@@ -295,7 +295,14 @@ export function QueryConsole({ databaseId, databaseName }: QueryConsoleProps) {
                   Executed in {result.executionTime.toFixed(2)}ms
                 </span>
                 {result.rows.length > 0 && (
-                  <Button variant="outline" size="sm" onClick={handleExportCSV}>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={(e) => {
+                      console.log('[QueryConsole] Button clicked event:', e);
+                      handleExportCSV();
+                    }}
+                  >
                     <Download className="h-4 w-4 mr-2" />
                     Export CSV
                   </Button>
@@ -366,6 +373,7 @@ export function QueryConsole({ databaseId, databaseName }: QueryConsoleProps) {
               <Label htmlFor="query-name">Query Name</Label>
               <Input
                 id="query-name"
+                name="query-name"
                 placeholder="My saved query"
                 value={queryName}
                 onChange={(e) => setQueryName(e.target.value)}
@@ -375,6 +383,7 @@ export function QueryConsole({ databaseId, databaseName }: QueryConsoleProps) {
               <Label htmlFor="query-description">Description (Optional)</Label>
               <Input
                 id="query-description"
+                name="query-description"
                 placeholder="What does this query do?"
                 value={queryDescription}
                 onChange={(e) => setQueryDescription(e.target.value)}
