@@ -103,7 +103,7 @@ export function MigrationWizard({ databases }: MigrationWizardProps) {
             }
           }
 
-          // Create table
+          // Create table (use simple names - D1 API doesn't need quoted identifiers)
           const columns = schema.map(col => {
             let def = `${col.name} ${col.type || 'TEXT'}`;
             if (col.pk > 0) def += ' PRIMARY KEY';
@@ -129,10 +129,14 @@ export function MigrationWizard({ databases }: MigrationWizardProps) {
               const values = cols.map(col => {
                 const val = row[col];
                 if (val === null) return 'NULL';
-                if (typeof val === 'number') return val;
-                return `'${String(val).replace(/'/g, "''")}'`;
+                if (typeof val === 'number') return String(val);
+                if (typeof val === 'boolean') return val ? '1' : '0';
+                // Properly escape single quotes in strings
+                const strVal = String(val).replace(/'/g, "''");
+                return `'${strVal}'`;
               }).join(', ');
 
+              // Execute INSERT statement
               await executeQuery(
                 targetDb,
                 `INSERT INTO ${table} (${cols.join(', ')}) VALUES (${values});`
