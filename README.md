@@ -332,6 +332,11 @@ After deployment, your D1 Manager will be available at:
 - Check that `.env` does NOT have `VITE_WORKER_API=http://localhost:8787`
 - Rebuild frontend: `npm run build && npx wrangler deploy`
 
+**Migration Wizard Notes:**
+- DEFAULT values (e.g., `datetime('now')`) are not preserved during migration
+- Column structure, types, constraints, and all data are migrated correctly
+- This is intentional to avoid SQL syntax issues with complex default expressions
+
 For more help, see [Cloudflare Workers Troubleshooting](https://developers.cloudflare.com/workers/troubleshooting/).
 
 ---
