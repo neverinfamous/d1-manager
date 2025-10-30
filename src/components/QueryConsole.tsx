@@ -157,13 +157,7 @@ export function QueryConsole({ databaseId, databaseName }: QueryConsoleProps) {
   };
 
   const handleExportCSV = () => {
-    console.log('[QueryConsole] Export CSV clicked');
-    console.log('[QueryConsole] Result:', result);
-    
-    if (!result || result.rows.length === 0) {
-      console.log('[QueryConsole] No results to export');
-      return;
-    }
+    if (!result || result.rows.length === 0) return;
 
     try {
       // Create CSV content
@@ -189,16 +183,12 @@ export function QueryConsole({ databaseId, databaseName }: QueryConsoleProps) {
 
       // Create blob and download
       const csvContent = csvRows.join('\n');
-      console.log('[QueryConsole] CSV content length:', csvContent.length);
-      
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       const url = URL.createObjectURL(blob);
       
       link.href = url;
       link.download = `query_results_${Date.now()}.csv`;
-      
-      console.log('[QueryConsole] Triggering download:', link.download);
       
       document.body.appendChild(link);
       link.click();
@@ -207,10 +197,9 @@ export function QueryConsole({ databaseId, databaseName }: QueryConsoleProps) {
       setTimeout(() => {
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
-        console.log('[QueryConsole] Download cleanup complete');
       }, 100);
     } catch (err) {
-      console.error('[QueryConsole] Export CSV error:', err);
+      console.error('[QueryConsole] Export CSV failed:', err);
       alert('Failed to export CSV: ' + (err instanceof Error ? err.message : 'Unknown error'));
     }
   };
@@ -261,11 +250,14 @@ export function QueryConsole({ databaseId, databaseName }: QueryConsoleProps) {
         </CardHeader>
         <CardContent>
           <textarea
+            id="sql-query-input"
+            name="sql-query"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Enter your SQL query here..."
             className="w-full h-48 p-4 font-mono text-sm bg-muted rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+            aria-label="SQL Query Input"
           />
           <p className="text-xs text-muted-foreground mt-2">
             Press Ctrl+Enter (Cmd+Enter on Mac) to execute
@@ -294,27 +286,8 @@ export function QueryConsole({ databaseId, databaseName }: QueryConsoleProps) {
                 <span className="text-xs text-muted-foreground">
                   Executed in {result.executionTime.toFixed(2)}ms
                 </span>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => {
-                    console.log('[QueryConsole] TEST BUTTON CLICKED!');
-                    alert('Test button works!');
-                  }}
-                >
-                  Test
-                </Button>
                 {result.rows.length > 0 && (
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={(e) => {
-                      console.log('[QueryConsole] Export CSV Button clicked event:', e);
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleExportCSV();
-                    }}
-                  >
+                  <Button variant="outline" size="sm" onClick={handleExportCSV}>
                     <Download className="h-4 w-4 mr-2" />
                     Export CSV
                   </Button>

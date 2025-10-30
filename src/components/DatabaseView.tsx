@@ -119,10 +119,13 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable }
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
+            id="table-search"
+            name="table-search"
             placeholder="Search tables..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10"
+            aria-label="Search tables"
           />
         </div>
         <div className="text-sm text-muted-foreground">

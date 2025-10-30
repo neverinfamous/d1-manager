@@ -52,10 +52,7 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
   };
 
   const handleExportCSV = () => {
-    console.log('[TableView] Export CSV clicked');
-    
     if (data.length === 0) {
-      console.log('[TableView] No data to export');
       alert('No data to export');
       return;
     }
@@ -88,16 +85,12 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
 
       // Create blob and download
       const csvContent = csvRows.join('\n');
-      console.log('[TableView] CSV content length:', csvContent.length);
-      
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       const url = URL.createObjectURL(blob);
       
       link.href = url;
       link.download = `${tableName}_${Date.now()}.csv`;
-      
-      console.log('[TableView] Triggering download:', link.download);
       
       document.body.appendChild(link);
       link.click();
@@ -106,10 +99,9 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
       setTimeout(() => {
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
-        console.log('[TableView] Download cleanup complete');
       }, 100);
     } catch (err) {
-      console.error('[TableView] Export CSV error:', err);
+      console.error('[TableView] Export CSV failed:', err);
       alert('Failed to export CSV: ' + (err instanceof Error ? err.message : 'Unknown error'));
     }
   };
