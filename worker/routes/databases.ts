@@ -15,6 +15,14 @@ export async function handleDatabaseRoutes(
     'X-Auth-Key': env.API_KEY,
     'Content-Type': 'application/json'
   };
+  
+  console.log('[Databases] Auth check:', {
+    hasEmail: !!env.CF_EMAIL,
+    hasApiKey: !!env.API_KEY,
+    emailLength: env.CF_EMAIL?.length,
+    apiKeyLength: env.API_KEY?.length,
+    accountId: env.ACCOUNT_ID
+  });
 
   try {
     // List databases
