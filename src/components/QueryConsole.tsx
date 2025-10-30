@@ -1,8 +1,18 @@
 import { useState } from 'react';
-import { Play, Loader2, Download, History, Save } from 'lucide-react';
+import { Play, Loader2, Download, History, Save, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { executeQuery } from '@/services/api';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { executeQuery, getSavedQueries, createSavedQuery, deleteSavedQuery, type SavedQuery } from '@/services/api';
 
 interface QueryConsoleProps {
   databaseId: string;
@@ -21,6 +31,13 @@ export function QueryConsole({ databaseId, databaseName }: QueryConsoleProps) {
   const [result, setResult] = useState<QueryResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [executing, setExecuting] = useState(false);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [showSavedQueries, setShowSavedQueries] = useState(false);
+  const [queryName, setQueryName] = useState('');
+  const [queryDescription, setQueryDescription] = useState('');
+  const [savedQueries, setSavedQueries] = useState<SavedQuery[]>([]);
+  const [savingQuery, setSavingQuery] = useState(false);
+  const [loadingQueries, setLoadingQueries] = useState(false);
 
   const handleExecute = async () => {
     if (!query.trim()) {
@@ -83,6 +100,99 @@ export function QueryConsole({ databaseId, databaseName }: QueryConsoleProps) {
     }
   };
 
+  const loadSavedQueries = async () => {
+    setLoadingQueries(true);
+    try {
+      const queries = await getSavedQueries(databaseId);
+      setSavedQueries(queries);
+    } catch (err) {
+      console.error('[QueryConsole] Failed to load saved queries:', err);
+      setError('Failed to load saved queries');
+    } finally {
+      setLoadingQueries(false);
+    }
+  };
+
+  const handleSaveQuery = async () => {
+    if (!queryName.trim() || !query.trim()) return;
+
+    setSavingQuery(true);
+    setError(null);
+    try {
+      await createSavedQuery(
+        queryName.trim(),
+        query,
+        queryDescription.trim() || undefined,
+        databaseId
+      );
+      
+      setQueryName('');
+      setQueryDescription('');
+      setShowSaveDialog(false);
+      alert('Query saved successfully!');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save query');
+    } finally {
+      setSavingQuery(false);
+    }
+  };
+
+  const handleShowSavedQueries = async () => {
+    await loadSavedQueries();
+    setShowSavedQueries(true);
+  };
+
+  const handleLoadSavedQuery = (savedQuery: SavedQuery) => {
+    setQuery(savedQuery.query);
+    setShowSavedQueries(false);
+  };
+
+  const handleDeleteSavedQuery = async (id: number) => {
+    try {
+      await deleteSavedQuery(id);
+      await loadSavedQueries();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete query');
+    }
+  };
+
+  const handleExportCSV = () => {
+    if (!result || result.rows.length === 0) return;
+
+    // Create CSV content
+    const csvRows = [];
+    
+    // Add headers
+    csvRows.push(result.columns.map(col => `"${col}"`).join(','));
+    
+    // Add data rows
+    for (const row of result.rows) {
+      const values = row.map(cell => {
+        if (cell === null) return 'NULL';
+        if (cell === undefined) return '';
+        const str = String(cell);
+        // Escape quotes and wrap in quotes if contains comma, quote, or newline
+        if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+          return `"${str.replace(/"/g, '""')}"`;
+        }
+        return str;
+      });
+      csvRows.push(values.join(','));
+    }
+
+    // Create blob and download
+    const csvContent = csvRows.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `query_results_${Date.now()}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -92,11 +202,11 @@ export function QueryConsole({ databaseId, databaseName }: QueryConsoleProps) {
           <p className="text-sm text-muted-foreground">{databaseName}</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" onClick={handleShowSavedQueries}>
             <History className="h-4 w-4 mr-2" />
-            History
+            Saved Queries
           </Button>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" onClick={() => setShowSaveDialog(true)}>
             <Save className="h-4 w-4 mr-2" />
             Save Query
           </Button>
@@ -163,7 +273,7 @@ export function QueryConsole({ databaseId, databaseName }: QueryConsoleProps) {
                   Executed in {result.executionTime.toFixed(2)}ms
                 </span>
                 {result.rows.length > 0 && (
-                  <Button variant="outline" size="sm">
+                  <Button variant="outline" size="sm" onClick={handleExportCSV}>
                     <Download className="h-4 w-4 mr-2" />
                     Export CSV
                   </Button>
@@ -221,6 +331,110 @@ export function QueryConsole({ databaseId, databaseName }: QueryConsoleProps) {
           </CardContent>
         </Card>
       )}
+
+      {/* Save Query Dialog */}
+      <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Save Query</DialogTitle>
+            <DialogDescription>Give your query a name to save it for later use.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="query-name">Query Name</Label>
+              <Input
+                id="query-name"
+                placeholder="My saved query"
+                value={queryName}
+                onChange={(e) => setQueryName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="query-description">Description (Optional)</Label>
+              <Input
+                id="query-description"
+                placeholder="What does this query do?"
+                value={queryDescription}
+                onChange={(e) => setQueryDescription(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSaveDialog(false)} disabled={savingQuery}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveQuery} disabled={!queryName.trim() || savingQuery}>
+              {savingQuery ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Save'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Saved Queries Dialog */}
+      <Dialog open={showSavedQueries} onOpenChange={setShowSavedQueries}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Saved Queries</DialogTitle>
+            <DialogDescription>
+              {savedQueries.length} saved {savedQueries.length === 1 ? 'query' : 'queries'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 max-h-96 overflow-y-auto">
+            {loadingQueries ? (
+              <div className="text-center py-8">
+                <Loader2 className="w-8 h-8 animate-spin mx-auto text-muted-foreground" />
+                <p className="text-sm text-muted-foreground mt-2">Loading saved queries...</p>
+              </div>
+            ) : savedQueries.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">No saved queries yet</p>
+            ) : (
+              savedQueries.map(savedQuery => (
+                <Card key={savedQuery.id} className="bg-muted/50">
+                  <CardContent className="pt-4">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <h4 className="font-semibold">{savedQuery.name}</h4>
+                        {savedQuery.description && (
+                          <p className="text-sm text-muted-foreground mt-1">{savedQuery.description}</p>
+                        )}
+                        <pre className="text-xs font-mono mt-2 p-2 bg-background rounded overflow-x-auto">
+                          {savedQuery.query}
+                        </pre>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Saved {new Date(savedQuery.created_at).toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="flex gap-2 ml-4">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleLoadSavedQuery(savedQuery)}
+                        >
+                          Load
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteSavedQuery(savedQuery.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
