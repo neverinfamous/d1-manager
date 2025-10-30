@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Table, RefreshCw, Plus, Search, Loader2 } from 'lucide-react';
+import { ArrowLeft, Table, RefreshCw, Plus, Search, Loader2, Wand2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { listTables, executeQuery, type TableInfo } from '@/services/api';
 import { SchemaDesigner } from './SchemaDesigner';
+import { QueryBuilder } from './QueryBuilder';
 
 interface DatabaseViewProps {
   databaseId: string;
@@ -19,6 +20,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable }
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSchemaDesigner, setShowSchemaDesigner] = useState(false);
+  const [activeTab, setActiveTab] = useState<'tables' | 'builder'>('tables');
 
   useEffect(() => {
     loadTables();
@@ -74,17 +76,44 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable }
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={loadTables}>
-            <RefreshCw className="h-4 w-4" />
-          </Button>
-          <Button onClick={() => setShowSchemaDesigner(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Create Table
-          </Button>
+          <div className="flex gap-1 mr-4">
+            <Button
+              variant={activeTab === 'tables' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setActiveTab('tables')}
+            >
+              <Table className="h-4 w-4 mr-2" />
+              Tables
+            </Button>
+            <Button
+              variant={activeTab === 'builder' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setActiveTab('builder')}
+            >
+              <Wand2 className="h-4 w-4 mr-2" />
+              Query Builder
+            </Button>
+          </div>
+          {activeTab === 'tables' && (
+            <>
+              <Button variant="outline" size="icon" onClick={loadTables}>
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+              <Button onClick={() => setShowSchemaDesigner(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Create Table
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
-      {/* Search Bar */}
+      {/* Content based on active tab */}
+      {activeTab === 'builder' ? (
+        <QueryBuilder databaseId={databaseId} databaseName={databaseName} />
+      ) : (
+        <>
+          {/* Search Bar */}
       <div className="flex items-center gap-4">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -181,6 +210,8 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable }
               ))}
             </div>
           )}
+        </>
+      )}
         </>
       )}
 
