@@ -43,8 +43,17 @@ async function handleApiRequest(request: Request, env: Env): Promise<Response> {
     }
   }
 
-  // Detect if we're in local development without credentials
+  // Only use mock data if in local development AND missing credentials
   const isLocalDev = isLocalhost && (!env.ACCOUNT_ID || !env.CF_EMAIL || !env.API_KEY);
+  
+  console.log('[Environment]', {
+    isLocalhost,
+    hasAccountId: !!env.ACCOUNT_ID,
+    hasCfEmail: !!env.CF_EMAIL,
+    hasApiKey: !!env.API_KEY,
+    isLocalDev,
+    hostname: url.hostname
+  });
 
   // Route API requests
   if (url.pathname.startsWith('/api/databases')) {
