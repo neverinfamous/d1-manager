@@ -97,7 +97,7 @@ export function MigrationWizard({ databases }: MigrationWizardProps) {
           // Drop if requested
           if (dropExisting) {
             try {
-              await executeQuery(targetDb, `DROP TABLE IF EXISTS ${table};`);
+              await executeQuery(targetDb, `DROP TABLE IF EXISTS ${table};`, undefined, true);
             } catch {
               console.warn(`Table ${table} doesn't exist in target, skipping drop`);
             }
@@ -112,7 +112,7 @@ export function MigrationWizard({ databases }: MigrationWizardProps) {
             return def;
           }).join(', ');
 
-          await executeQuery(targetDb, `CREATE TABLE IF NOT EXISTS ${table} (${columns});`);
+          await executeQuery(targetDb, `CREATE TABLE IF NOT EXISTS ${table} (${columns});`, undefined, true);
         }
 
         // Copy data
@@ -136,10 +136,12 @@ export function MigrationWizard({ databases }: MigrationWizardProps) {
                 return `'${strVal}'`;
               }).join(', ');
 
-              // Execute INSERT statement
+              // Execute INSERT statement (skip validation for migration)
               await executeQuery(
                 targetDb,
-                `INSERT INTO ${table} (${cols.join(', ')}) VALUES (${values});`
+                `INSERT INTO ${table} (${cols.join(', ')}) VALUES (${values});`,
+                undefined,
+                true
               );
             }
           }
