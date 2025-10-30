@@ -44,12 +44,11 @@ async function handleApiRequest(request: Request, env: Env): Promise<Response> {
   }
 
   // Only use mock data if in local development AND missing credentials
-  const isLocalDev = isLocalhost && (!env.ACCOUNT_ID || !env.CF_EMAIL || !env.API_KEY);
+  const isLocalDev = isLocalhost && (!env.ACCOUNT_ID || !env.API_KEY);
   
   console.log('[Environment]', {
     isLocalhost,
     hasAccountId: !!env.ACCOUNT_ID,
-    hasCfEmail: !!env.CF_EMAIL,
     hasApiKey: !!env.API_KEY,
     isLocalDev,
     hostname: url.hostname

@@ -16,9 +16,7 @@ export async function handleDatabaseRoutes(
   };
   
   console.log('[Databases] Auth check:', {
-    hasEmail: !!env.CF_EMAIL,
     hasApiKey: !!env.API_KEY,
-    emailLength: env.CF_EMAIL?.length,
     apiKeyLength: env.API_KEY?.length,
     accountId: env.ACCOUNT_ID
   });
@@ -60,9 +58,7 @@ export async function handleDatabaseRoutes(
       }
       
       console.log('[Databases] Making API request to:', `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database`);
-      console.log('[Databases] API Key check - first 10 chars:', env.API_KEY?.substring(0, 10));
-      console.log('[Databases] API Key check - last 5 chars:', env.API_KEY?.substring(env.API_KEY.length - 5));
-      console.log('[Databases] Email:', env.CF_EMAIL);
+      console.log('[Databases] Using Bearer token authentication');
       
       const response = await fetch(
         `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database`,
