@@ -11,8 +11,7 @@ export async function handleDatabaseRoutes(
   console.log('[Databases] Handling database operation');
   
   const cfHeaders = {
-    'X-Auth-Email': env.CF_EMAIL,
-    'X-Auth-Key': env.API_KEY,
+    'Authorization': `Bearer ${env.API_KEY}`,
     'Content-Type': 'application/json'
   };
   
