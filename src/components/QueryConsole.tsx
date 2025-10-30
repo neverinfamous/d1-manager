@@ -294,12 +294,24 @@ export function QueryConsole({ databaseId, databaseName }: QueryConsoleProps) {
                 <span className="text-xs text-muted-foreground">
                   Executed in {result.executionTime.toFixed(2)}ms
                 </span>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => {
+                    console.log('[QueryConsole] TEST BUTTON CLICKED!');
+                    alert('Test button works!');
+                  }}
+                >
+                  Test
+                </Button>
                 {result.rows.length > 0 && (
                   <Button 
                     variant="outline" 
                     size="sm" 
                     onClick={(e) => {
-                      console.log('[QueryConsole] Button clicked event:', e);
+                      console.log('[QueryConsole] Export CSV Button clicked event:', e);
+                      e.preventDefault();
+                      e.stopPropagation();
                       handleExportCSV();
                     }}
                   >
