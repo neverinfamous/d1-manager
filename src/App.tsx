@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { api, type D1Database } from './services/api'
 import { auth } from './services/auth'
 import { useTheme } from './hooks/useTheme'
-import { Database, Plus, Moon, Sun, Monitor, Loader2, Code } from 'lucide-react'
+import { Database, Plus, Moon, Sun, Monitor, Loader2, Code, GitCompare } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -25,6 +25,7 @@ import { DatabaseView } from './components/DatabaseView'
 import { TableView } from './components/TableView'
 import { QueryConsole } from './components/QueryConsole'
 import { CrossDatabaseSearch } from './components/CrossDatabaseSearch'
+import { DatabaseComparison } from './components/DatabaseComparison'
 
 type View = 
   | { type: 'list' }
@@ -40,6 +41,7 @@ export default function App() {
   const [newDbName, setNewDbName] = useState('')
   const [creating, setCreating] = useState(false)
   const [currentView, setCurrentView] = useState<View>({ type: 'list' })
+  const [showComparison, setShowComparison] = useState(false)
   const { theme, setTheme } = useTheme()
 
   // Load databases on mount
@@ -177,6 +179,38 @@ export default function App() {
           {/* Cross-Database Search */}
           {databases.length > 0 && (
             <CrossDatabaseSearch databases={databases} />
+          )}
+
+          {/* Database Comparison */}
+          {databases.length >= 2 && !showComparison && (
+            <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setShowComparison(true)}>
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <GitCompare className="h-5 w-5" />
+                  <CardTitle>Compare Databases</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">
+                  Compare schemas between databases to identify differences
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {showComparison && databases.length >= 2 && (
+            <Card>
+              <CardContent className="pt-6">
+                <DatabaseComparison databases={databases} />
+                <Button
+                  variant="outline"
+                  className="mt-4"
+                  onClick={() => setShowComparison(false)}
+                >
+                  Close Comparison
+                </Button>
+              </CardContent>
+            </Card>
           )}
 
           {/* Error Message */}
