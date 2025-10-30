@@ -60,10 +60,17 @@ export async function handleDatabaseRoutes(
         });
       }
       
+      console.log('[Databases] Making API request to:', `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database`);
+      console.log('[Databases] API Key check - first 10 chars:', env.API_KEY?.substring(0, 10));
+      console.log('[Databases] API Key check - last 5 chars:', env.API_KEY?.substring(env.API_KEY.length - 5));
+      console.log('[Databases] Email:', env.CF_EMAIL);
+      
       const response = await fetch(
         `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database`,
         { headers: cfHeaders }
       );
+      
+      console.log('[Databases] Response status:', response.status);
       
       if (!response.ok) {
         const errorText = await response.text();
