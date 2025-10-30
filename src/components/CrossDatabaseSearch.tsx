@@ -36,8 +36,9 @@ export function CrossDatabaseSearch({ databases }: CrossDatabaseSearchProps) {
       setError(null);
       const searchResults: SearchResult[] = [];
 
-      // Search across all databases in parallel
-      const searchPromises = databases.map(async (db) => {
+      // Search across all databases sequentially to avoid overwhelming Cloudflare Access
+      // Parallel requests can cause authentication issues with Cloudflare Access
+      for (const db of databases) {
         try {
           // Get all tables in the database
           const tables = await api.listTables(db.uuid);
@@ -94,9 +95,8 @@ export function CrossDatabaseSearch({ databases }: CrossDatabaseSearchProps) {
         } catch (dbError) {
           console.error(`Error searching database ${db.name}:`, dbError);
         }
-      });
+      }
 
-      await Promise.all(searchPromises);
       setResults(searchResults);
       
       if (searchResults.length === 0) {
