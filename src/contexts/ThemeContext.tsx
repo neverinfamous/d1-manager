@@ -50,8 +50,16 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 
   // Apply theme to document
   useEffect(() => {
-    // Apply data-theme attribute to document root
-    document.documentElement.setAttribute('data-theme', resolvedTheme)
+    const root = document.documentElement
+    
+    // Remove existing theme classes
+    root.classList.remove('light', 'dark')
+    
+    // Add the resolved theme class
+    root.classList.add(resolvedTheme)
+    
+    // Also set data-theme for potential CSS usage
+    root.setAttribute('data-theme', resolvedTheme)
     
     // Update meta theme-color for mobile browsers
     const metaThemeColor = document.querySelector('meta[name="theme-color"]')

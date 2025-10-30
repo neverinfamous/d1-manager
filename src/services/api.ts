@@ -274,3 +274,11 @@ class APIService {
 
 export const api = new APIService()
 
+// Export individual methods for convenience
+export const listTables = (databaseId: string) => api.listTables(databaseId)
+export const getTableSchema = (databaseId: string, tableName: string) => api.getTableSchema(databaseId, tableName)
+export const getTableData = <T = Record<string, unknown>>(databaseId: string, tableName: string, limit?: number, offset?: number) => 
+  api.getTableData<T>(databaseId, tableName, limit, offset)
+export const executeQuery = <T = Record<string, unknown>>(databaseId: string, query: string) => 
+  api.executeQuery<T>(databaseId, query)
+
