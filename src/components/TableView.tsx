@@ -2,7 +2,17 @@ import { useState, useEffect } from 'react';
 import { ArrowLeft, RefreshCw, Download, Trash2, Edit, Plus, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { getTableSchema, getTableData, type ColumnInfo } from '@/services/api';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { getTableSchema, getTableData, executeQuery, type ColumnInfo } from '@/services/api';
 
 interface TableViewProps {
   databaseId: string;
@@ -18,6 +28,9 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const rowsPerPage = 50;
+  const [showInsertDialog, setShowInsertDialog] = useState(false);
+  const [insertValues, setInsertValues] = useState<Record<string, string>>({});
+  const [inserting, setInserting] = useState(false);
 
   useEffect(() => {
     loadTableData();
@@ -49,6 +62,47 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
     if (value === undefined) return '';
     if (typeof value === 'object') return JSON.stringify(value);
     return String(value);
+  };
+
+  const handleOpenInsertDialog = () => {
+    // Initialize insert values with empty strings for all columns
+    const initialValues: Record<string, string> = {};
+    schema.forEach(col => {
+      initialValues[col.name] = '';
+    });
+    setInsertValues(initialValues);
+    setShowInsertDialog(true);
+  };
+
+  const handleInsertRow = async () => {
+    setInserting(true);
+    setError(null);
+    
+    try {
+      // Build INSERT query
+      const columns = schema.filter(col => col.pk === 0 || insertValues[col.name]); // Skip auto-increment PKs if empty
+      const columnNames = columns.map(col => col.name);
+      const values = columns.map(col => {
+        const value = insertValues[col.name];
+        if (value === '' || value === null) return 'NULL';
+        // Try to determine if it's a number
+        if (!isNaN(Number(value)) && value.trim() !== '') return value;
+        // Otherwise treat as string
+        return `'${value.replace(/'/g, "''")}'`; // Escape single quotes
+      });
+      
+      const query = `INSERT INTO "${tableName}" (${columnNames.map(n => `"${n}"`).join(', ')}) VALUES (${values.join(', ')})`;
+      
+      await executeQuery(databaseId, query, [], true); // Skip validation for INSERT
+      
+      setShowInsertDialog(false);
+      setInsertValues({});
+      await loadTableData(); // Reload data
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to insert row');
+    } finally {
+      setInserting(false);
+    }
   };
 
   const handleExportCSV = () => {
@@ -129,7 +183,7 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
             <Download className="h-4 w-4 mr-2" />
             Export CSV
           </Button>
-          <Button>
+          <Button onClick={handleOpenInsertDialog}>
             <Plus className="h-4 w-4 mr-2" />
             Insert Row
           </Button>
@@ -191,7 +245,7 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
             {data.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12">
                 <p className="text-sm text-muted-foreground mb-4">No rows in this table</p>
-                <Button>
+                <Button onClick={handleOpenInsertDialog}>
                   <Plus className="h-4 w-4 mr-2" />
                   Insert First Row
                 </Button>
@@ -281,6 +335,60 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
           </div>
         </div>
       )}
+
+      {/* Insert Row Dialog */}
+      <Dialog open={showInsertDialog} onOpenChange={setShowInsertDialog}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Insert Row into {tableName}</DialogTitle>
+            <DialogDescription>
+              Fill in the values for the new row. Leave fields empty for NULL values.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            {schema.map((col) => (
+              <div key={col.name} className="space-y-2">
+                <Label htmlFor={`insert-${col.name}`}>
+                  {col.name}
+                  {col.pk > 0 && <span className="text-xs text-muted-foreground ml-2">(Primary Key)</span>}
+                  {col.notnull && !col.pk ? <span className="text-destructive ml-1">*</span> : null}
+                </Label>
+                <div className="flex gap-2 items-center">
+                  <Input
+                    id={`insert-${col.name}`}
+                    name={`insert-${col.name}`}
+                    placeholder={col.dflt_value || (col.pk > 0 ? 'Auto-increment' : 'NULL')}
+                    value={insertValues[col.name] || ''}
+                    onChange={(e) => setInsertValues({...insertValues, [col.name]: e.target.value})}
+                    disabled={col.pk > 0 && col.type.includes('INTEGER')} // Disable auto-increment PKs
+                  />
+                  <span className="text-xs text-muted-foreground min-w-[60px]">
+                    {col.type}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+          {error && (
+            <p className="text-sm text-destructive">{error}</p>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowInsertDialog(false)} disabled={inserting}>
+              Cancel
+            </Button>
+            <Button onClick={handleInsertRow} disabled={inserting}>
+              {inserting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Inserting...
+                </>
+              ) : (
+                'Insert Row'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
