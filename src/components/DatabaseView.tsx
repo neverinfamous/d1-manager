@@ -24,6 +24,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable }
 
   useEffect(() => {
     loadTables();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [databaseId]);
 
   const loadTables = async () => {
@@ -43,7 +44,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable }
     table.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleCreateTable = async (tableName: string, columns: any[]) => {
+  const handleCreateTable = async (tableName: string, columns: Array<{ name: string; type: string; primaryKey: boolean; notNull: boolean; defaultValue: string }>) => {
     // Generate CREATE TABLE SQL
     const columnDefs = columns.map(col => {
       let def = `${col.name} ${col.type}`;

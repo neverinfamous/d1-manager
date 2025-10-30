@@ -27,7 +27,7 @@ export function MigrationWizard({ databases }: MigrationWizardProps) {
   const [copyData, setCopyData] = useState(true);
   const [dropExisting, setDropExisting] = useState(false);
   const [tasks, setTasks] = useState<MigrationTask[]>([]);
-  const [migrating, setMigrating] = useState(false);
+  const [_migrating, setMigrating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSourceChange = async (dbId: string) => {
@@ -40,7 +40,7 @@ export function MigrationWizard({ databases }: MigrationWizardProps) {
         const tables = await listTables(dbId);
         const tableNames = tables.filter(t => t.type === 'table').map(t => t.name);
         setAvailableTables(tableNames);
-      } catch (err) {
+      } catch (_err) {
         setError('Failed to load tables from source database');
       }
     } else {
@@ -98,7 +98,7 @@ export function MigrationWizard({ databases }: MigrationWizardProps) {
           if (dropExisting) {
             try {
               await executeQuery(targetDb, `DROP TABLE IF EXISTS ${table};`);
-            } catch (err) {
+            } catch (_err) {
               console.warn(`Table ${table} doesn't exist in target, skipping drop`);
             }
           }
@@ -117,7 +117,8 @@ export function MigrationWizard({ databases }: MigrationWizardProps) {
 
         // Copy data
         if (copyData) {
-          const data = await getTableData(sourceDb, table, 1000); // Limit for safety
+          const dataResult = await getTableData(sourceDb, table, 1000); // Limit for safety
+          const data = dataResult.results || [];
           
           if (data.length > 0) {
             // Get column names
@@ -190,19 +191,23 @@ export function MigrationWizard({ databases }: MigrationWizardProps) {
       <Card>
         <CardContent className="pt-6">
           <div className="flex items-center justify-between">
-            {['Select', 'Configure', 'Preview', 'Migrate', 'Complete'].map((label, idx) => (
+            {(['Select', 'Configure', 'Preview', 'Migrate', 'Complete'] as const).map((label, idx) => {
+              const steps: MigrationStep[] = ['select', 'configure', 'preview', 'migrate', 'complete'];
+              const currentStepStatus = getStepStatus(steps[idx]);
+              
+              return (
               <div key={label} className="flex items-center">
                 <div className="flex flex-col items-center">
                   <div
                     className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${
-                      getStepStatus(['select', 'configure', 'preview', 'migrate', 'complete'][idx]) === 'completed'
+                      currentStepStatus === 'completed'
                         ? 'bg-primary border-primary text-primary-foreground'
-                        : getStepStatus(['select', 'configure', 'preview', 'migrate', 'complete'][idx]) === 'active'
+                        : currentStepStatus === 'active'
                         ? 'border-primary text-primary'
                         : 'border-muted text-muted-foreground'
                     }`}
                   >
-                    {getStepStatus(['select', 'configure', 'preview', 'migrate', 'complete'][idx]) === 'completed' ? (
+                    {currentStepStatus === 'completed' ? (
                       <CheckCircle className="h-5 w-5" />
                     ) : (
                       <span>{idx + 1}</span>
@@ -213,14 +218,14 @@ export function MigrationWizard({ databases }: MigrationWizardProps) {
                 {idx < 4 && (
                   <div
                     className={`w-12 h-0.5 mx-2 ${
-                      getStepStatus(['select', 'configure', 'preview', 'migrate', 'complete'][idx]) === 'completed'
+                      currentStepStatus === 'completed'
                         ? 'bg-primary'
                         : 'bg-muted'
                     }`}
                   />
                 )}
               </div>
-            ))}
+            )})}
           </div>
         </CardContent>
       </Card>

@@ -65,7 +65,7 @@ export function SchemaDesigner({ open, onOpenChange, onCreateTable }: SchemaDesi
     setError('');
   };
 
-  const updateColumn = (id: string, field: keyof Column, value: any) => {
+  const updateColumn = (id: string, field: keyof Column, value: string | boolean) => {
     setColumns(columns.map(col => 
       col.id === id ? { ...col, [field]: value } : col
     ));
@@ -178,7 +178,7 @@ export function SchemaDesigner({ open, onOpenChange, onCreateTable }: SchemaDesi
             </div>
 
             <div className="space-y-3">
-              {columns.map((column, index) => (
+              {columns.map((column) => (
                 <Card key={column.id} className="bg-muted/50">
                   <CardContent className="pt-4">
                     <div className="grid grid-cols-12 gap-3 items-start">

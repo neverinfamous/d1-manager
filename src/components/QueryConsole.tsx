@@ -11,7 +11,7 @@ interface QueryConsoleProps {
 
 interface QueryResult {
   columns: string[];
-  rows: any[][];
+  rows: unknown[][];
   rowsAffected?: number;
   executionTime: number;
 }
@@ -38,21 +38,24 @@ export function QueryConsole({ databaseId, databaseName }: QueryConsoleProps) {
 
       if (response.results && response.results.length > 0) {
         const firstResult = response.results[0];
+        const resultsArray = firstResult.results as Record<string, unknown>[] | undefined;
         
         // Extract columns from first row or meta
-        const columns = firstResult.results && firstResult.results.length > 0
-          ? Object.keys(firstResult.results[0])
+        const columns = resultsArray && resultsArray.length > 0
+          ? Object.keys(resultsArray[0])
           : [];
         
         // Convert results to rows array
-        const rows = firstResult.results?.map((row: any) =>
+        const rows = resultsArray?.map((row: Record<string, unknown>) =>
           columns.map(col => row[col])
         ) || [];
+        
+        const meta = firstResult.meta as { rows_written?: number; rows_read?: number } | undefined;
 
         setResult({
           columns,
           rows,
-          rowsAffected: firstResult.meta?.rows_written || firstResult.meta?.rows_read,
+          rowsAffected: meta?.rows_written || meta?.rows_read,
           executionTime: endTime - startTime
         });
       } else {
@@ -70,7 +73,7 @@ export function QueryConsole({ databaseId, databaseName }: QueryConsoleProps) {
     }
   };
 
-  const formatValue = (value: any): string => {
+  const formatValue = (value: unknown): string => {
     if (value === null) return 'NULL';
     if (value === undefined) return '';
     if (typeof value === 'object') return JSON.stringify(value);

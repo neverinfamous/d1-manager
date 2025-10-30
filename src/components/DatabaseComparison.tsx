@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { GitCompare, Loader2, ChevronDown, ChevronRight, Plus, Minus, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { listTables, getTableSchema, type TableInfo, type ColumnInfo } from '@/services/api';
+import { listTables, getTableSchema, type ColumnInfo } from '@/services/api';
 
 interface DatabaseComparisonProps {
   databases: Array<{ uuid: string; name: string }>;

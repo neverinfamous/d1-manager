@@ -13,7 +13,7 @@ interface TableViewProps {
 
 export function TableView({ databaseId, databaseName, tableName, onBack }: TableViewProps) {
   const [schema, setSchema] = useState<ColumnInfo[]>([]);
-  const [data, setData] = useState<any[]>([]);
+  const [data, setData] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
@@ -21,6 +21,7 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
 
   useEffect(() => {
     loadTableData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [databaseId, tableName, page]);
 
   const loadTableData = async () => {
@@ -35,7 +36,7 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
       ]);
       
       setSchema(schemaResult);
-      setData(dataResult);
+      setData(dataResult.results || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load table data');
     } finally {
@@ -43,7 +44,7 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
     }
   };
 
-  const formatValue = (value: any): string => {
+  const formatValue = (value: unknown): string => {
     if (value === null) return 'NULL';
     if (value === undefined) return '';
     if (typeof value === 'object') return JSON.stringify(value);

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, X, Database, Table, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Search, Database, Table, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -10,8 +10,8 @@ interface SearchResult {
   databaseName: string;
   tableName: string;
   columnName: string;
-  value: any;
-  rowData: Record<string, any>;
+  value: unknown;
+  rowData: Record<string, unknown>;
 }
 
 interface CrossDatabaseSearchProps {
@@ -68,10 +68,10 @@ export function CrossDatabaseSearch({ databases }: CrossDatabaseSearchProps) {
               const response = await api.executeQuery(db.uuid, sql);
               
               if (response.results && response.results[0]?.results) {
-                const rows = response.results[0].results;
+                const rows = response.results[0].results as Record<string, unknown>[];
                 
                 // Process results
-                rows.forEach((row: any) => {
+                rows.forEach((row: Record<string, unknown>) => {
                   textColumns.forEach(col => {
                     const value = row[col.name];
                     if (value && String(value).toLowerCase().includes(searchQuery.toLowerCase())) {
@@ -116,7 +116,7 @@ export function CrossDatabaseSearch({ databases }: CrossDatabaseSearchProps) {
     setIsExpanded(false);
   };
 
-  const formatValue = (value: any): string => {
+  const formatValue = (value: unknown): string => {
     if (value === null) return 'NULL';
     if (value === undefined) return '';
     if (typeof value === 'object') return JSON.stringify(value);

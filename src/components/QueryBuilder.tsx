@@ -56,7 +56,7 @@ export function QueryBuilder({ databaseId, databaseName }: QueryBuilderProps) {
   const [orderDirection, setOrderDirection] = useState<'ASC' | 'DESC'>('ASC');
   const [limit, setLimit] = useState<string>('100');
   const [generatedSQL, setGeneratedSQL] = useState<string>('');
-  const [results, setResults] = useState<any[]>([]);
+  const [results, setResults] = useState<Record<string, unknown>[]>([]);
   const [resultColumns, setResultColumns] = useState<string[]>([]);
   const [executing, setExecuting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -68,16 +68,19 @@ export function QueryBuilder({ databaseId, databaseName }: QueryBuilderProps) {
   useEffect(() => {
     loadTables();
     loadSavedQueries();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [databaseId]);
 
   useEffect(() => {
     if (selectedTable) {
       loadTableSchema();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTable]);
 
   useEffect(() => {
     generateSQL();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTable, selectedColumns, conditions, orderBy, orderDirection, limit]);
 
   const loadTables = async () => {
@@ -174,7 +177,7 @@ export function QueryBuilder({ databaseId, databaseName }: QueryBuilderProps) {
       const response = await executeQuery(databaseId, generatedSQL);
 
       if (response.results && response.results[0]?.results) {
-        const rows = response.results[0].results;
+        const rows = response.results[0].results as Record<string, unknown>[];
         setResults(rows);
         if (rows.length > 0) {
           setResultColumns(Object.keys(rows[0]));
@@ -222,7 +225,7 @@ export function QueryBuilder({ databaseId, databaseName }: QueryBuilderProps) {
     localStorage.setItem(`d1-saved-queries-${databaseId}`, JSON.stringify(updated));
   };
 
-  const formatValue = (value: any): string => {
+  const formatValue = (value: unknown): string => {
     if (value === null) return 'NULL';
     if (value === undefined) return '';
     if (typeof value === 'object') return JSON.stringify(value);
