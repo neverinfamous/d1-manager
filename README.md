@@ -228,16 +228,111 @@ This project was built using the following Model Context Protocol (MCP) servers:
 
 ## 🚀 Production Deployment
 
-*(Coming Soon)*
+### Prerequisites
 
-To deploy to Cloudflare Workers:
+- [Cloudflare account](https://dash.cloudflare.com/sign-up)
+- [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/install-and-update/) installed
+- Domain managed by Cloudflare (optional - can use workers.dev subdomain)
 
-1. Configure `wrangler.toml` (see `wrangler.toml.example`)
-2. Set up Cloudflare Access with GitHub OAuth
-3. Create D1 databases and update bindings
-4. Deploy: `npm run build && npx wrangler deploy`
+### Setup Steps
 
-Full deployment guide coming in Phase 2.
+1. **Configure Wrangler:**
+   ```bash
+   cp wrangler.toml.example wrangler.toml
+   ```
+   Edit `wrangler.toml` with your settings:
+   - Update `name` to your Worker name
+   - Set `routes` for custom domains (or remove for workers.dev)
+   - Configure D1 database binding
+
+2. **Create D1 Database for Metadata:**
+   ```bash
+   npx wrangler login
+   npx wrangler d1 create d1-manager-metadata
+   ```
+   Copy the `database_id` into `wrangler.toml` under `[[d1_databases]]`
+
+3. **Initialize Database Schema:**
+   ```bash
+   npx wrangler d1 execute d1-manager-metadata --remote --file=worker/schema.sql
+   ```
+
+4. **Set Up Cloudflare Access (Zero Trust):**
+   - Navigate to [Cloudflare Zero Trust](https://one.dash.cloudflare.com/)
+   - Set up GitHub OAuth under **Settings → Authentication**
+   - Create a new Access Application for your domain(s)
+   - Configure policies (e.g., allow GitHub users from your org)
+   - Copy the **Application Audience (AUD) tag**
+
+5. **Create API Token:**
+   - Go to [Cloudflare API Tokens](https://dash.cloudflare.com/profile/api-tokens)
+   - Click **Create Token** → **Create Custom Token**
+   - Name it: `D1-Manager-Token`
+   - Permissions:
+     - **Account** → **D1** → **Edit**
+   - Click **Continue to summary** → **Create Token**
+   - Copy the token immediately (it won't be shown again)
+
+6. **Set Worker Secrets:**
+   ```bash
+   # Your Cloudflare Account ID (from dashboard URL)
+   npx wrangler secret put ACCOUNT_ID
+
+   # API Token with D1 Edit permissions (from step 5)
+   npx wrangler secret put API_KEY
+
+   # Cloudflare Access team domain (e.g., https://yourteam.cloudflareaccess.com)
+   npx wrangler secret put TEAM_DOMAIN
+
+   # Application Audience tag from Cloudflare Access (from step 4)
+   npx wrangler secret put POLICY_AUD
+   ```
+
+7. **Update Environment for Production:**
+   
+   Edit `.env` to comment out the local development API:
+   ```env
+   # VITE_WORKER_API=http://localhost:8787
+   # Uncomment the line above for local development only
+   # For production, leave it commented so it uses window.location.origin
+   ```
+
+8. **Build and Deploy:**
+   ```bash
+   npm run build
+   npx wrangler deploy
+   ```
+
+### Deployment Domains
+
+After deployment, your D1 Manager will be available at:
+- **Workers.dev:** `https://your-worker-name.your-account.workers.dev`
+- **Custom Domain:** `https://yourdomain.com` (if configured in `wrangler.toml`)
+
+### Verification
+
+1. Navigate to your deployed URL
+2. You should be redirected to GitHub OAuth login (via Cloudflare Access)
+3. After authentication, you'll see your production D1 databases
+
+### Troubleshooting
+
+**"Failed to list databases" Error:**
+- Verify all secrets are set correctly: `npx wrangler secret list`
+- Ensure API token has **D1 Edit** permissions (not just Read)
+- Check that `ACCOUNT_ID` matches your Cloudflare account
+- Use **API Token** (not Global API Key) for authentication
+
+**Authentication Loop:**
+- Verify `TEAM_DOMAIN` is correct (include `https://`)
+- Check `POLICY_AUD` matches your Access application
+- Ensure your GitHub account is allowed in Access policies
+
+**Mock Data in Production:**
+- Check that `.env` does NOT have `VITE_WORKER_API=http://localhost:8787`
+- Rebuild frontend: `npm run build && npx wrangler deploy`
+
+For more help, see [Cloudflare Workers Troubleshooting](https://developers.cloudflare.com/workers/troubleshooting/).
 
 ---
 
