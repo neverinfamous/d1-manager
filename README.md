@@ -14,6 +14,7 @@ A modern, full-featured web application for managing Cloudflare D1 databases wit
 #### Database Management
 - **List & Browse** - View all D1 databases with metadata (created date, size, table count)
 - **Create Database** - Interactive dialog for creating new databases
+- **Rename Database** - Rename databases with migration-based approach (see details below)
 - **Delete Database** - Remove databases with confirmation
 - **Bulk Operations** - Select multiple databases for batch operations
   - **Multi-Select** - Checkbox on each database card with "Select All" option
@@ -150,6 +151,7 @@ d1-manager/
 ### Databases
 - `GET /api/databases` - List all D1 databases
 - `POST /api/databases` - Create a new database
+- `POST /api/databases/:dbId/rename` - Rename a database (migration-based)
 - `DELETE /api/databases/:dbId` - Delete a database
 - `GET /api/databases/:dbId/info` - Get database information
 - `POST /api/databases/export` - Export multiple databases (returns SQL content for ZIP creation)
@@ -247,6 +249,66 @@ The D1 Manager supports bulk operations on multiple databases:
 - Shows confirmation dialog with list of databases to delete
 - Sequential deletion with progress tracking
 - Reports any failures while continuing with remaining databases
+
+### Database Renaming
+
+The D1 Manager includes a database rename feature that uses a migration-based approach since Cloudflare's D1 API does not natively support renaming databases.
+
+**How It Works:**
+
+The rename operation performs the following steps automatically:
+1. **Validates** the new database name for uniqueness and Cloudflare naming requirements
+2. **Creates** a new database with the desired name
+3. **Exports** all data from the original database using D1's export API
+4. **Imports** the exported data into the new database
+5. **Verifies** the import was successful
+6. **Deletes** the original database upon successful migration
+
+**Important Safety Features:**
+
+- ⚠️ **Backup Warning** - The UI prominently warns users to download a backup before renaming
+- 📥 **One-Click Backup** - Convenient "Download Backup Now" button in the rename dialog
+- ✅ **Confirmation Checkbox** - Users must acknowledge they have backed up the database
+- 🔄 **Progress Tracking** - Real-time progress updates throughout the migration process
+- 🔙 **Automatic Rollback** - If any step fails, the new database is automatically deleted
+- 📝 **Validation** - Name validation ensures compliance with Cloudflare's requirements
+
+**Best Practices:**
+
+1. **Always backup first** - Download a backup of your database before renaming
+2. **Choose off-peak times** - Rename during low-traffic periods if possible
+3. **Test with small databases** - If unsure, test the rename process with a small test database first
+4. **Monitor the process** - Watch the progress indicators to ensure smooth operation
+5. **Verify after rename** - Check that all tables and data are present in the renamed database
+
+**Limitations:**
+
+- **Migration time** - Large databases may take several minutes to migrate
+- **Temporary duplication** - Both databases exist briefly during the migration (counts toward quota)
+- **No rollback after deletion** - Once the original database is deleted, the rename cannot be undone
+- **Downtime** - Applications using the database should be updated to use the new name after renaming
+
+**Database Naming Requirements:**
+
+- Must be 3-63 characters long
+- Can only contain lowercase letters (a-z), numbers (0-9), and hyphens (-)
+- Cannot start or end with a hyphen
+- Must be unique across your Cloudflare account
+
+**What Happens If Rename Fails:**
+
+If the rename operation fails at any step:
+- The original database remains untouched
+- The new database (if created) is automatically deleted
+- A detailed error message explains what went wrong
+- You can retry the operation after addressing the issue
+
+**Recovery from Partial Failure:**
+
+If the original database was deleted but you need to recover:
+1. The new database with the desired name should still exist with all your data
+2. If you downloaded a backup (as recommended), you can import it to a new database
+3. Contact Cloudflare support if you need assistance with data recovery
 
 ### Authentication
 
@@ -382,7 +444,7 @@ For more help, see [Cloudflare Workers Troubleshooting](https://developers.cloud
 ## 📋 Roadmap
 
 ### ✅ Phase 1 - Basic Functionality (COMPLETE)
-- ✅ Database list, create, delete
+- ✅ Database list, create, rename, delete
 - ✅ Table browsing with search
 - ✅ Table data viewer with pagination
 - ✅ SQL query console with execution

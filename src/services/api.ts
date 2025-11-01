@@ -279,6 +279,47 @@ class APIService {
   }
 
   /**
+   * Rename a database (migration-based approach)
+   */
+  async renameDatabase(
+    databaseId: string,
+    newName: string,
+    onProgress?: (step: string, progress: number) => void
+  ): Promise<D1Database> {
+    try {
+      onProgress?.('validating', 10)
+      
+      // Call the rename endpoint
+      const response = await fetch(`${WORKER_API}/api/databases/${databaseId}/rename`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify({ newName })
+      })
+      
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+        throw new Error(error.error || error.message || `Rename failed: ${response.statusText}`)
+      }
+      
+      onProgress?.('completed', 100)
+      
+      const data = await response.json() as { result: D1Database & { oldId: string }, success: boolean }
+      
+      if (!data.success) {
+        throw new Error('Rename operation failed')
+      }
+      
+      return data.result
+    } catch (error) {
+      console.error('Database rename failed:', error)
+      throw new Error(error instanceof Error ? error.message : 'Failed to rename database')
+    }
+  }
+
+  /**
    * List tables in a database
    */
   async listTables(databaseId: string): Promise<TableInfo[]> {

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { api, type D1Database } from './services/api'
 import { auth } from './services/auth'
 import { useTheme } from './hooks/useTheme'
-import { Database, Plus, Moon, Sun, Monitor, Loader2, Code, GitCompare, Upload, Download, Trash2 } from 'lucide-react'
+import { Database, Plus, Moon, Sun, Monitor, Loader2, Code, GitCompare, Upload, Download, Trash2, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
@@ -74,6 +74,17 @@ export default function App() {
     databaseNames: string[]
     isDeleting: boolean
     currentProgress?: { current: number; total: number }
+  } | null>(null)
+
+  // Rename operation state
+  const [renameDialogState, setRenameDialogState] = useState<{
+    database: D1Database
+    newName: string
+    backupConfirmed: boolean
+    isRenaming: boolean
+    currentStep?: string
+    progress?: number
+    error?: string
   } | null>(null)
 
   // Load databases on mount
@@ -280,6 +291,93 @@ export default function App() {
       setError(err instanceof Error ? err.message : 'Failed to upload database')
     } finally {
       setUploading(false)
+    }
+  }
+
+  const handleRenameClick = (db: D1Database) => {
+    setRenameDialogState({
+      database: db,
+      newName: db.name,
+      backupConfirmed: false,
+      isRenaming: false
+    })
+  }
+
+  const validateDatabaseName = (name: string): string | null => {
+    if (!name.trim()) {
+      return 'Database name is required'
+    }
+    if (name.length < 3 || name.length > 63) {
+      return 'Database name must be between 3 and 63 characters'
+    }
+    if (!/^[a-z0-9-]+$/.test(name)) {
+      return 'Database name can only contain lowercase letters, numbers, and hyphens'
+    }
+    if (name.startsWith('-') || name.endsWith('-')) {
+      return 'Database name cannot start or end with a hyphen'
+    }
+    if (databases.some(db => db.name === name && db.uuid !== renameDialogState?.database.uuid)) {
+      return 'A database with this name already exists'
+    }
+    return null
+  }
+
+  const handleRenameDatabase = async () => {
+    if (!renameDialogState) return
+    
+    const validationError = validateDatabaseName(renameDialogState.newName)
+    if (validationError) {
+      setRenameDialogState(prev => prev ? { ...prev, error: validationError } : null)
+      return
+    }
+
+    if (!renameDialogState.backupConfirmed) {
+      setRenameDialogState(prev => prev ? { ...prev, error: 'Please confirm you have backed up your database' } : null)
+      return
+    }
+
+    setRenameDialogState(prev => prev ? { ...prev, isRenaming: true, error: undefined } : null)
+    setError('')
+
+    try {
+      await api.renameDatabase(
+        renameDialogState.database.uuid,
+        renameDialogState.newName,
+        (step, progress) => {
+          setRenameDialogState(prev => prev ? {
+            ...prev,
+            currentStep: step,
+            progress
+          } : null)
+        }
+      )
+
+      // Reload databases
+      await loadDatabases()
+
+      // Close dialog
+      setRenameDialogState(null)
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to rename database'
+      setRenameDialogState(prev => prev ? { 
+        ...prev, 
+        isRenaming: false, 
+        error: errorMessage 
+      } : null)
+    }
+  }
+
+  const handleDownloadBackup = async () => {
+    if (!renameDialogState) return
+    
+    try {
+      // Use the existing export functionality for a single database
+      await api.exportDatabases([{
+        uuid: renameDialogState.database.uuid,
+        name: renameDialogState.database.name
+      }])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to download backup')
     }
   }
 
@@ -532,7 +630,7 @@ export default function App() {
                           className="flex-1"
                           onClick={() => handleDatabaseClick(db)}
                         >
-                          <Database className="h-4 w-4 mr-2" />
+                          <Database className="h-3.5 w-3.5 mr-1.5" />
                           Browse
                         </Button>
                         <Button 
@@ -541,8 +639,20 @@ export default function App() {
                           className="flex-1"
                           onClick={() => handleOpenQueryConsole(db)}
                         >
-                          <Code className="h-4 w-4 mr-2" />
+                          <Code className="h-3.5 w-3.5 mr-1.5" />
                           Query
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          className="flex-1"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleRenameClick(db)
+                          }}
+                        >
+                          <Pencil className="h-3.5 w-3.5 mr-1.5" />
+                          Rename
                         </Button>
                       </div>
                     </CardContent>
@@ -803,6 +913,149 @@ export default function App() {
                   : deleteConfirmState.databaseNames.length === 1
                     ? 'Delete Database'
                     : `Delete ${deleteConfirmState.databaseNames.length} Databases`}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Rename Database Dialog */}
+      {renameDialogState && (
+        <Dialog open={true} onOpenChange={() => !renameDialogState.isRenaming && setRenameDialogState(null)}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Rename Database</DialogTitle>
+              <DialogDescription>
+                Rename "{renameDialogState.database.name}" by creating a new database and migrating all data
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4 space-y-4">
+              {/* Warning Alert */}
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-900 rounded-lg p-4">
+                <h4 className="text-sm font-semibold text-yellow-800 dark:text-yellow-200 mb-2">
+                  ⚠️ Important: This operation involves data migration
+                </h4>
+                <ul className="text-xs text-yellow-700 dark:text-yellow-300 space-y-1 list-disc list-inside">
+                  <li>A new database will be created with the desired name</li>
+                  <li>All data will be exported and imported into the new database</li>
+                  <li>The original database will be deleted after successful migration</li>
+                  <li>This process may take several minutes for large databases</li>
+                </ul>
+              </div>
+
+              {/* Backup Recommendation */}
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-900 rounded-lg p-4">
+                <h4 className="text-sm font-semibold text-blue-800 dark:text-blue-200 mb-2">
+                  💾 Strongly Recommended: Download a backup first
+                </h4>
+                <p className="text-xs text-blue-700 dark:text-blue-300 mb-3">
+                  Before renaming, we highly recommend downloading a backup of your database in case anything goes wrong during the migration process.
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDownloadBackup}
+                  disabled={renameDialogState.isRenaming}
+                  className="w-full"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Download Backup Now
+                </Button>
+              </div>
+
+              {/* New Name Input */}
+              <div className="grid gap-2">
+                <Label htmlFor="rename-db-name">New Database Name</Label>
+                <Input
+                  id="rename-db-name"
+                  placeholder="my-database"
+                  value={renameDialogState.newName}
+                  onChange={(e) => setRenameDialogState(prev => prev ? { 
+                    ...prev, 
+                    newName: e.target.value.toLowerCase(),
+                    error: undefined 
+                  } : null)}
+                  disabled={renameDialogState.isRenaming}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Must be 3-63 characters, lowercase letters, numbers, and hyphens only
+                </p>
+              </div>
+
+              {/* Backup Confirmation Checkbox */}
+              <div className="flex items-start space-x-3 p-3 border rounded-lg">
+                <Checkbox
+                  id="backup-confirmed"
+                  checked={renameDialogState.backupConfirmed}
+                  onCheckedChange={(checked) => setRenameDialogState(prev => prev ? { 
+                    ...prev, 
+                    backupConfirmed: checked === true,
+                    error: undefined 
+                  } : null)}
+                  disabled={renameDialogState.isRenaming}
+                />
+                <div className="grid gap-1.5 leading-none">
+                  <label
+                    htmlFor="backup-confirmed"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                  >
+                    I have backed up this database
+                  </label>
+                  <p className="text-xs text-muted-foreground">
+                    I understand the risks and have downloaded a backup
+                  </p>
+                </div>
+              </div>
+
+              {/* Progress Indicator */}
+              {renameDialogState.isRenaming && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">
+                      {renameDialogState.currentStep === 'validating' && 'Validating and preparing...'}
+                      {renameDialogState.currentStep === 'creating' && 'Creating new database...'}
+                      {renameDialogState.currentStep === 'exporting' && 'Exporting data...'}
+                      {renameDialogState.currentStep === 'importing' && 'Importing data...'}
+                      {renameDialogState.currentStep === 'deleting' && 'Cleaning up...'}
+                      {renameDialogState.currentStep === 'completed' && 'Rename complete!'}
+                      {!renameDialogState.currentStep && 'Processing...'}
+                    </span>
+                    {renameDialogState.progress !== undefined && (
+                      <span className="font-medium">{Math.round(renameDialogState.progress)}%</span>
+                    )}
+                  </div>
+                  {renameDialogState.progress !== undefined && (
+                    <Progress value={renameDialogState.progress} />
+                  )}
+                </div>
+              )}
+
+              {/* Error Message */}
+              {renameDialogState.error && (
+                <div className="bg-destructive/10 border border-destructive text-destructive px-3 py-2 rounded-lg text-sm">
+                  {renameDialogState.error}
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setRenameDialogState(null)}
+                disabled={renameDialogState.isRenaming}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleRenameDatabase}
+                disabled={
+                  renameDialogState.isRenaming ||
+                  !renameDialogState.backupConfirmed ||
+                  renameDialogState.newName === renameDialogState.database.name ||
+                  !renameDialogState.newName.trim()
+                }
+              >
+                {renameDialogState.isRenaming && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                {renameDialogState.isRenaming ? 'Renaming...' : 'Rename Database'}
               </Button>
             </DialogFooter>
           </DialogContent>
