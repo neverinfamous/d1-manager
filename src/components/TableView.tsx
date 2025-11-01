@@ -495,7 +495,7 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
             </div>
             <div className="space-y-2">
               {schema.map((col) => (
-                <div key={col.cid} className="flex items-center gap-4 text-sm group">
+                <div key={col.cid} className="flex items-center gap-4 text-sm">
                   <div className="flex items-center gap-2 min-w-[200px]">
                     <span className="font-medium">{col.name}</span>
                     {col.pk > 0 && (
@@ -514,7 +514,7 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
                     </div>
                   )}
                   {!col.dflt_value && <div className="flex-1"></div>}
-                  <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex items-center gap-2">
                     <Button 
                       variant="ghost" 
                       size="icon" 
