@@ -87,11 +87,21 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
     
     try {
       // Build INSERT query
-      const columns = schema.filter(col => col.pk === 0 || insertValues[col.name]); // Skip auto-increment PKs if empty
+      // Skip auto-increment primary keys if they're empty (let DB handle them)
+      const columns = schema.filter(col => {
+        // Include non-PK columns always
+        if (col.pk === 0) return true;
+        // For PK columns, only include if user provided a value OR if it's not auto-increment
+        const value = insertValues[col.name];
+        const hasValue = value !== '' && value !== null && value !== undefined;
+        const isAutoIncrement = col.type && col.type.toUpperCase().includes('INTEGER');
+        return hasValue || !isAutoIncrement;
+      });
+      
       const columnNames = columns.map(col => col.name);
       const values = columns.map(col => {
         const value = insertValues[col.name];
-        if (value === '' || value === null) return 'NULL';
+        if (value === '' || value === null || value === undefined) return 'NULL';
         // Try to determine if it's a number
         if (!isNaN(Number(value)) && value.trim() !== '') return value;
         // Otherwise treat as string
@@ -459,10 +469,10 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
                     placeholder={col.dflt_value || (col.pk > 0 ? 'Auto-increment' : 'NULL')}
                     value={insertValues[col.name] || ''}
                     onChange={(e) => setInsertValues({...insertValues, [col.name]: e.target.value})}
-                    disabled={col.pk > 0 && col.type.includes('INTEGER')} // Disable auto-increment PKs
+                    disabled={col.pk > 0 && !!col.type && col.type.toUpperCase().includes('INTEGER')} // Disable auto-increment PKs
                   />
                   <span className="text-xs text-muted-foreground min-w-[60px]">
-                    {col.type}
+                    {col.type || 'ANY'}
                   </span>
                 </div>
               </div>
@@ -516,7 +526,7 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
                     disabled={col.pk > 0} // Disable primary keys (can't be modified)
                   />
                   <span className="text-xs text-muted-foreground min-w-[60px]">
-                    {col.type}
+                    {col.type || 'ANY'}
                   </span>
                 </div>
               </div>

@@ -50,11 +50,13 @@ export function CrossDatabaseSearch({ databases }: CrossDatabaseSearchProps) {
               const schema = await api.getTableSchema(db.uuid, table.name);
               
               // Build WHERE clause for text columns
-              const textColumns = schema.filter(col => 
-                col.type.toUpperCase().includes('TEXT') || 
-                col.type.toUpperCase().includes('VARCHAR') ||
-                col.type === ''
-              );
+              const textColumns = schema.filter(col => {
+                if (!col.type) return true; // Include columns without type (SQLite allows this)
+                const typeUpper = col.type.toUpperCase();
+                return typeUpper.includes('TEXT') || 
+                       typeUpper.includes('VARCHAR') ||
+                       col.type === '';
+              });
 
               if (textColumns.length === 0) continue;
 
