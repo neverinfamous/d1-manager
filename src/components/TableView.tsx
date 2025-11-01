@@ -478,10 +478,9 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
                   <Input
                     id={`insert-${col.name}`}
                     name={`insert-${col.name}`}
-                    placeholder={col.dflt_value || (col.pk > 0 ? 'Auto-increment' : 'NULL')}
+                    placeholder={col.dflt_value || (col.pk > 0 && col.type && col.type.toUpperCase().includes('INTEGER') ? 'Auto-increment (optional)' : 'NULL')}
                     value={insertValues[col.name] || ''}
                     onChange={(e) => setInsertValues({...insertValues, [col.name]: e.target.value})}
-                    disabled={col.pk > 0 && !!col.type && col.type.toUpperCase().includes('INTEGER')} // Disable auto-increment PKs
                   />
                   <span className="text-xs text-muted-foreground min-w-[60px]">
                     {col.type || 'ANY'}
