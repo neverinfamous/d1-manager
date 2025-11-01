@@ -332,50 +332,6 @@ export default function App() {
             </Button>
           </div>
 
-          {/* Bulk Operations Toolbar */}
-          {(selectedDatabases.length > 0 || databases.length > 0) && (
-            <div className="flex items-center justify-between mb-6 p-4 border rounded-lg bg-card">
-              <div className="flex items-center gap-4">
-                {databases.length > 0 && selectedDatabases.length === 0 && (
-                  <Button variant="outline" onClick={selectAllDatabases}>
-                    Select All
-                  </Button>
-                )}
-                {selectedDatabases.length > 0 && (
-                  <span className="text-sm text-muted-foreground">
-                    {selectedDatabases.length} database{selectedDatabases.length !== 1 ? 's' : ''} selected
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" onClick={() => setShowUploadDialog(true)}>
-                  <Upload className="h-4 w-4 mr-2" />
-                  Upload Database
-                </Button>
-                {selectedDatabases.length > 0 && (
-                  <>
-                    <Button variant="outline" onClick={clearSelection}>
-                      Clear Selection
-                    </Button>
-                    <Button onClick={handleBulkDownload} disabled={bulkDownloadProgress !== null}>
-                      <Download className="h-4 w-4 mr-2" />
-                      {bulkDownloadProgress ? (
-                        bulkDownloadProgress.status === 'error' ? 'Download Failed' :
-                        bulkDownloadProgress.status === 'complete' ? 'Download Complete' :
-                        bulkDownloadProgress.status === 'preparing' ? 'Preparing...' :
-                        `Downloading (${Math.round(bulkDownloadProgress.progress)}%)`
-                      ) : 'Download Selected'}
-                    </Button>
-                    <Button variant="destructive" onClick={handleBulkDelete}>
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete Selected
-                    </Button>
-                  </>
-                )}
-              </div>
-            </div>
-          )}
-
           {/* Cross-Database Search */}
           {databases.length > 0 && (
             <CrossDatabaseSearch databases={databases} />
@@ -443,6 +399,50 @@ export default function App() {
                 </Button>
               </CardContent>
             </Card>
+          )}
+
+          {/* Bulk Operations Toolbar */}
+          {(selectedDatabases.length > 0 || databases.length > 0) && (
+            <div className="flex items-center justify-between mb-6 p-4 border rounded-lg bg-card">
+              <div className="flex items-center gap-4">
+                {databases.length > 0 && selectedDatabases.length === 0 && (
+                  <Button variant="outline" onClick={selectAllDatabases}>
+                    Select All
+                  </Button>
+                )}
+                {selectedDatabases.length > 0 && (
+                  <span className="text-sm text-muted-foreground">
+                    {selectedDatabases.length} database{selectedDatabases.length !== 1 ? 's' : ''} selected
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" onClick={() => setShowUploadDialog(true)}>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload Database
+                </Button>
+                {selectedDatabases.length > 0 && (
+                  <>
+                    <Button variant="outline" onClick={clearSelection}>
+                      Clear Selection
+                    </Button>
+                    <Button onClick={handleBulkDownload} disabled={bulkDownloadProgress !== null}>
+                      <Download className="h-4 w-4 mr-2" />
+                      {bulkDownloadProgress ? (
+                        bulkDownloadProgress.status === 'error' ? 'Download Failed' :
+                        bulkDownloadProgress.status === 'complete' ? 'Download Complete' :
+                        bulkDownloadProgress.status === 'preparing' ? 'Preparing...' :
+                        `Downloading (${Math.round(bulkDownloadProgress.progress)}%)`
+                      ) : 'Download Selected'}
+                    </Button>
+                    <Button variant="destructive" onClick={handleBulkDelete}>
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete Selected
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
           )}
 
           {/* Error Message */}
