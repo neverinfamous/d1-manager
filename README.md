@@ -33,6 +33,21 @@ A modern, full-featured web application for managing Cloudflare D1 databases wit
   - Add default values
   - Live SQL preview
   - Validation and error handling
+- **Table CRUD Operations** - Complete table management capabilities
+  - **Rename Table** - Individual rename button on each table card with validation
+  - **Delete Table** - Drop tables with confirmation dialog
+  - **Clone Table** - Duplicate table structure, data, and indexes with custom names
+  - **Export Table** - Download tables as SQL or CSV format
+- **Bulk Table Operations** - Multi-select operations for efficiency
+  - **Multi-Select** - Checkbox on each table card with "Select All" option
+  - **Bulk Clone** - Clone multiple tables with suggested names (e.g., `table_copy`)
+  - **Bulk Export** - Export multiple tables as SQL/CSV in a ZIP archive
+  - **Bulk Delete** - Delete multiple tables with progress tracking
+- **Column Management** - Advanced schema modification capabilities
+  - **Add Column** - Add new columns to existing tables
+  - **Rename Column** - Rename columns with ALTER TABLE
+  - **Modify Column** - Change column type, constraints, and defaults
+  - **Drop Column** - Remove columns from tables
 
 #### Query Console
 - **SQL Editor** - Execute custom SQL queries against any database
@@ -165,6 +180,14 @@ d1-manager/
 - `POST /api/tables/:dbId/create` - Create a new table
 - `DELETE /api/tables/:dbId/:tableName` - Drop a table
 - `PATCH /api/tables/:dbId/:tableName/rename` - Rename a table
+- `POST /api/tables/:dbId/:tableName/clone` - Clone a table (structure, data, and indexes)
+- `GET /api/tables/:dbId/:tableName/export?format=sql|csv` - Export table as SQL or CSV
+
+#### Column Operations
+- `POST /api/tables/:dbId/:tableName/columns/add` - Add a new column to a table
+- `PATCH /api/tables/:dbId/:tableName/columns/:columnName/rename` - Rename a column
+- `PATCH /api/tables/:dbId/:tableName/columns/:columnName/modify` - Modify column type/constraints
+- `DELETE /api/tables/:dbId/:tableName/columns/:columnName` - Drop a column
 
 ### Queries
 - `POST /api/query/:dbId/execute` - Execute a SQL query
@@ -223,9 +246,11 @@ This allows full UI testing without connecting to actual Cloudflare D1 databases
 
 ### Bulk Operations
 
-The D1 Manager supports bulk operations on multiple databases:
+The D1 Manager supports bulk operations on both databases and tables:
 
-**To use bulk operations:**
+#### Database Bulk Operations
+
+**To use database bulk operations:**
 1. Click checkboxes on database cards to select databases (or use "Select All")
 2. Selected databases show a blue ring border
 3. Action buttons appear in the toolbar:
@@ -249,6 +274,37 @@ The D1 Manager supports bulk operations on multiple databases:
 - Shows confirmation dialog with list of databases to delete
 - Sequential deletion with progress tracking
 - Reports any failures while continuing with remaining databases
+
+#### Table Bulk Operations
+
+**To use table bulk operations:**
+1. Navigate to a database's table view
+2. Click checkboxes on table cards to select tables (or use "Select All")
+3. Selected tables show a blue ring border
+4. Action buttons appear in the toolbar:
+   - **Clone Selected** - Duplicate multiple tables with custom names
+   - **Export Selected** - Export tables as SQL or CSV files
+   - **Delete Selected** - Delete multiple tables with confirmation
+
+**Clone Process:**
+- Opens dialog to specify new names for each cloned table
+- Suggested names pre-filled (e.g., `users_copy`)
+- Copies table structure, data, and indexes
+- Progress tracking for multiple tables
+- Automatically refreshes table list after completion
+
+**Export Process:**
+- Choose between SQL (structure + data) or CSV (data only) format
+- Single table: Downloads immediately
+- Multiple tables: Creates ZIP file with all exports
+- Real-time progress tracking
+- Timestamped filenames
+
+**Delete Process:**
+- Shows confirmation dialog with list of tables to delete
+- Sequential deletion with progress tracking
+- Reports any failures while continuing with remaining tables
+- Cannot be undone - use with caution
 
 ### Database Renaming
 
@@ -460,6 +516,11 @@ For more help, see [Cloudflare Workers Troubleshooting](https://developers.cloud
 - ✅ **Backup/Restore** - UI ready for Time Travel API integration
 - ✅ **Analytics** - Dashboard structure prepared for production
 - ✅ **Multi-database operations** - Bulk download, delete, and upload capabilities
+- ✅ **Table CRUD enhancements** - Complete table management with multi-select
+  - Rename, delete, clone, and export tables
+  - Bulk operations with progress tracking
+  - Export as SQL or CSV with format selection
+  - Column management (add, rename, modify, drop)
 
 ---
 

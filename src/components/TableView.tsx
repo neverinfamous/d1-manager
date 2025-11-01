@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, RefreshCw, Download, Trash2, Edit, Plus, Loader2 } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Download, Trash2, Edit, Plus, Loader2, Columns, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -13,7 +13,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { getTableSchema, getTableData, executeQuery, type ColumnInfo } from '@/services/api';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { getTableSchema, getTableData, executeQuery, type ColumnInfo, api } from '@/services/api';
 
 interface TableViewProps {
   databaseId: string;
@@ -40,6 +47,31 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deletingRow, setDeletingRow] = useState<Record<string, unknown> | null>(null);
   const [deleting, setDeleting] = useState(false);
+  
+  // Column management state
+  const [showAddColumnDialog, setShowAddColumnDialog] = useState(false);
+  const [addColumnValues, setAddColumnValues] = useState({
+    name: '',
+    type: 'TEXT',
+    notnull: false,
+    defaultValue: ''
+  });
+  const [addingColumn, setAddingColumn] = useState(false);
+  const [showRenameColumnDialog, setShowRenameColumnDialog] = useState(false);
+  const [renamingColumn, setRenamingColumn] = useState<ColumnInfo | null>(null);
+  const [renameColumnValue, setRenameColumnValue] = useState('');
+  const [renamingColumnInProgress, setRenamingColumnInProgress] = useState(false);
+  const [showModifyColumnDialog, setShowModifyColumnDialog] = useState(false);
+  const [modifyingColumn, setModifyingColumn] = useState<ColumnInfo | null>(null);
+  const [modifyColumnValues, setModifyColumnValues] = useState({
+    type: 'TEXT',
+    notnull: false,
+    defaultValue: ''
+  });
+  const [modifyingColumnInProgress, setModifyingColumnInProgress] = useState(false);
+  const [showDeleteColumnDialog, setShowDeleteColumnDialog] = useState(false);
+  const [deletingColumn, setDeletingColumn] = useState<ColumnInfo | null>(null);
+  const [deletingColumnInProgress, setDeletingColumnInProgress] = useState(false);
 
   useEffect(() => {
     loadTableData();
@@ -232,6 +264,139 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
     }
   };
 
+  const handleOpenAddColumnDialog = () => {
+    setAddColumnValues({
+      name: '',
+      type: 'TEXT',
+      notnull: false,
+      defaultValue: ''
+    });
+    setShowAddColumnDialog(true);
+  };
+
+  const handleAddColumn = async () => {
+    setAddingColumn(true);
+    setError(null);
+    
+    try {
+      // Validate column name
+      if (!addColumnValues.name.trim()) {
+        throw new Error('Column name is required');
+      }
+      
+      // Check for duplicate column name
+      if (schema.some(col => col.name.toLowerCase() === addColumnValues.name.toLowerCase())) {
+        throw new Error('Column name already exists');
+      }
+      
+      // Call API to add column
+      await api.addColumn(databaseId, tableName, {
+        name: addColumnValues.name,
+        type: addColumnValues.type,
+        notnull: addColumnValues.notnull,
+        defaultValue: addColumnValues.defaultValue || undefined
+      });
+      
+      setShowAddColumnDialog(false);
+      setAddColumnValues({
+        name: '',
+        type: 'TEXT',
+        notnull: false,
+        defaultValue: ''
+      });
+      await loadTableData(); // Reload data to refresh schema
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to add column');
+    } finally {
+      setAddingColumn(false);
+    }
+  };
+
+  const handleRenameColumn = async () => {
+    if (!renamingColumn) return;
+    
+    setRenamingColumnInProgress(true);
+    setError(null);
+    
+    try {
+      // Validate column name
+      if (!renameColumnValue.trim()) {
+        throw new Error('Column name is required');
+      }
+      
+      // Check if name is different
+      if (renameColumnValue === renamingColumn.name) {
+        throw new Error('New name must be different from current name');
+      }
+      
+      // Check for duplicate column name
+      if (schema.some(col => col.name.toLowerCase() === renameColumnValue.toLowerCase())) {
+        throw new Error('Column name already exists');
+      }
+      
+      // Call API to rename column
+      await api.renameColumn(databaseId, tableName, renamingColumn.name, renameColumnValue);
+      
+      setShowRenameColumnDialog(false);
+      setRenamingColumn(null);
+      setRenameColumnValue('');
+      await loadTableData(); // Reload data to refresh schema
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to rename column');
+    } finally {
+      setRenamingColumnInProgress(false);
+    }
+  };
+
+  const handleModifyColumn = async () => {
+    if (!modifyingColumn) return;
+    
+    setModifyingColumnInProgress(true);
+    setError(null);
+    
+    try {
+      // Call API to modify column (will use table recreation)
+      await api.modifyColumn(databaseId, tableName, modifyingColumn.name, {
+        type: modifyColumnValues.type,
+        notnull: modifyColumnValues.notnull,
+        defaultValue: modifyColumnValues.defaultValue || undefined
+      });
+      
+      setShowModifyColumnDialog(false);
+      setModifyingColumn(null);
+      setModifyColumnValues({
+        type: 'TEXT',
+        notnull: false,
+        defaultValue: ''
+      });
+      await loadTableData(); // Reload data to refresh schema
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to modify column');
+    } finally {
+      setModifyingColumnInProgress(false);
+    }
+  };
+
+  const handleDeleteColumn = async () => {
+    if (!deletingColumn) return;
+    
+    setDeletingColumnInProgress(true);
+    setError(null);
+    
+    try {
+      // Call API to delete column
+      await api.deleteColumn(databaseId, tableName, deletingColumn.name);
+      
+      setShowDeleteColumnDialog(false);
+      setDeletingColumn(null);
+      await loadTableData(); // Reload data to refresh schema
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete column');
+    } finally {
+      setDeletingColumnInProgress(false);
+    }
+  };
+
   const handleExportCSV = () => {
     if (data.length === 0) {
       alert('No data to export');
@@ -321,10 +486,16 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
       {!loading && schema.length > 0 && (
         <Card>
           <CardContent className="pt-6">
-            <h3 className="text-sm font-semibold mb-4">Schema</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold">Schema</h3>
+              <Button variant="outline" size="sm" onClick={handleOpenAddColumnDialog}>
+                <Columns className="h-4 w-4 mr-2" />
+                Add Column
+              </Button>
+            </div>
             <div className="space-y-2">
               {schema.map((col) => (
-                <div key={col.cid} className="flex items-center gap-4 text-sm">
+                <div key={col.cid} className="flex items-center gap-4 text-sm group">
                   <div className="flex items-center gap-2 min-w-[200px]">
                     <span className="font-medium">{col.name}</span>
                     {col.pk > 0 && (
@@ -334,14 +505,60 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
                     )}
                   </div>
                   <div className="text-muted-foreground min-w-[100px]">{col.type || 'ANY'}</div>
-                  <div className="text-muted-foreground">
+                  <div className="text-muted-foreground min-w-[80px]">
                     {col.notnull ? 'NOT NULL' : 'NULL'}
                   </div>
                   {col.dflt_value && (
-                    <div className="text-muted-foreground">
+                    <div className="text-muted-foreground flex-1">
                       Default: {col.dflt_value}
                     </div>
                   )}
+                  {!col.dflt_value && <div className="flex-1"></div>}
+                  <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-7 w-7"
+                      onClick={() => {
+                        setRenamingColumn(col);
+                        setRenameColumnValue(col.name);
+                        setShowRenameColumnDialog(true);
+                      }}
+                      title="Rename column"
+                    >
+                      <Edit className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-7 w-7"
+                      onClick={() => {
+                        setModifyingColumn(col);
+                        setModifyColumnValues({
+                          type: col.type || 'TEXT',
+                          notnull: col.notnull === 1,
+                          defaultValue: col.dflt_value || ''
+                        });
+                        setShowModifyColumnDialog(true);
+                      }}
+                      title="Modify column type/constraints"
+                    >
+                      <Settings className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-7 w-7"
+                      onClick={() => {
+                        setDeletingColumn(col);
+                        setShowDeleteColumnDialog(true);
+                      }}
+                      disabled={schema.length === 1}
+                      title={schema.length === 1 ? "Cannot delete the only column" : "Delete column"}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -627,6 +844,271 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
                 </>
               ) : (
                 'Delete Row'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Column Dialog */}
+      <Dialog open={showAddColumnDialog} onOpenChange={setShowAddColumnDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Add Column to {tableName}</DialogTitle>
+            <DialogDescription>
+              Add a new column to the table. The column will be added with NULL values for existing rows unless you specify a default value.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="add-column-name">
+                Column Name <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="add-column-name"
+                placeholder="e.g., email, created_at"
+                value={addColumnValues.name}
+                onChange={(e) => setAddColumnValues({...addColumnValues, name: e.target.value})}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="add-column-type">Column Type</Label>
+              <Select
+                value={addColumnValues.type}
+                onValueChange={(value) => setAddColumnValues({...addColumnValues, type: value})}
+              >
+                <SelectTrigger id="add-column-type">
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="TEXT">TEXT</SelectItem>
+                  <SelectItem value="INTEGER">INTEGER</SelectItem>
+                  <SelectItem value="REAL">REAL</SelectItem>
+                  <SelectItem value="BLOB">BLOB</SelectItem>
+                  <SelectItem value="NUMERIC">NUMERIC</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="add-column-default">Default Value (optional)</Label>
+              <Input
+                id="add-column-default"
+                placeholder="e.g., 0, 'unknown', CURRENT_TIMESTAMP"
+                value={addColumnValues.defaultValue}
+                onChange={(e) => setAddColumnValues({...addColumnValues, defaultValue: e.target.value})}
+              />
+              <p className="text-xs text-muted-foreground">
+                Leave empty for NULL. Use quotes for text values.
+              </p>
+            </div>
+            
+            <div className="flex items-start space-x-3">
+              <Checkbox
+                id="add-column-notnull"
+                checked={addColumnValues.notnull}
+                onCheckedChange={(checked) => setAddColumnValues({...addColumnValues, notnull: checked === true})}
+              />
+              <div className="space-y-1 leading-none">
+                <Label htmlFor="add-column-notnull" className="text-sm font-medium cursor-pointer">
+                  NOT NULL constraint
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Requires a default value if table has existing rows
+                </p>
+              </div>
+            </div>
+          </div>
+          {error && (
+            <p className="text-sm text-destructive">{error}</p>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddColumnDialog(false)} disabled={addingColumn}>
+              Cancel
+            </Button>
+            <Button onClick={handleAddColumn} disabled={addingColumn}>
+              {addingColumn ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Adding...
+                </>
+              ) : (
+                'Add Column'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rename Column Dialog */}
+      <Dialog open={showRenameColumnDialog} onOpenChange={setShowRenameColumnDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename Column</DialogTitle>
+            <DialogDescription>
+              Rename the column "{renamingColumn?.name}" to a new name.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="rename-column-name">
+                New Column Name <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="rename-column-name"
+                placeholder="Enter new column name"
+                value={renameColumnValue}
+                onChange={(e) => setRenameColumnValue(e.target.value)}
+              />
+            </div>
+          </div>
+          {error && (
+            <p className="text-sm text-destructive">{error}</p>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRenameColumnDialog(false)} disabled={renamingColumnInProgress}>
+              Cancel
+            </Button>
+            <Button onClick={handleRenameColumn} disabled={renamingColumnInProgress}>
+              {renamingColumnInProgress ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Renaming...
+                </>
+              ) : (
+                'Rename Column'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modify Column Dialog */}
+      <Dialog open={showModifyColumnDialog} onOpenChange={setShowModifyColumnDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Modify Column "{modifyingColumn?.name}"</DialogTitle>
+            <DialogDescription>
+              Change the column type or constraints. This operation requires recreating the table.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-md border border-yellow-200 dark:border-yellow-900 bg-yellow-50 dark:bg-yellow-950/30 p-4 mb-4">
+            <p className="text-sm font-medium mb-2">⚠️ Important: Table Recreation Required</p>
+            <p className="text-sm text-muted-foreground mb-2">
+              SQLite does not support modifying column types or constraints directly. This operation will:
+            </p>
+            <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1">
+              <li>Create a temporary table with the new column definition</li>
+              <li>Copy all data with appropriate type conversions</li>
+              <li>Drop the original table</li>
+              <li>Rename the temporary table</li>
+            </ul>
+            <p className="text-sm text-muted-foreground mt-2 font-medium">
+              It's strongly recommended to backup your database before proceeding.
+            </p>
+          </div>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="modify-column-type">Column Type</Label>
+              <Select
+                value={modifyColumnValues.type}
+                onValueChange={(value) => setModifyColumnValues({...modifyColumnValues, type: value})}
+              >
+                <SelectTrigger id="modify-column-type">
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="TEXT">TEXT</SelectItem>
+                  <SelectItem value="INTEGER">INTEGER</SelectItem>
+                  <SelectItem value="REAL">REAL</SelectItem>
+                  <SelectItem value="BLOB">BLOB</SelectItem>
+                  <SelectItem value="NUMERIC">NUMERIC</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="modify-column-default">Default Value (optional)</Label>
+              <Input
+                id="modify-column-default"
+                placeholder="e.g., 0, 'unknown', CURRENT_TIMESTAMP"
+                value={modifyColumnValues.defaultValue}
+                onChange={(e) => setModifyColumnValues({...modifyColumnValues, defaultValue: e.target.value})}
+              />
+            </div>
+            
+            <div className="flex items-start space-x-3">
+              <Checkbox
+                id="modify-column-notnull"
+                checked={modifyColumnValues.notnull}
+                onCheckedChange={(checked) => setModifyColumnValues({...modifyColumnValues, notnull: checked === true})}
+              />
+              <div className="space-y-1 leading-none">
+                <Label htmlFor="modify-column-notnull" className="text-sm font-medium cursor-pointer">
+                  NOT NULL constraint
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  If enabled, all existing NULL values will be replaced with the default value
+                </p>
+              </div>
+            </div>
+          </div>
+          {error && (
+            <p className="text-sm text-destructive">{error}</p>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowModifyColumnDialog(false)} disabled={modifyingColumnInProgress}>
+              Cancel
+            </Button>
+            <Button onClick={handleModifyColumn} disabled={modifyingColumnInProgress}>
+              {modifyingColumnInProgress ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Modifying...
+                </>
+              ) : (
+                'Modify Column'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Column Dialog */}
+      <Dialog open={showDeleteColumnDialog} onOpenChange={setShowDeleteColumnDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Column</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete the column "{deletingColumn?.name}"? This action cannot be undone and all data in this column will be permanently lost.
+            </DialogDescription>
+          </DialogHeader>
+          {deletingColumn && (
+            <div className="py-4">
+              <div className="rounded-md border border-yellow-200 dark:border-yellow-900 bg-yellow-50 dark:bg-yellow-950/30 p-4">
+                <p className="text-sm font-medium mb-2">⚠️ Warning</p>
+                <p className="text-sm text-muted-foreground">
+                  This will permanently delete all data in the "{deletingColumn.name}" column. Make sure you have a backup before proceeding.
+                </p>
+              </div>
+            </div>
+          )}
+          {error && (
+            <p className="text-sm text-destructive">{error}</p>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteColumnDialog(false)} disabled={deletingColumnInProgress}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteColumn} disabled={deletingColumnInProgress}>
+              {deletingColumnInProgress ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                'Delete Column'
               )}
             </Button>
           </DialogFooter>

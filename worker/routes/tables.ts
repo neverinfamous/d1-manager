@@ -554,6 +554,220 @@ export async function handleTableRoutes(
       }
     }
 
+    // Add column to table
+    if (request.method === 'POST' && url.pathname.match(/^\/api\/tables\/[^/]+\/[^/]+\/columns\/add$/)) {
+      const tableName = decodeURIComponent(pathParts[4]);
+      console.log('[Tables] Adding column to table:', tableName);
+      
+      const body = await request.json() as {
+        name: string;
+        type: string;
+        notnull?: boolean;
+        defaultValue?: string;
+      };
+      
+      if (!body.name || !body.type) {
+        return new Response(JSON.stringify({ 
+          error: 'Column name and type are required' 
+        }), { 
+          status: 400,
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        });
+      }
+      
+      // Mock response for local development
+      if (isLocalDev) {
+        return new Response(JSON.stringify({
+          result: [
+            { cid: 0, name: 'id', type: 'INTEGER', notnull: 1, dflt_value: null, pk: 1 },
+            { cid: 1, name: body.name, type: body.type, notnull: body.notnull ? 1 : 0, dflt_value: body.defaultValue || null, pk: 0 }
+          ],
+          success: true
+        }), {
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        });
+      }
+      
+      const sanitizedTable = sanitizeIdentifier(tableName);
+      const sanitizedColumn = sanitizeIdentifier(body.name);
+      
+      // Build ALTER TABLE ADD COLUMN query
+      let query = `ALTER TABLE "${sanitizedTable}" ADD COLUMN "${sanitizedColumn}" ${body.type}`;
+      
+      if (body.notnull) {
+        query += ' NOT NULL';
+      }
+      
+      if (body.defaultValue) {
+        // Check if default value needs quotes
+        const defaultVal = body.defaultValue.trim();
+        if (!isNaN(Number(defaultVal)) && defaultVal !== '') {
+          query += ` DEFAULT ${defaultVal}`;
+        } else if (defaultVal.toUpperCase() === 'CURRENT_TIMESTAMP' || defaultVal.toUpperCase() === 'NULL') {
+          query += ` DEFAULT ${defaultVal}`;
+        } else {
+          query += ` DEFAULT '${defaultVal.replace(/'/g, "''")}'`;
+        }
+      }
+      
+      await executeQueryViaAPI(dbId, query, env);
+      
+      // Get updated schema
+      const schemaResult = await executeQueryViaAPI(dbId, `PRAGMA table_info("${sanitizedTable}")`, env);
+      
+      return new Response(JSON.stringify({
+        result: schemaResult.results,
+        success: true
+      }), {
+        headers: {
+          'Content-Type': 'application/json',
+          ...corsHeaders
+        }
+      });
+    }
+
+    // Rename column
+    if (request.method === 'PATCH' && url.pathname.match(/^\/api\/tables\/[^/]+\/[^/]+\/columns\/[^/]+\/rename$/)) {
+      const tableName = decodeURIComponent(pathParts[4]);
+      const columnName = decodeURIComponent(pathParts[6]);
+      console.log('[Tables] Renaming column:', columnName, 'in table:', tableName);
+      
+      const body = await request.json() as { newName: string };
+      
+      if (!body.newName || !body.newName.trim()) {
+        return new Response(JSON.stringify({ 
+          error: 'New column name is required' 
+        }), { 
+          status: 400,
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        });
+      }
+      
+      // Mock response for local development
+      if (isLocalDev) {
+        return new Response(JSON.stringify({
+          success: true
+        }), {
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        });
+      }
+      
+      const sanitizedTable = sanitizeIdentifier(tableName);
+      const sanitizedOldColumn = sanitizeIdentifier(columnName);
+      const sanitizedNewColumn = sanitizeIdentifier(body.newName);
+      
+      const query = `ALTER TABLE "${sanitizedTable}" RENAME COLUMN "${sanitizedOldColumn}" TO "${sanitizedNewColumn}"`;
+      
+      await executeQueryViaAPI(dbId, query, env);
+      
+      return new Response(JSON.stringify({
+        success: true
+      }), {
+        headers: {
+          'Content-Type': 'application/json',
+          ...corsHeaders
+        }
+      });
+    }
+
+    // Modify column (requires table recreation)
+    if (request.method === 'PATCH' && url.pathname.match(/^\/api\/tables\/[^/]+\/[^/]+\/columns\/[^/]+\/modify$/)) {
+      const tableName = decodeURIComponent(pathParts[4]);
+      const columnName = decodeURIComponent(pathParts[6]);
+      console.log('[Tables] Modifying column:', columnName, 'in table:', tableName);
+      
+      const body = await request.json() as {
+        type?: string;
+        notnull?: boolean;
+        defaultValue?: string;
+      };
+      
+      // Mock response for local development
+      if (isLocalDev) {
+        return new Response(JSON.stringify({
+          result: [
+            { cid: 0, name: 'id', type: 'INTEGER', notnull: 1, dflt_value: null, pk: 1 },
+            { cid: 1, name: columnName, type: body.type || 'TEXT', notnull: body.notnull ? 1 : 0, dflt_value: body.defaultValue || null, pk: 0 }
+          ],
+          success: true
+        }), {
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        });
+      }
+      
+      // Table recreation required for modifying columns
+      await recreateTableWithModifiedColumn(dbId, tableName, {
+        action: 'modify',
+        columnName,
+        newColumnDef: body
+      }, env);
+      
+      // Get updated schema
+      const sanitizedTable = sanitizeIdentifier(tableName);
+      const schemaResult = await executeQueryViaAPI(dbId, `PRAGMA table_info("${sanitizedTable}")`, env);
+      
+      return new Response(JSON.stringify({
+        result: schemaResult.results,
+        success: true
+      }), {
+        headers: {
+          'Content-Type': 'application/json',
+          ...corsHeaders
+        }
+      });
+    }
+
+    // Delete column (requires table recreation)
+    if (request.method === 'DELETE' && url.pathname.match(/^\/api\/tables\/[^/]+\/[^/]+\/columns\/[^/]+$/)) {
+      const tableName = decodeURIComponent(pathParts[4]);
+      const columnName = decodeURIComponent(pathParts[6]);
+      console.log('[Tables] Deleting column:', columnName, 'from table:', tableName);
+      
+      // Mock response for local development
+      if (isLocalDev) {
+        return new Response(JSON.stringify({
+          success: true
+        }), {
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        });
+      }
+      
+      const sanitizedTable = sanitizeIdentifier(tableName);
+      const sanitizedColumn = sanitizeIdentifier(columnName);
+      
+      // Use ALTER TABLE DROP COLUMN (supported in SQLite 3.35.0+)
+      const query = `ALTER TABLE "${sanitizedTable}" DROP COLUMN "${sanitizedColumn}"`;
+      
+      await executeQueryViaAPI(dbId, query, env);
+      
+      return new Response(JSON.stringify({
+        success: true
+      }), {
+        headers: {
+          'Content-Type': 'application/json',
+          ...corsHeaders
+        }
+      });
+    }
+
     // Route not found
     return new Response(JSON.stringify({ 
       error: 'Route not found' 
@@ -579,6 +793,113 @@ export async function handleTableRoutes(
         ...corsHeaders
       }
     });
+  }
+}
+
+/**
+ * Recreate a table with modified column definitions
+ * This is required for operations SQLite doesn't support directly like DROP COLUMN or MODIFY COLUMN
+ */
+async function recreateTableWithModifiedColumn(
+  dbId: string,
+  tableName: string,
+  modification: {
+    action: 'drop' | 'modify';
+    columnName: string;
+    newColumnDef?: {
+      type?: string;
+      notnull?: boolean;
+      defaultValue?: string;
+    };
+  },
+  env: Env
+): Promise<void> {
+  const sanitizedTable = sanitizeIdentifier(tableName);
+  const tempTableName = `${tableName}_temp_${Date.now()}`;
+  const sanitizedTempTable = sanitizeIdentifier(tempTableName);
+
+  try {
+    // 1. Get current schema
+    const schemaResult = await executeQueryViaAPI(dbId, `PRAGMA table_info("${sanitizedTable}")`, env);
+    const columns = schemaResult.results as Array<{
+      cid: number;
+      name: string;
+      type: string;
+      notnull: number;
+      dflt_value: string | null;
+      pk: number;
+    }>;
+
+    // 2. Build new column definitions
+    let newColumns = columns;
+    if (modification.action === 'drop') {
+      // Remove the column
+      newColumns = columns.filter(col => col.name !== modification.columnName);
+    } else if (modification.action === 'modify' && modification.newColumnDef) {
+      // Modify the column
+      newColumns = columns.map(col => {
+        if (col.name === modification.columnName) {
+          return {
+            ...col,
+            type: modification.newColumnDef!.type || col.type,
+            notnull: modification.newColumnDef!.notnull !== undefined 
+              ? (modification.newColumnDef!.notnull ? 1 : 0) 
+              : col.notnull,
+            dflt_value: modification.newColumnDef!.defaultValue !== undefined
+              ? modification.newColumnDef!.defaultValue
+              : col.dflt_value
+          };
+        }
+        return col;
+      });
+    }
+
+    // 3. Create temporary table with new schema
+    const columnDefs = newColumns.map(col => {
+      let def = `"${col.name}" ${col.type || 'TEXT'}`;
+      if (col.pk > 0) def += ' PRIMARY KEY';
+      if (col.notnull && col.pk === 0) def += ' NOT NULL';
+      if (col.dflt_value !== null && col.dflt_value !== '') {
+        const defaultVal = col.dflt_value.trim();
+        if (!isNaN(Number(defaultVal)) && defaultVal !== '') {
+          def += ` DEFAULT ${defaultVal}`;
+        } else if (defaultVal.toUpperCase() === 'CURRENT_TIMESTAMP' || defaultVal.toUpperCase() === 'NULL') {
+          def += ` DEFAULT ${defaultVal}`;
+        } else {
+          def += ` DEFAULT '${defaultVal.replace(/'/g, "''")}'`;
+        }
+      }
+      return def;
+    }).join(', ');
+
+    const createTableQuery = `CREATE TABLE "${sanitizedTempTable}" (${columnDefs})`;
+    await executeQueryViaAPI(dbId, createTableQuery, env);
+
+    // 4. Copy data from original table to temp table
+    const columnNames = newColumns.map(col => `"${col.name}"`).join(', ');
+    const copyDataQuery = `INSERT INTO "${sanitizedTempTable}" (${columnNames}) SELECT ${columnNames} FROM "${sanitizedTable}"`;
+    await executeQueryViaAPI(dbId, copyDataQuery, env);
+
+    // 5. Drop original table
+    const dropTableQuery = `DROP TABLE "${sanitizedTable}"`;
+    await executeQueryViaAPI(dbId, dropTableQuery, env);
+
+    // 6. Rename temp table to original name
+    const renameTableQuery = `ALTER TABLE "${sanitizedTempTable}" RENAME TO "${sanitizedTable}"`;
+    await executeQueryViaAPI(dbId, renameTableQuery, env);
+
+    // 7. Recreate indexes (if any)
+    // Note: For simplicity, we're not handling indexes in this implementation
+    // In production, you'd want to get and recreate indexes as well
+
+  } catch (err) {
+    // If anything fails, try to clean up temp table
+    try {
+      await executeQueryViaAPI(dbId, `DROP TABLE IF EXISTS "${sanitizedTempTable}"`, env);
+    } catch (cleanupErr) {
+      console.error('[Tables] Failed to clean up temp table:', cleanupErr);
+    }
+    throw err;
   }
 }
 

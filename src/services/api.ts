@@ -438,6 +438,123 @@ class APIService {
   }
 
   /**
+   * Add a column to a table
+   */
+  async addColumn(
+    databaseId: string,
+    tableName: string,
+    columnDef: {
+      name: string
+      type: string
+      notnull?: boolean
+      defaultValue?: string
+    }
+  ): Promise<ColumnInfo[]> {
+    const response = await fetch(
+      `${WORKER_API}/api/tables/${databaseId}/${encodeURIComponent(tableName)}/columns/add`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify(columnDef)
+      }
+    )
+    
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+      throw new Error(error.error || `Failed to add column: ${response.statusText}`)
+    }
+    
+    const data = await response.json()
+    return data.result
+  }
+
+  /**
+   * Rename a column in a table
+   */
+  async renameColumn(
+    databaseId: string,
+    tableName: string,
+    oldName: string,
+    newName: string
+  ): Promise<void> {
+    const response = await fetch(
+      `${WORKER_API}/api/tables/${databaseId}/${encodeURIComponent(tableName)}/columns/${encodeURIComponent(oldName)}/rename`,
+      {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify({ newName })
+      }
+    )
+    
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+      throw new Error(error.error || `Failed to rename column: ${response.statusText}`)
+    }
+  }
+
+  /**
+   * Modify a column's type and constraints (requires table recreation)
+   */
+  async modifyColumn(
+    databaseId: string,
+    tableName: string,
+    columnName: string,
+    updates: {
+      type?: string
+      notnull?: boolean
+      defaultValue?: string
+    }
+  ): Promise<ColumnInfo[]> {
+    const response = await fetch(
+      `${WORKER_API}/api/tables/${databaseId}/${encodeURIComponent(tableName)}/columns/${encodeURIComponent(columnName)}/modify`,
+      {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify(updates)
+      }
+    )
+    
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+      throw new Error(error.error || `Failed to modify column: ${response.statusText}`)
+    }
+    
+    const data = await response.json()
+    return data.result
+  }
+
+  /**
+   * Delete a column from a table (requires table recreation)
+   */
+  async deleteColumn(
+    databaseId: string,
+    tableName: string,
+    columnName: string
+  ): Promise<void> {
+    const response = await fetch(
+      `${WORKER_API}/api/tables/${databaseId}/${encodeURIComponent(tableName)}/columns/${encodeURIComponent(columnName)}`,
+      {
+        method: 'DELETE',
+        credentials: 'include'
+      }
+    )
+    
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+      throw new Error(error.error || `Failed to delete column: ${response.statusText}`)
+    }
+  }
+
+  /**
    * Delete multiple tables
    */
   async deleteTables(
