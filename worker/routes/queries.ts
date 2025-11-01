@@ -152,7 +152,7 @@ export async function handleQueryRoutes(
       }
       
       // Execute queries sequentially (REST API doesn't support true batch)
-      const results = [];
+      const results: Array<{ results: unknown[]; meta: Record<string, unknown>; success: boolean }> = [];
       for (const q of body.queries) {
         const result = await executeQueryViaAPI(dbId, q.query, q.params, env);
         results.push(result);

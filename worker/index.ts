@@ -111,7 +111,7 @@ async function handleApiRequest(request: Request, env: Env): Promise<Response> {
 }
 
 export default {
-  async fetch(request: Request, env: Env, _ctx: ExecutionContext): Promise<Response> {
+  async fetch(request: Request, env: Env): Promise<Response> {
     try {
       return await handleApiRequest(request, env);
     } catch (err) {
