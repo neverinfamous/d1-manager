@@ -87,28 +87,40 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
     
     try {
       // Build INSERT query
-      // Skip auto-increment primary keys if they're empty (let DB handle them)
-      const columns = schema.filter(col => {
-        // Include non-PK columns always
-        if (col.pk === 0) return true;
-        // For PK columns, only include if user provided a value OR if it's not auto-increment
+      // Filter columns to include based on whether they have values or need explicit insertion
+      const columnsWithValues = schema.filter(col => {
         const value = insertValues[col.name];
         const hasValue = value !== '' && value !== null && value !== undefined;
-        const isAutoIncrement = col.type && col.type.toUpperCase().includes('INTEGER');
-        return hasValue || !isAutoIncrement;
+        
+        // If column has a value, always include it
+        if (hasValue) return true;
+        
+        // If it's a primary key with INTEGER type (auto-increment), skip it when empty
+        if (col.pk > 0 && col.type && col.type.toUpperCase().includes('INTEGER')) {
+          return false;
+        }
+        
+        // Otherwise include it (will be set to NULL or default)
+        return true;
       });
       
-      const columnNames = columns.map(col => col.name);
-      const values = columns.map(col => {
-        const value = insertValues[col.name];
-        if (value === '' || value === null || value === undefined) return 'NULL';
-        // Try to determine if it's a number
-        if (!isNaN(Number(value)) && value.trim() !== '') return value;
-        // Otherwise treat as string
-        return `'${value.replace(/'/g, "''")}'`; // Escape single quotes
-      });
-      
-      const query = `INSERT INTO "${tableName}" (${columnNames.map(n => `"${n}"`).join(', ')}) VALUES (${values.join(', ')})`;
+      // If no columns need explicit values (e.g., only auto-increment PK), use DEFAULT VALUES
+      let query: string;
+      if (columnsWithValues.length === 0) {
+        query = `INSERT INTO "${tableName}" DEFAULT VALUES`;
+      } else {
+        const columnNames = columnsWithValues.map(col => col.name);
+        const values = columnsWithValues.map(col => {
+          const value = insertValues[col.name];
+          if (value === '' || value === null || value === undefined) return 'NULL';
+          // Try to determine if it's a number
+          if (!isNaN(Number(value)) && value.trim() !== '') return value;
+          // Otherwise treat as string
+          return `'${value.replace(/'/g, "''")}'`; // Escape single quotes
+        });
+        
+        query = `INSERT INTO "${tableName}" (${columnNames.map(n => `"${n}"`).join(', ')}) VALUES (${values.join(', ')})`;
+      }
       
       await executeQuery(databaseId, query, [], true); // Skip validation for INSERT
       
