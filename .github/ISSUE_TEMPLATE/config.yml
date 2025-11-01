@@ -1,0 +1,12 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 💬 Discussions
+    url: https://github.com/neverinfamous/d1-manager/discussions
+    about: Ask questions, share ideas, or discuss D1 Database Manager
+  - name: 📚 Documentation
+    url: https://github.com/neverinfamous/d1-manager#readme
+    about: Read the documentation and guides
+  - name: 🔒 Security Issue
+    url: https://github.com/neverinfamous/d1-manager/security/advisories/new
+    about: Report a security vulnerability (private)
+
