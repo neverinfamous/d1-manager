@@ -15,10 +15,10 @@ export async function handleDatabaseRoutes(
     'Content-Type': 'application/json'
   };
   
-  console.log('[Databases] Auth check:', {
+  // Verify auth configuration (sensitive values redacted)
+  console.log('[Databases] Auth configured:', {
     hasApiKey: !!env.API_KEY,
-    apiKeyLength: env.API_KEY?.length,
-    accountId: env.ACCOUNT_ID
+    hasAccountId: !!env.ACCOUNT_ID
   });
 
   try {
