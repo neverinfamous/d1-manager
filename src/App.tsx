@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react'
 import { api, type D1Database } from './services/api'
 import { auth } from './services/auth'
 import { useTheme } from './hooks/useTheme'
-import { Database, Plus, Moon, Sun, Monitor, Loader2, Code, GitCompare } from 'lucide-react'
+import { Database, Plus, Moon, Sun, Monitor, Loader2, Code, GitCompare, Upload, Download, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Card,
   CardContent,
@@ -21,6 +22,15 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Progress } from '@/components/ui/progress'
 import { DatabaseView } from './components/DatabaseView'
 import { TableView } from './components/TableView'
 import { QueryConsole } from './components/QueryConsole'
@@ -45,6 +55,26 @@ export default function App() {
   const [showComparison, setShowComparison] = useState(false)
   const [showMigration, setShowMigration] = useState(false)
   const { theme, setTheme } = useTheme()
+  
+  // Bulk operations state
+  const [selectedDatabases, setSelectedDatabases] = useState<string[]>([])
+  const [bulkDownloadProgress, setBulkDownloadProgress] = useState<{
+    progress: number
+    status: 'preparing' | 'downloading' | 'complete' | 'error'
+    error?: string
+  } | null>(null)
+  const [showUploadDialog, setShowUploadDialog] = useState(false)
+  const [uploadFile, setUploadFile] = useState<File | null>(null)
+  const [uploadMode, setUploadMode] = useState<'create' | 'import'>('create')
+  const [uploadDbName, setUploadDbName] = useState('')
+  const [uploadTargetDb, setUploadTargetDb] = useState('')
+  const [uploading, setUploading] = useState(false)
+  const [deleteConfirmState, setDeleteConfirmState] = useState<{
+    databaseIds: string[]
+    databaseNames: string[]
+    isDeleting: boolean
+    currentProgress?: { current: number; total: number }
+  } | null>(null)
 
   // Load databases on mount
   useEffect(() => {
@@ -129,6 +159,130 @@ export default function App() {
     })
   }
 
+  // Bulk operation handlers
+  const toggleDatabaseSelection = (uuid: string) => {
+    setSelectedDatabases(prev => {
+      if (prev.includes(uuid)) {
+        return prev.filter(id => id !== uuid)
+      } else {
+        return [...prev, uuid]
+      }
+    })
+  }
+
+  const selectAllDatabases = () => {
+    setSelectedDatabases(databases.map(db => db.uuid))
+  }
+
+  const clearSelection = () => {
+    setSelectedDatabases([])
+  }
+
+  const handleBulkDownload = async () => {
+    if (selectedDatabases.length === 0) return
+    
+    setError('')
+    setBulkDownloadProgress({ progress: 0, status: 'preparing' })
+    
+    try {
+      const selectedDbData = databases.filter(db => selectedDatabases.includes(db.uuid))
+      
+      await api.exportDatabases(selectedDbData, (progress) => {
+        setBulkDownloadProgress({
+          progress,
+          status: progress < 100 ? 'downloading' : 'complete'
+        })
+      })
+      
+      // Clear selection after successful download
+      setSelectedDatabases([])
+      
+      setTimeout(() => {
+        setBulkDownloadProgress(null)
+      }, 2000)
+    } catch (err) {
+      console.error('Bulk download error:', err)
+      setError(err instanceof Error ? err.message : 'Failed to download databases')
+      setBulkDownloadProgress({
+        progress: 0,
+        status: 'error',
+        error: err instanceof Error ? err.message : 'Download failed'
+      })
+    }
+  }
+
+  const handleBulkDelete = () => {
+    if (selectedDatabases.length === 0) return
+    
+    const selectedDbData = databases.filter(db => selectedDatabases.includes(db.uuid))
+    
+    setDeleteConfirmState({
+      databaseIds: selectedDatabases,
+      databaseNames: selectedDbData.map(db => db.name),
+      isDeleting: false
+    })
+  }
+
+  const confirmBulkDelete = async () => {
+    if (!deleteConfirmState) return
+    
+    setDeleteConfirmState(prev => prev ? { ...prev, isDeleting: true } : null)
+    setError('')
+    
+    try {
+      const result = await api.deleteDatabases(deleteConfirmState.databaseIds, (current, total) => {
+        setDeleteConfirmState(prev => prev ? {
+          ...prev,
+          currentProgress: { current, total }
+        } : null)
+      })
+      
+      // Show errors if any
+      if (result.failed.length > 0) {
+        setError(`Some databases failed to delete:\n${result.failed.map(f => `${f.id}: ${f.error}`).join('\n')}`)
+      }
+      
+      // Reload databases
+      await loadDatabases()
+      
+      // Clear selection
+      setSelectedDatabases([])
+      setDeleteConfirmState(null)
+    } catch (err) {
+      setError('Failed to delete databases')
+      console.error('Bulk delete error:', err)
+      setDeleteConfirmState(prev => prev ? { ...prev, isDeleting: false } : null)
+    }
+  }
+
+  const handleUploadDatabase = async () => {
+    if (!uploadFile) return
+    
+    setUploading(true)
+    setError('')
+    
+    try {
+      await api.importDatabase(uploadFile, {
+        createNew: uploadMode === 'create',
+        databaseName: uploadMode === 'create' ? uploadDbName : undefined,
+        targetDatabaseId: uploadMode === 'import' ? uploadTargetDb : undefined
+      })
+      
+      // Reload databases
+      await loadDatabases()
+      
+      // Close dialog and reset
+      setShowUploadDialog(false)
+      setUploadFile(null)
+      setUploadDbName('')
+      setUploadTargetDb('')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to upload database')
+    } finally {
+      setUploading(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -177,6 +331,50 @@ export default function App() {
               Create Database
             </Button>
           </div>
+
+          {/* Bulk Operations Toolbar */}
+          {(selectedDatabases.length > 0 || databases.length > 0) && (
+            <div className="flex items-center justify-between mb-6 p-4 border rounded-lg bg-card">
+              <div className="flex items-center gap-4">
+                {databases.length > 0 && selectedDatabases.length === 0 && (
+                  <Button variant="outline" onClick={selectAllDatabases}>
+                    Select All
+                  </Button>
+                )}
+                {selectedDatabases.length > 0 && (
+                  <span className="text-sm text-muted-foreground">
+                    {selectedDatabases.length} database{selectedDatabases.length !== 1 ? 's' : ''} selected
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" onClick={() => setShowUploadDialog(true)}>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload Database
+                </Button>
+                {selectedDatabases.length > 0 && (
+                  <>
+                    <Button variant="outline" onClick={clearSelection}>
+                      Clear Selection
+                    </Button>
+                    <Button onClick={handleBulkDownload} disabled={bulkDownloadProgress !== null}>
+                      <Download className="h-4 w-4 mr-2" />
+                      {bulkDownloadProgress ? (
+                        bulkDownloadProgress.status === 'error' ? 'Download Failed' :
+                        bulkDownloadProgress.status === 'complete' ? 'Download Complete' :
+                        bulkDownloadProgress.status === 'preparing' ? 'Preparing...' :
+                        `Downloading (${Math.round(bulkDownloadProgress.progress)}%)`
+                      ) : 'Download Selected'}
+                    </Button>
+                    <Button variant="destructive" onClick={handleBulkDelete}>
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete Selected
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Cross-Database Search */}
           {databases.length > 0 && (
@@ -278,9 +476,23 @@ export default function App() {
 
             {!loading && databases.length > 0 && (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {databases.map((db) => (
-                  <Card key={db.uuid} className="hover:shadow-lg transition-shadow">
-                    <CardHeader>
+                {databases.map((db) => {
+                  const isSelected = selectedDatabases.includes(db.uuid)
+                  return (
+                  <Card 
+                    key={db.uuid} 
+                    className={`hover:shadow-lg transition-shadow relative ${
+                      isSelected ? 'ring-2 ring-primary' : ''
+                    }`}
+                  >
+                    <div className="absolute top-4 left-4 z-10">
+                      <Checkbox
+                        checked={isSelected}
+                        onCheckedChange={() => toggleDatabaseSelection(db.uuid)}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </div>
+                    <CardHeader className="pl-12">
                       <div className="flex items-start justify-between">
                         <Database className="h-8 w-8 text-primary" />
                         <span className={`text-xs px-2 py-1 rounded-full ${
@@ -335,7 +547,7 @@ export default function App() {
                       </div>
                     </CardContent>
                   </Card>
-                ))}
+                )})}
               </div>
             )}
           </>
@@ -428,6 +640,174 @@ export default function App() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Upload Database Dialog */}
+      <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Upload Database</DialogTitle>
+            <DialogDescription>
+              Upload a SQL file to create a new database or import into an existing one.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="sql-file">SQL File</Label>
+              <Input
+                id="sql-file"
+                type="file"
+                accept=".sql"
+                onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+                disabled={uploading}
+              />
+              <p className="text-xs text-muted-foreground">
+                Maximum file size: 5GB
+              </p>
+            </div>
+
+            {uploadFile && (
+              <>
+                <div className="grid gap-2">
+                  <Label>Import Mode</Label>
+                  <RadioGroup value={uploadMode} onValueChange={(v) => setUploadMode(v as 'create' | 'import')}>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="create" id="create" />
+                      <Label htmlFor="create" className="font-normal">Create new database</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="import" id="import" />
+                      <Label htmlFor="import" className="font-normal">Import into existing database</Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+
+                {uploadMode === 'create' && (
+                  <div className="grid gap-2">
+                    <Label htmlFor="new-db-name">New Database Name</Label>
+                    <Input
+                      id="new-db-name"
+                      placeholder="my-database"
+                      value={uploadDbName}
+                      onChange={(e) => setUploadDbName(e.target.value)}
+                      disabled={uploading}
+                    />
+                  </div>
+                )}
+
+                {uploadMode === 'import' && (
+                  <div className="grid gap-2">
+                    <Label htmlFor="target-db">Target Database</Label>
+                    <Select value={uploadTargetDb} onValueChange={setUploadTargetDb} disabled={uploading}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a database" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {databases.map((db) => (
+                          <SelectItem key={db.uuid} value={db.uuid}>
+                            {db.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowUploadDialog(false)
+                setUploadFile(null)
+                setUploadDbName('')
+                setUploadTargetDb('')
+              }}
+              disabled={uploading}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleUploadDatabase} 
+              disabled={
+                uploading || 
+                !uploadFile || 
+                (uploadMode === 'create' && !uploadDbName.trim()) ||
+                (uploadMode === 'import' && !uploadTargetDb)
+              }
+            >
+              {uploading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {uploading ? 'Uploading...' : 'Upload'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      {deleteConfirmState && (
+        <Dialog open={true} onOpenChange={() => !deleteConfirmState.isDeleting && setDeleteConfirmState(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                {deleteConfirmState.databaseNames.length === 1
+                  ? 'Delete Database?'
+                  : `Delete ${deleteConfirmState.databaseNames.length} Databases?`}
+              </DialogTitle>
+              <DialogDescription>
+                This action cannot be undone. This will permanently delete the database(s) and all their data.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              {deleteConfirmState.databaseNames.length === 1 ? (
+                <p className="text-sm">
+                  Database: <strong>{deleteConfirmState.databaseNames[0]}</strong>
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Databases to delete:</p>
+                  <ul className="text-sm list-disc list-inside max-h-40 overflow-y-auto">
+                    {deleteConfirmState.databaseNames.map((name, index) => (
+                      <li key={index}>{name}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              
+              {deleteConfirmState.isDeleting && deleteConfirmState.currentProgress && (
+                <div className="mt-4 space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    Deleting database {deleteConfirmState.currentProgress.current} of {deleteConfirmState.currentProgress.total}...
+                  </p>
+                  <Progress 
+                    value={(deleteConfirmState.currentProgress.current / deleteConfirmState.currentProgress.total) * 100} 
+                  />
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setDeleteConfirmState(null)}
+                disabled={deleteConfirmState.isDeleting}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={confirmBulkDelete}
+                disabled={deleteConfirmState.isDeleting}
+              >
+                {deleteConfirmState.isDeleting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                {deleteConfirmState.isDeleting 
+                  ? 'Deleting...' 
+                  : deleteConfirmState.databaseNames.length === 1
+                    ? 'Delete Database'
+                    : `Delete ${deleteConfirmState.databaseNames.length} Databases`}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   )
 }

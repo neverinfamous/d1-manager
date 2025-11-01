@@ -1,6 +1,6 @@
 # D1 Database Manager for Cloudflare
 
-**Last Updated:** October 30, 2025 | **Version:** 2.0.0  
+**Last Updated:** November 1, 2025 | **Version:** 2.1.0  
 **Tech Stack:** React 19.2.0 | Vite 7.1.12 | TypeScript 5.9.3 | Tailwind CSS | shadcn/ui | Cloudflare Workers + Zero Trust
 
 A modern, full-featured web application for managing Cloudflare D1 databases with enterprise-grade authentication via Cloudflare Access (Zero Trust). Similar in design and functionality to the R2 Bucket Manager, providing capabilities beyond the standard Cloudflare dashboard.
@@ -14,7 +14,12 @@ A modern, full-featured web application for managing Cloudflare D1 databases wit
 #### Database Management
 - **List & Browse** - View all D1 databases with metadata (created date, size, table count)
 - **Create Database** - Interactive dialog for creating new databases
-- **Delete Database** - Remove databases (placeholder UI)
+- **Delete Database** - Remove databases with confirmation
+- **Bulk Operations** - Select multiple databases for batch operations
+  - **Multi-Select** - Checkbox on each database card with "Select All" option
+  - **Bulk Download** - Export multiple databases as a single ZIP file of SQL dumps
+  - **Bulk Delete** - Delete multiple databases with progress tracking
+  - **Upload Database** - Import SQL files to create new databases or update existing ones
 - **Database Cards** - Beautiful cards showing database information and quick actions
 
 #### Table Operations
@@ -147,6 +152,8 @@ d1-manager/
 - `POST /api/databases` - Create a new database
 - `DELETE /api/databases/:dbId` - Delete a database
 - `GET /api/databases/:dbId/info` - Get database information
+- `POST /api/databases/export` - Export multiple databases (returns SQL content for ZIP creation)
+- `POST /api/databases/import` - Import SQL file to create new or update existing database
 
 ### Tables
 - `GET /api/tables/:dbId/list` - List all tables in a database
@@ -207,8 +214,39 @@ The Worker automatically detects localhost requests and returns mock data:
 - **Sample Tables:** `users`, `posts`, `comments`
 - **Sample Schema:** Realistic column structures
 - **Query Results:** Formatted response data
+- **Export Operations:** Returns mock SQL content
+- **Import Operations:** Simulates database creation/import
 
 This allows full UI testing without connecting to actual Cloudflare D1 databases.
+
+### Bulk Operations
+
+The D1 Manager supports bulk operations on multiple databases:
+
+**To use bulk operations:**
+1. Click checkboxes on database cards to select databases (or use "Select All")
+2. Selected databases show a blue ring border
+3. Action buttons appear in the toolbar:
+   - **Download Selected** - Exports databases as SQL files in a ZIP archive
+   - **Delete Selected** - Deletes multiple databases with confirmation
+   - **Upload Database** - Import SQL files (always visible)
+
+**Download Process:**
+- Uses D1's polling export API to generate SQL dumps
+- Creates a timestamped ZIP file containing all selected databases
+- Progress tracking from preparation through download completion
+
+**Upload Process:**
+- Accepts `.sql` files up to 5GB
+- Two modes:
+  - **Create New Database** - Creates a new database from SQL file
+  - **Import into Existing** - Imports SQL into selected existing database
+- Automatically refreshes database list after successful upload
+
+**Delete Process:**
+- Shows confirmation dialog with list of databases to delete
+- Sequential deletion with progress tracking
+- Reports any failures while continuing with remaining databases
 
 ### Authentication
 
@@ -359,6 +397,7 @@ For more help, see [Cloudflare Workers Troubleshooting](https://developers.cloud
 - ✅ **Migration wizard** - 5-step wizard for database-to-database migrations
 - ✅ **Backup/Restore** - UI ready for Time Travel API integration
 - ✅ **Analytics** - Dashboard structure prepared for production
+- ✅ **Multi-database operations** - Bulk download, delete, and upload capabilities
 
 ---
 

@@ -128,6 +128,157 @@ class APIService {
   }
 
   /**
+   * Delete multiple databases
+   */
+  async deleteDatabases(
+    databaseIds: string[],
+    onProgress?: (completed: number, total: number) => void
+  ): Promise<{ succeeded: string[], failed: Array<{ id: string, error: string }> }> {
+    const succeeded: string[] = []
+    const failed: Array<{ id: string, error: string }> = []
+    
+    for (let i = 0; i < databaseIds.length; i++) {
+      try {
+        await this.deleteDatabase(databaseIds[i])
+        succeeded.push(databaseIds[i])
+      } catch (err) {
+        failed.push({
+          id: databaseIds[i],
+          error: err instanceof Error ? err.message : 'Unknown error'
+        })
+      }
+      onProgress?.(i + 1, databaseIds.length)
+    }
+    
+    return { succeeded, failed }
+  }
+
+  /**
+   * Export multiple databases as a ZIP file
+   */
+  async exportDatabases(
+    databases: Array<{ uuid: string, name: string }>,
+    onProgress?: (progress: number) => void
+  ): Promise<void> {
+    try {
+      onProgress?.(10)
+      
+      // Call the export endpoint
+      const response = await fetch(`${WORKER_API}/api/databases/export`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          databaseIds: databases.map(db => db.uuid)
+        })
+      })
+      
+      if (!response.ok) {
+        throw new Error(`Failed to export databases: ${response.statusText}`)
+      }
+      
+      onProgress?.(50)
+      
+      const data = await response.json() as { result: { [key: string]: string }, success: boolean }
+      
+      if (!data.success) {
+        throw new Error('Export operation failed')
+      }
+      
+      onProgress?.(70)
+      
+      // Create a ZIP file using JSZip
+      const JSZip = (await import('jszip')).default
+      const zip = new JSZip()
+      
+      // Add each database's SQL export to the ZIP
+      const exports = data.result
+      for (const db of databases) {
+        if (exports[db.uuid]) {
+          zip.file(`${db.name}.sql`, exports[db.uuid])
+        }
+      }
+      
+      onProgress?.(90)
+      
+      // Generate the ZIP file
+      const blob = await zip.generateAsync({ type: 'blob' })
+      
+      // Download the ZIP file
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)
+      link.download = `d1-databases-${timestamp}.zip`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+      
+      onProgress?.(100)
+    } catch (error) {
+      console.error('Database export failed:', error)
+      throw new Error(error instanceof Error ? error.message : 'Failed to export databases')
+    }
+  }
+
+  /**
+   * Import a database from SQL file
+   */
+  async importDatabase(
+    file: File,
+    options: {
+      createNew?: boolean
+      databaseName?: string
+      targetDatabaseId?: string
+    }
+  ): Promise<D1Database | void> {
+    try {
+      // Read the SQL file content
+      const sqlContent = await file.text()
+      
+      // Validate it's a SQL file
+      if (!file.name.endsWith('.sql')) {
+        throw new Error('Only .sql files are supported')
+      }
+      
+      // Check file size (5GB limit)
+      const maxSize = 5 * 1024 * 1024 * 1024 // 5GB
+      if (file.size > maxSize) {
+        throw new Error('File size exceeds 5GB limit')
+      }
+      
+      // Call the import endpoint
+      const response = await fetch(`${WORKER_API}/api/databases/import`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          sqlContent,
+          createNew: options.createNew,
+          databaseName: options.databaseName,
+          targetDatabaseId: options.targetDatabaseId
+        })
+      })
+      
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+        throw new Error(error.error || `Import failed: ${response.statusText}`)
+      }
+      
+      const data = await response.json()
+      return data.result
+    } catch (error) {
+      console.error('Database import failed:', error)
+      throw new Error(error instanceof Error ? error.message : 'Failed to import database')
+    }
+  }
+
+  /**
    * List tables in a database
    */
   async listTables(databaseId: string): Promise<TableInfo[]> {
