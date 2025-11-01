@@ -200,6 +200,360 @@ export async function handleTableRoutes(
       });
     }
 
+    // Delete table
+    if (request.method === 'DELETE' && url.pathname.match(/^\/api\/tables\/[^/]+\/[^/]+$/)) {
+      const tableName = decodeURIComponent(pathParts[4]);
+      console.log('[Tables] Deleting table:', tableName);
+      
+      // Mock response for local development
+      if (isLocalDev) {
+        return new Response(JSON.stringify({
+          success: true
+        }), {
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        });
+      }
+      
+      const sanitizedTable = sanitizeIdentifier(tableName);
+      const query = `DROP TABLE "${sanitizedTable}"`;
+      await executeQueryViaAPI(dbId, query, env);
+      
+      return new Response(JSON.stringify({
+        success: true
+      }), {
+        headers: {
+          'Content-Type': 'application/json',
+          ...corsHeaders
+        }
+      });
+    }
+
+    // Rename table
+    if (request.method === 'PATCH' && url.pathname.match(/^\/api\/tables\/[^/]+\/[^/]+\/rename$/)) {
+      const tableName = decodeURIComponent(pathParts[4]);
+      console.log('[Tables] Renaming table:', tableName);
+      
+      const body = await request.json() as { newName: string };
+      const newName = body.newName;
+      
+      if (!newName || !newName.trim()) {
+        return new Response(JSON.stringify({ 
+          error: 'New table name is required' 
+        }), { 
+          status: 400,
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        });
+      }
+      
+      // Mock response for local development
+      if (isLocalDev) {
+        return new Response(JSON.stringify({
+          result: { name: newName, type: 'table', ncol: 5, wr: 0, strict: 0 },
+          success: true
+        }), {
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        });
+      }
+      
+      const sanitizedOldTable = sanitizeIdentifier(tableName);
+      const sanitizedNewTable = sanitizeIdentifier(newName);
+      const query = `ALTER TABLE "${sanitizedOldTable}" RENAME TO "${sanitizedNewTable}"`;
+      await executeQueryViaAPI(dbId, query, env);
+      
+      // Get the new table info
+      const tableListResult = await executeQueryViaAPI(dbId, "PRAGMA table_list", env);
+      const newTableInfo = (tableListResult.results as TableInfo[]).find(
+        (table: TableInfo) => table.name === newName
+      );
+      
+      return new Response(JSON.stringify({
+        result: newTableInfo || { name: newName, type: 'table', ncol: 0, wr: 0, strict: 0 },
+        success: true
+      }), {
+        headers: {
+          'Content-Type': 'application/json',
+          ...corsHeaders
+        }
+      });
+    }
+
+    // Clone table
+    if (request.method === 'POST' && url.pathname.match(/^\/api\/tables\/[^/]+\/[^/]+\/clone$/)) {
+      const tableName = decodeURIComponent(pathParts[4]);
+      console.log('[Tables] Cloning table:', tableName);
+      
+      const body = await request.json() as { newName: string };
+      const newName = body.newName;
+      
+      if (!newName || !newName.trim()) {
+        return new Response(JSON.stringify({ 
+          error: 'New table name is required' 
+        }), { 
+          status: 400,
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        });
+      }
+      
+      // Mock response for local development
+      if (isLocalDev) {
+        return new Response(JSON.stringify({
+          result: { name: newName, type: 'table', ncol: 5, wr: 0, strict: 0 },
+          success: true
+        }), {
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        });
+      }
+      
+      const sanitizedOldTable = sanitizeIdentifier(tableName);
+      const sanitizedNewTable = sanitizeIdentifier(newName);
+      
+      // Get schema
+      const schemaResult = await executeQueryViaAPI(dbId, `PRAGMA table_info("${sanitizedOldTable}")`, env);
+      const columns = schemaResult.results as Array<{
+        cid: number;
+        name: string;
+        type: string;
+        notnull: number;
+        dflt_value: string | null;
+        pk: number;
+      }>;
+      
+      // Generate CREATE TABLE statement
+      const columnDefs = columns.map(col => {
+        let def = `"${col.name}" ${col.type || 'TEXT'}`;
+        if (col.pk > 0) def += ' PRIMARY KEY';
+        if (col.notnull && col.pk === 0) def += ' NOT NULL';
+        if (col.dflt_value !== null) def += ` DEFAULT ${col.dflt_value}`;
+        return def;
+      }).join(', ');
+      
+      const createTableQuery = `CREATE TABLE "${sanitizedNewTable}" (${columnDefs})`;
+      await executeQueryViaAPI(dbId, createTableQuery, env);
+      
+      // Copy data
+      const copyDataQuery = `INSERT INTO "${sanitizedNewTable}" SELECT * FROM "${sanitizedOldTable}"`;
+      await executeQueryViaAPI(dbId, copyDataQuery, env);
+      
+      // Get indexes and recreate them
+      const indexesResult = await executeQueryViaAPI(dbId, `PRAGMA index_list("${sanitizedOldTable}")`, env);
+      const indexes = indexesResult.results as Array<{
+        seq: number;
+        name: string;
+        unique: number;
+        origin: string;
+        partial: number;
+      }>;
+      
+      for (const index of indexes) {
+        if (index.origin === 'c') { // Only copy user-created indexes
+          const indexInfoResult = await executeQueryViaAPI(dbId, `PRAGMA index_info("${index.name}")`, env);
+          const indexColumns = indexInfoResult.results as Array<{ seqno: number; cid: number; name: string }>;
+          
+          const columnNames = indexColumns.map(ic => `"${ic.name}"`).join(', ');
+          const newIndexName = index.name.replace(tableName, newName);
+          const uniqueStr = index.unique ? 'UNIQUE ' : '';
+          
+          const createIndexQuery = `CREATE ${uniqueStr}INDEX "${newIndexName}" ON "${sanitizedNewTable}" (${columnNames})`;
+          await executeQueryViaAPI(dbId, createIndexQuery, env);
+        }
+      }
+      
+      // Get the new table info
+      const tableListResult = await executeQueryViaAPI(dbId, "PRAGMA table_list", env);
+      const newTableInfo = (tableListResult.results as TableInfo[]).find(
+        (table: TableInfo) => table.name === newName
+      );
+      
+      return new Response(JSON.stringify({
+        result: newTableInfo || { name: newName, type: 'table', ncol: columns.length, wr: 0, strict: 0 },
+        success: true
+      }), {
+        headers: {
+          'Content-Type': 'application/json',
+          ...corsHeaders
+        }
+      });
+    }
+
+    // Export table
+    if (request.method === 'GET' && url.pathname.match(/^\/api\/tables\/[^/]+\/[^/]+\/export$/)) {
+      const tableName = decodeURIComponent(pathParts[4]);
+      const format = url.searchParams.get('format') || 'sql';
+      console.log('[Tables] Exporting table:', tableName, 'format:', format);
+      
+      // Mock response for local development
+      if (isLocalDev) {
+        const mockContent = format === 'csv' 
+          ? 'id,email,name,created_at\n1,user1@example.com,User One,2024-01-01\n2,user2@example.com,User Two,2024-01-02'
+          : `CREATE TABLE "${tableName}" (id INTEGER PRIMARY KEY, email TEXT, name TEXT, created_at DATETIME);\nINSERT INTO "${tableName}" VALUES (1, 'user1@example.com', 'User One', '2024-01-01');\nINSERT INTO "${tableName}" VALUES (2, 'user2@example.com', 'User Two', '2024-01-02');`;
+        
+        return new Response(JSON.stringify({
+          result: {
+            content: mockContent,
+            filename: `${tableName}.${format}`
+          },
+          success: true
+        }), {
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        });
+      }
+      
+      const sanitizedTable = sanitizeIdentifier(tableName);
+      
+      if (format === 'csv') {
+        // Export as CSV
+        const dataResult = await executeQueryViaAPI(dbId, `SELECT * FROM "${sanitizedTable}"`, env);
+        const rows = dataResult.results as Record<string, unknown>[];
+        
+        if (rows.length === 0) {
+          return new Response(JSON.stringify({
+            result: {
+              content: '',
+              filename: `${tableName}.csv`
+            },
+            success: true
+          }), {
+            headers: {
+              'Content-Type': 'application/json',
+              ...corsHeaders
+            }
+          });
+        }
+        
+        // Get column names from first row
+        const columns = Object.keys(rows[0]);
+        
+        // Create CSV content
+        const csvRows: string[] = [];
+        csvRows.push(columns.map(col => `"${col}"`).join(','));
+        
+        for (const row of rows) {
+          const values = columns.map(col => {
+            const cell = row[col];
+            if (cell === null) return 'NULL';
+            if (cell === undefined) return '';
+            const str = String(cell);
+            if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+              return `"${str.replace(/"/g, '""')}"`;
+            }
+            return str;
+          });
+          csvRows.push(values.join(','));
+        }
+        
+        return new Response(JSON.stringify({
+          result: {
+            content: csvRows.join('\n'),
+            filename: `${tableName}.csv`
+          },
+          success: true
+        }), {
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        });
+      } else {
+        // Export as SQL
+        // Get schema
+        const schemaResult = await executeQueryViaAPI(dbId, `PRAGMA table_info("${sanitizedTable}")`, env);
+        const columns = schemaResult.results as Array<{
+          cid: number;
+          name: string;
+          type: string;
+          notnull: number;
+          dflt_value: string | null;
+          pk: number;
+        }>;
+        
+        // Generate CREATE TABLE statement
+        const columnDefs = columns.map(col => {
+          let def = `"${col.name}" ${col.type || 'TEXT'}`;
+          if (col.pk > 0) def += ' PRIMARY KEY';
+          if (col.notnull && col.pk === 0) def += ' NOT NULL';
+          if (col.dflt_value !== null) def += ` DEFAULT ${col.dflt_value}`;
+          return def;
+        }).join(', ');
+        
+        const sqlStatements: string[] = [];
+        sqlStatements.push(`CREATE TABLE "${tableName}" (${columnDefs});`);
+        
+        // Get data
+        const dataResult = await executeQueryViaAPI(dbId, `SELECT * FROM "${sanitizedTable}"`, env);
+        const rows = dataResult.results as Record<string, unknown>[];
+        
+        // Generate INSERT statements
+        for (const row of rows) {
+          const columnNames = Object.keys(row);
+          const values = columnNames.map(col => {
+            const val = row[col];
+            if (val === null) return 'NULL';
+            if (typeof val === 'number') return String(val);
+            return `'${String(val).replace(/'/g, "''")}'`;
+          });
+          
+          sqlStatements.push(
+            `INSERT INTO "${tableName}" (${columnNames.map(n => `"${n}"`).join(', ')}) VALUES (${values.join(', ')});`
+          );
+        }
+        
+        // Get indexes
+        const indexesResult = await executeQueryViaAPI(dbId, `PRAGMA index_list("${sanitizedTable}")`, env);
+        const indexes = indexesResult.results as Array<{
+          seq: number;
+          name: string;
+          unique: number;
+          origin: string;
+          partial: number;
+        }>;
+        
+        for (const index of indexes) {
+          if (index.origin === 'c') {
+            const indexInfoResult = await executeQueryViaAPI(dbId, `PRAGMA index_info("${index.name}")`, env);
+            const indexColumns = indexInfoResult.results as Array<{ seqno: number; cid: number; name: string }>;
+            
+            const columnNames = indexColumns.map(ic => `"${ic.name}"`).join(', ');
+            const uniqueStr = index.unique ? 'UNIQUE ' : '';
+            
+            sqlStatements.push(
+              `CREATE ${uniqueStr}INDEX "${index.name}" ON "${tableName}" (${columnNames});`
+            );
+          }
+        }
+        
+        return new Response(JSON.stringify({
+          result: {
+            content: sqlStatements.join('\n'),
+            filename: `${tableName}.sql`
+          },
+          success: true
+        }), {
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        });
+      }
+    }
+
     // Route not found
     return new Response(JSON.stringify({ 
       error: 'Route not found' 

@@ -396,6 +396,236 @@ class APIService {
   }
 
   /**
+   * Rename a table
+   */
+  async renameTable(databaseId: string, tableName: string, newName: string): Promise<TableInfo> {
+    const response = await fetch(
+      `${WORKER_API}/api/tables/${databaseId}/${encodeURIComponent(tableName)}/rename`,
+      {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify({ newName })
+      }
+    )
+    
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+      throw new Error(error.error || `Failed to rename table: ${response.statusText}`)
+    }
+    
+    const data = await response.json()
+    return data.result
+  }
+
+  /**
+   * Delete a table
+   */
+  async deleteTable(databaseId: string, tableName: string): Promise<void> {
+    const response = await fetch(
+      `${WORKER_API}/api/tables/${databaseId}/${encodeURIComponent(tableName)}`,
+      {
+        method: 'DELETE',
+        credentials: 'include'
+      }
+    )
+    
+    if (!response.ok) {
+      throw new Error(`Failed to delete table: ${response.statusText}`)
+    }
+  }
+
+  /**
+   * Delete multiple tables
+   */
+  async deleteTables(
+    databaseId: string,
+    tableNames: string[],
+    onProgress?: (completed: number, total: number) => void
+  ): Promise<{ succeeded: string[], failed: Array<{ name: string, error: string }> }> {
+    const succeeded: string[] = []
+    const failed: Array<{ name: string, error: string }> = []
+    
+    for (let i = 0; i < tableNames.length; i++) {
+      try {
+        await this.deleteTable(databaseId, tableNames[i])
+        succeeded.push(tableNames[i])
+      } catch (err) {
+        failed.push({
+          name: tableNames[i],
+          error: err instanceof Error ? err.message : 'Unknown error'
+        })
+      }
+      onProgress?.(i + 1, tableNames.length)
+    }
+    
+    return { succeeded, failed }
+  }
+
+  /**
+   * Clone a table
+   */
+  async cloneTable(databaseId: string, tableName: string, newName: string): Promise<TableInfo> {
+    const response = await fetch(
+      `${WORKER_API}/api/tables/${databaseId}/${encodeURIComponent(tableName)}/clone`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify({ newName })
+      }
+    )
+    
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+      throw new Error(error.error || `Failed to clone table: ${response.statusText}`)
+    }
+    
+    const data = await response.json()
+    return data.result
+  }
+
+  /**
+   * Clone multiple tables
+   */
+  async cloneTables(
+    databaseId: string,
+    tables: Array<{ name: string, newName: string }>,
+    onProgress?: (completed: number, total: number) => void
+  ): Promise<{ succeeded: Array<{ oldName: string, newName: string }>, failed: Array<{ name: string, error: string }> }> {
+    const succeeded: Array<{ oldName: string, newName: string }> = []
+    const failed: Array<{ name: string, error: string }> = []
+    
+    for (let i = 0; i < tables.length; i++) {
+      try {
+        await this.cloneTable(databaseId, tables[i].name, tables[i].newName)
+        succeeded.push({ oldName: tables[i].name, newName: tables[i].newName })
+      } catch (err) {
+        failed.push({
+          name: tables[i].name,
+          error: err instanceof Error ? err.message : 'Unknown error'
+        })
+      }
+      onProgress?.(i + 1, tables.length)
+    }
+    
+    return { succeeded, failed }
+  }
+
+  /**
+   * Export a single table
+   */
+  async exportTable(databaseId: string, tableName: string, format: 'sql' | 'csv' = 'sql'): Promise<void> {
+    try {
+      const response = await fetch(
+        `${WORKER_API}/api/tables/${databaseId}/${encodeURIComponent(tableName)}/export?format=${format}`,
+        { credentials: 'include' }
+      )
+      
+      if (!response.ok) {
+        throw new Error(`Failed to export table: ${response.statusText}`)
+      }
+      
+      const data = await response.json() as { result: { content: string, filename: string }, success: boolean }
+      
+      if (!data.success) {
+        throw new Error('Export operation failed')
+      }
+      
+      // Download the file
+      const blob = new Blob([data.result.content], { type: format === 'csv' ? 'text/csv' : 'text/plain' })
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = data.result.filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error('Table export failed:', error)
+      throw new Error(error instanceof Error ? error.message : 'Failed to export table')
+    }
+  }
+
+  /**
+   * Export multiple tables as a ZIP file
+   */
+  async exportTables(
+    databaseId: string,
+    tableNames: string[],
+    format: 'sql' | 'csv' = 'sql',
+    onProgress?: (progress: number) => void
+  ): Promise<void> {
+    try {
+      onProgress?.(10)
+      
+      // Fetch all table exports
+      const exports: Array<{ name: string, content: string }> = []
+      
+      for (let i = 0; i < tableNames.length; i++) {
+        const response = await fetch(
+          `${WORKER_API}/api/tables/${databaseId}/${encodeURIComponent(tableNames[i])}/export?format=${format}`,
+          { credentials: 'include' }
+        )
+        
+        if (!response.ok) {
+          throw new Error(`Failed to export table ${tableNames[i]}: ${response.statusText}`)
+        }
+        
+        const data = await response.json() as { result: { content: string, filename: string }, success: boolean }
+        
+        if (!data.success) {
+          throw new Error(`Export operation failed for table ${tableNames[i]}`)
+        }
+        
+        exports.push({
+          name: data.result.filename,
+          content: data.result.content
+        })
+        
+        onProgress?.(10 + (i + 1) / tableNames.length * 60)
+      }
+      
+      onProgress?.(70)
+      
+      // Create a ZIP file using JSZip
+      const JSZip = (await import('jszip')).default
+      const zip = new JSZip()
+      
+      // Add each table's export to the ZIP
+      for (const exp of exports) {
+        zip.file(exp.name, exp.content)
+      }
+      
+      onProgress?.(90)
+      
+      // Generate the ZIP file
+      const blob = await zip.generateAsync({ type: 'blob' })
+      
+      // Download the ZIP file
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)
+      link.download = `tables-export-${timestamp}.zip`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+      
+      onProgress?.(100)
+    } catch (error) {
+      console.error('Tables export failed:', error)
+      throw new Error(error instanceof Error ? error.message : 'Failed to export tables')
+    }
+  }
+
+  /**
    * Execute a SQL query
    */
   async executeQuery<T = Record<string, unknown>>(
