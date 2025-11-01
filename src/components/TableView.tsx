@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -35,6 +36,7 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
   const [editingRow, setEditingRow] = useState<Record<string, unknown> | null>(null);
   const [editValues, setEditValues] = useState<Record<string, string>>({});
   const [updating, setUpdating] = useState(false);
+  const [allowEditPrimaryKey, setAllowEditPrimaryKey] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deletingRow, setDeletingRow] = useState<Record<string, unknown> | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -143,6 +145,7 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
       stringValues[col.name] = value !== null && value !== undefined ? String(value) : '';
     });
     setEditValues(stringValues);
+    setAllowEditPrimaryKey(false); // Reset checkbox when opening dialog
     setShowEditDialog(true);
   };
 
@@ -159,8 +162,11 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
         throw new Error('Cannot update row: No primary key found');
       }
       
-      // Build SET clause for non-PK columns
-      const updateColumns = schema.filter(col => col.pk === 0);
+      // Build SET clause - include PKs if editing is allowed
+      const updateColumns = allowEditPrimaryKey 
+        ? schema // Include all columns when PK editing is enabled
+        : schema.filter(col => col.pk === 0); // Only non-PK columns otherwise
+      
       const setClause = updateColumns.map(col => {
         const value = editValues[col.name];
         if (value === '' || value === null) return `"${col.name}" = NULL`;
@@ -168,7 +174,7 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
         return `"${col.name}" = '${value.replace(/'/g, "''")}'`;
       }).join(', ');
       
-      // Build WHERE clause based on primary keys
+      // Build WHERE clause based on ORIGINAL primary key values (from editingRow, not editValues)
       const whereClause = pkColumns.map(col => {
         const value = editingRow[col.name];
         return `"${col.name}" = ${typeof value === 'number' ? value : `'${String(value).replace(/'/g, "''")}'`}`;
@@ -519,6 +525,26 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
               Modify the values for this row. Leave fields empty for NULL values.
             </DialogDescription>
           </DialogHeader>
+          {schema.some(col => col.pk > 0) && (
+            <div className="flex items-start space-x-3 rounded-md border border-yellow-200 dark:border-yellow-900 bg-yellow-50 dark:bg-yellow-950/30 p-4">
+              <Checkbox
+                id="allow-edit-pk"
+                checked={allowEditPrimaryKey}
+                onCheckedChange={(checked) => setAllowEditPrimaryKey(checked === true)}
+              />
+              <div className="space-y-1 leading-none">
+                <Label
+                  htmlFor="allow-edit-pk"
+                  className="text-sm font-medium cursor-pointer"
+                >
+                  ⚠️ Allow editing primary key (advanced)
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Changing primary keys can break relationships and cause data integrity issues. Only enable this if you know what you're doing.
+                </p>
+              </div>
+            </div>
+          )}
           <div className="grid gap-4 py-4">
             {schema.map((col) => (
               <div key={col.name} className="space-y-2">
@@ -534,7 +560,7 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
                     placeholder="NULL"
                     value={editValues[col.name] || ''}
                     onChange={(e) => setEditValues({...editValues, [col.name]: e.target.value})}
-                    disabled={col.pk > 0} // Disable primary keys (can't be modified)
+                    disabled={col.pk > 0 && !allowEditPrimaryKey} // Disable primary keys unless checkbox is checked
                   />
                   <span className="text-xs text-muted-foreground min-w-[60px]">
                     {col.type || 'ANY'}
