@@ -1,6 +1,6 @@
 # D1 Database Manager for Cloudflare
 
-**Last Updated:** November 1, 2025 | **Version:** 2.1.0  
+**Last Updated:** November 2, 2025 | **Version:** 2.2.0  
 **Tech Stack:** React 19.2.0 | Vite 7.1.12 | TypeScript 5.9.3 | Tailwind CSS | shadcn/ui | Cloudflare Workers + Zero Trust
 
 A modern, full-featured web application for managing Cloudflare D1 databases with enterprise-grade authentication via Cloudflare Access (Zero Trust). Similar in design and functionality to the R2 Bucket Manager, providing capabilities beyond the standard Cloudflare dashboard.
@@ -27,6 +27,12 @@ A modern, full-featured web application for managing Cloudflare D1 databases wit
 - **Browse Tables** - View all tables in a database with search functionality
 - **Table Schema** - Detailed column information with types, primary keys, constraints
 - **Table Data** - Paginated table browser (50 rows per page)
+- **Row-Level Filtering** - Advanced type-aware filtering with server-side SQL WHERE clauses
+  - **Type-Aware Operators** - TEXT (contains, equals, starts/ends with), INTEGER/REAL (=, >, <, ≥, ≤), NULL checks
+  - **Filter Bar UI** - Inline filters above table with one input per column
+  - **URL Persistence** - Filters stored in query params for shareable filtered views
+  - **SQL Injection Protection** - Proper escaping and parameterization
+  - **Active Indicators** - Badge count, highlighted inputs, "(filtered)" label
 - **Visual Schema Designer** - Create tables with visual column builder
   - Define column names and types (TEXT, INTEGER, REAL, BLOB, etc.)
   - Set primary keys and NOT NULL constraints
@@ -70,7 +76,7 @@ A modern, full-featured web application for managing Cloudflare D1 databases wit
 - **Responsive Design** - Works on desktop, tablet, and mobile
 - **Beautiful UI** - Modern interface using shadcn/ui components
 - **Navigation** - Seamless navigation between databases, tables, and query console
-- **Search & Filter** - Search tables by name in database view
+- **Search & Filter** - Search tables by name in database view, filter rows with type-aware operators
 
 ---
 
@@ -184,7 +190,9 @@ d1-manager/
 ### Tables
 - `GET /api/tables/:dbId/list` - List all tables in a database
 - `GET /api/tables/:dbId/schema/:tableName` - Get table schema (columns, types)
-- `GET /api/tables/:dbId/data/:tableName` - Get table data (supports pagination)
+- `GET /api/tables/:dbId/data/:tableName` - Get table data with pagination and filtering
+  - Query params: `limit`, `offset`, `filter_<column>`, `filterValue_<column>`
+  - Filter types: contains, equals, notEquals, gt, gte, lt, lte, isNull, isNotNull, startsWith, endsWith
 - `GET /api/tables/:dbId/indexes/:tableName` - Get table indexes
 - `GET /api/tables/:dbId/dependencies?tables=table1,table2` - Get foreign key dependencies for tables
 - `POST /api/tables/:dbId/create` - Create a new table
@@ -499,8 +507,18 @@ For more help, see [Cloudflare Workers Troubleshooting](https://developers.cloud
 
 ## 🔮 Planned Work
 
+### Full-Text Search (FTS5)
+- **FTS5 Virtual Table Management** - Create and manage D1 FTS5 full-text search indexes
+  - Detect existing FTS5 tables with special UI indicator
+  - Wizard to create FTS5 virtual tables from existing tables
+  - Configure tokenizers (porter, unicode61, trigram) and options
+  - Rebuild index UI for content updates
+  - Query builder with MATCH syntax support and ranking (bm25)
+  - Highlight matching terms in search results
+  - Performance metrics (query time, rank scores)
+
 ### Table Dependencies Enhancements
-- **Cascade Impact Simulator** - Preview the exact count of affected rows across the entire dependency chain
+- **Cascade Impact Simulator** - Preview exact count of affected rows across entire dependency chain
   - Real-time calculation of cascading deletions through multiple levels
   - Visual tree showing which rows in which tables will be affected
   - "Dry run" mode to see impact without executing deletion
@@ -509,7 +527,6 @@ For more help, see [Cloudflare Workers Troubleshooting](https://developers.cloud
 - **Force Delete Mode** - Advanced developer option to bypass foreign key constraints
   - Explicit toggle: "Enable Force Delete (Ignore Foreign Keys)"
   - Requires developer mode activation in settings
-  - Shows additional warning: "⚠️ DANGER: This will leave orphaned references"
   - Uses `PRAGMA foreign_keys = OFF` temporarily during operation
   - Logs all bypassed constraints for audit trail
   
@@ -518,14 +535,14 @@ For more help, see [Cloudflare Workers Troubleshooting](https://developers.cloud
   - Click to open table schema view in current or new tab
   - "View all X rows in [table_name]" link with pre-filtered query
   - Breadcrumb navigation to easily return to original context
-  - Keyboard shortcuts for rapid navigation (Ctrl+Click for new tab)
 
 ### Other Planned Features
-- **Index analyzer** - Suggest missing indexes based on foreign keys
+- **Index analyzer** - Suggest missing indexes based on foreign keys and filter usage
 - **Relationship diagram** - Visual graph of table relationships
 - **Constraint validator** - Check for orphaned records and broken references
 - **Dependency export** - Export schema relationships as documentation
 - **Circular dependency detector** - Identify and warn about circular FK chains
+- **Advanced Row Filters** - OR logic, BETWEEN operator, IN clause, filter presets
 
 ---
 
