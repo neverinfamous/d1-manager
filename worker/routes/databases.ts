@@ -1,6 +1,11 @@
 import type { Env, D1DatabaseInfo } from '../types';
 import { CF_API } from '../types';
 
+// D1Database interface (simplified for optimization operations)
+interface D1Database {
+  exec(query: string): Promise<{ count: number; duration: number }>;
+}
+
 export async function handleDatabaseRoutes(
   request: Request,
   env: Env,
@@ -719,33 +724,27 @@ export async function handleDatabaseRoutes(
         
         const startTime = Date.now();
         
-        // Execute the optimization command
-        const response = await fetch(
-          `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database/${dbId}/query`,
-          {
-            method: 'POST',
-            headers: cfHeaders,
-            body: JSON.stringify({ sql })
-          }
-        );
+        // Get the D1 database binding
+        // The database binding name should match the uuid
+        const db = env[dbId] as D1Database | undefined;
         
-        const duration = Date.now() - startTime;
-        
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error(`[Databases] ${body.operation} error:`, errorText);
-          throw new Error(`Failed to execute ${body.operation}: ${response.status}`);
+        if (!db) {
+          throw new Error('Database binding not found. Optimization requires Workers Binding API access.');
         }
         
-        const data = await response.json();
+        // Execute using Workers Binding API (supports VACUUM)
+        const result = await db.exec(sql);
+        
+        const duration = Date.now() - startTime;
         
         console.log(`[Databases] ${body.operation} completed in ${duration}ms`);
         
         return new Response(JSON.stringify({
           result: {
             operation: body.operation,
-            success: data.success,
+            success: true,
             duration_ms: duration,
+            count: result.count,
             message: `${body.operation.toUpperCase()} completed successfully`
           },
           success: true

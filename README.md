@@ -263,9 +263,11 @@ The D1 Manager supports efficient bulk operations on both databases and tables w
 #### Database Operations
 - **Multi-select** with "Select All" option and visual selection indicators
 - **Bulk Optimize** - Run VACUUM and/or ANALYZE on multiple databases with progress tracking
-  - Toggle individual operations (VACUUM for space reclamation, ANALYZE for query optimization)
+  - **VACUUM**: Requires Workers Binding API access (databases must be bound in wrangler.toml)
+  - **ANALYZE**: Available via REST API (PRAGMA optimize)
   - Sequential execution with per-operation progress indicators
   - Error reporting per database
+  - Note: VACUUM may not work for all databases due to binding requirements
 - **Bulk Download** - ZIP archive of SQL dumps using D1's export API
 - **Bulk Delete** - Sequential deletion with progress tracking and error reporting
 - **Upload/Import** - Create new databases or import into existing ones (up to 5GB SQL files)
