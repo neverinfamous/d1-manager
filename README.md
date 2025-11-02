@@ -184,8 +184,8 @@ d1-manager/
 - `POST /api/databases/:dbId/rename` - Rename a database (migration-based)
 - `DELETE /api/databases/:dbId` - Delete a database
 - `GET /api/databases/:dbId/info` - Get database information
-- `POST /api/databases/:dbId/optimize` - Run VACUUM or ANALYZE on a database
-  - Body: `{ operation: 'vacuum' | 'analyze' }`
+- `POST /api/databases/:dbId/optimize` - Run ANALYZE (PRAGMA optimize) on a database
+  - Body: `{ operation: 'analyze' }` (VACUUM not supported)
 - `POST /api/databases/export` - Export multiple databases (returns SQL content for ZIP creation)
 - `POST /api/databases/import` - Import SQL file to create new or update existing database
 
@@ -262,12 +262,11 @@ The D1 Manager supports efficient bulk operations on both databases and tables w
 
 #### Database Operations
 - **Multi-select** with "Select All" option and visual selection indicators
-- **Bulk Optimize** - Run VACUUM and/or ANALYZE on multiple databases with progress tracking
-  - **VACUUM**: Requires Workers Binding API access (databases must be bound in wrangler.toml)
-  - **ANALYZE**: Available via REST API (PRAGMA optimize)
+- **Bulk Optimize** - Run ANALYZE (PRAGMA optimize) on multiple databases with progress tracking
+  - Updates query statistics for better query performance
   - Sequential execution with per-operation progress indicators
   - Error reporting per database
-  - Note: VACUUM may not work for all databases due to binding requirements
+  - Note: VACUUM is not available via web interface (D1 automatically manages space reclamation)
 - **Bulk Download** - ZIP archive of SQL dumps using D1's export API
 - **Bulk Delete** - Sequential deletion with progress tracking and error reporting
 - **Upload/Import** - Create new databases or import into existing ones (up to 5GB SQL files)

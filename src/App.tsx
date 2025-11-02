@@ -400,7 +400,7 @@ export default function App() {
     setOptimizeDialogState({
       databaseIds: selectedDatabases,
       databaseNames: selectedDbData.map(db => db.name),
-      runVacuum: true,    // Default enabled
+      runVacuum: false,   // VACUUM not available via web interface
       runAnalyze: true,   // Default enabled
       isOptimizing: false
     })
@@ -409,11 +409,11 @@ export default function App() {
   const confirmOptimize = async () => {
     if (!optimizeDialogState) return
     
-    // Validate at least one operation is selected
-    if (!optimizeDialogState.runVacuum && !optimizeDialogState.runAnalyze) {
+    // Validate ANALYZE is selected (only available operation)
+    if (!optimizeDialogState.runAnalyze) {
       setOptimizeDialogState(prev => prev ? { 
         ...prev, 
-        error: 'Please select at least one optimization operation' 
+        error: 'Please enable ANALYZE to optimize the database' 
       } : null)
       return
     }
@@ -1028,26 +1028,21 @@ export default function App() {
               <div className="space-y-3 border rounded-lg p-4 bg-muted/30">
                 <p className="text-sm font-medium">Select operations to run:</p>
                 
-                <div className="flex items-start space-x-3">
+                <div className="flex items-start space-x-3 opacity-50">
                   <Checkbox
                     id="run-vacuum"
-                    checked={optimizeDialogState.runVacuum}
-                    onCheckedChange={(checked) => setOptimizeDialogState(prev => prev ? { 
-                      ...prev, 
-                      runVacuum: checked === true,
-                      error: undefined 
-                    } : null)}
-                    disabled={optimizeDialogState.isOptimizing}
+                    checked={false}
+                    disabled={true}
                   />
                   <div className="grid gap-1.5 leading-none">
                     <label
                       htmlFor="run-vacuum"
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                      className="text-sm font-medium leading-none"
                     >
-                      VACUUM
+                      VACUUM (Not Available)
                     </label>
                     <p className="text-xs text-muted-foreground">
-                      Reclaims free space by rebuilding the database file (reduces database size)
+                      D1 automatically manages space. For manual VACUUM, use wrangler CLI.
                     </p>
                   </div>
                 </div>
