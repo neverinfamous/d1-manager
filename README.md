@@ -35,19 +35,26 @@ A modern, full-featured web application for managing Cloudflare D1 databases wit
   - Validation and error handling
 - **Table CRUD Operations** - Complete table management capabilities
   - **Rename Table** - Individual rename button on each table card with validation
-  - **Delete Table** - Drop tables with confirmation dialog
+  - **Delete Table** - Drop tables with confirmation dialog and dependency analysis
   - **Clone Table** - Duplicate table structure, data, and indexes with custom names
   - **Export Table** - Download tables as SQL or CSV format
 - **Bulk Table Operations** - Multi-select operations for efficiency
   - **Multi-Select** - Checkbox on each table card with "Select All" option
   - **Bulk Clone** - Clone multiple tables with suggested names (e.g., `table_copy`)
   - **Bulk Export** - Export multiple tables as SQL/CSV in a ZIP archive
-  - **Bulk Delete** - Delete multiple tables with progress tracking
+  - **Bulk Delete** - Delete multiple tables with progress tracking and dependency analysis
 - **Column Management** - Advanced schema modification capabilities
   - **Add Column** - Add new columns to existing tables with type, constraints, and defaults
   - **Rename Column** - Rename columns using ALTER TABLE RENAME COLUMN
   - **Modify Column** - Change column type, NOT NULL constraints, and default values (uses table recreation)
   - **Drop Column** - Remove columns from tables (uses ALTER TABLE DROP COLUMN)
+- **Table Dependencies Viewer** - Foreign key relationship analysis before deletion
+  - **Outbound Dependencies** - Shows tables this table references
+  - **Inbound Dependencies** - Shows tables that reference this table
+  - **Cascade Impact** - Displays ON DELETE behavior (CASCADE, RESTRICT, SET NULL, etc.)
+  - **Row Count Estimates** - Shows number of rows affected by cascade operations
+  - **Confirmation Required** - Mandatory acknowledgment checkbox when dependencies exist
+  - **Per-Table View** - Collapsible accordion in bulk operations for detailed impact analysis
 
 #### Query Console
 - **SQL Editor** - Execute custom SQL queries against any database
@@ -177,6 +184,7 @@ d1-manager/
 - `GET /api/tables/:dbId/schema/:tableName` - Get table schema (columns, types)
 - `GET /api/tables/:dbId/data/:tableName` - Get table data (supports pagination)
 - `GET /api/tables/:dbId/indexes/:tableName` - Get table indexes
+- `GET /api/tables/:dbId/dependencies?tables=table1,table2` - Get foreign key dependencies for tables
 - `POST /api/tables/:dbId/create` - Create a new table
 - `DELETE /api/tables/:dbId/:tableName` - Drop a table
 - `PATCH /api/tables/:dbId/:tableName/rename` - Rename a table
@@ -305,6 +313,51 @@ The D1 Manager supports bulk operations on both databases and tables:
 - Sequential deletion with progress tracking
 - Reports any failures while continuing with remaining tables
 - Cannot be undone - use with caution
+
+### Table Dependencies Viewer
+
+The D1 Manager includes a comprehensive foreign key dependency viewer that analyzes relationships before table deletion, preventing accidental data loss from cascade operations.
+
+**How It Works:**
+
+When you attempt to delete a table (single or bulk), the system automatically:
+1. Analyzes all foreign key relationships using `PRAGMA foreign_key_list()`
+2. Identifies both inbound and outbound dependencies
+3. Calculates row counts for impact assessment
+4. Displays cascade behavior (CASCADE, RESTRICT, SET NULL, NO ACTION)
+5. Requires explicit confirmation if dependencies exist
+
+**Dependency Types:**
+
+- **Outbound Dependencies** - Tables that this table references via foreign keys
+  - Shows which tables would be affected if related data is deleted
+  - Displays the referring column name
+  - Shows ON DELETE behavior
+
+- **Inbound Dependencies** - Tables that reference this table via foreign keys
+  - Critical for understanding cascade impact
+  - Highlights potential data loss (e.g., "Deleting will cascade to 152 rows")
+  - Color-coded by severity: CASCADE (yellow), RESTRICT (red), SET NULL (blue)
+
+**User Interface:**
+
+- **Single Table Delete** - Dependencies displayed directly in the dialog with clear warnings
+- **Bulk Delete** - Collapsible accordion showing per-table dependencies with badge counts
+- **Confirmation Checkbox** - Mandatory acknowledgment: "I understand that deleting this table will affect dependent tables"
+- **Smart Validation** - Delete button disabled until confirmation checkbox is checked (only when dependencies exist)
+
+**Example Warning:**
+```
+⚠ Table comments references posts (ON DELETE CASCADE). Deleting will cascade to 152 rows.
+```
+
+**Benefits:**
+
+- Prevents accidental data loss from cascade deletions
+- Makes foreign key constraints visible before destructive operations
+- Helps understand database schema relationships
+- Provides row count impact for informed decisions
+- Works seamlessly in both local development (mock data) and production
 
 ### Column Management
 

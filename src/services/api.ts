@@ -36,6 +36,22 @@ export interface IndexInfo {
   partial: number
 }
 
+// Foreign key dependency types
+export interface ForeignKeyDependency {
+  table: string
+  column: string
+  onDelete: string | null
+  onUpdate: string | null
+  rowCount: number
+}
+
+export interface TableDependencies {
+  outbound: ForeignKeyDependency[]
+  inbound: ForeignKeyDependency[]
+}
+
+export type TableDependenciesResponse = Record<string, TableDependencies>
+
 // Query types
 export interface QueryResult<T = Record<string, unknown>> {
   results: T[]
@@ -393,6 +409,27 @@ class APIService {
     
     const data = await response.json()
     return data.result || []
+  }
+
+  /**
+   * Get table dependencies (foreign key relationships)
+   */
+  async getTableDependencies(
+    databaseId: string,
+    tableNames: string[]
+  ): Promise<TableDependenciesResponse> {
+    const tablesParam = tableNames.map(t => encodeURIComponent(t)).join(',')
+    const response = await fetch(
+      `${WORKER_API}/api/tables/${databaseId}/dependencies?tables=${tablesParam}`,
+      { credentials: 'include' }
+    )
+    
+    if (!response.ok) {
+      throw new Error(`Failed to get table dependencies: ${response.statusText}`)
+    }
+    
+    const data = await response.json()
+    return data.result || {}
   }
 
   /**

@@ -8,6 +8,12 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Progress } from '@/components/ui/progress';
 import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -15,10 +21,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { listTables, executeQuery, type TableInfo } from '@/services/api';
+import { listTables, executeQuery, type TableInfo, type TableDependenciesResponse } from '@/services/api';
 import { api } from '@/services/api';
 import { SchemaDesigner } from './SchemaDesigner';
 import { QueryBuilder } from './QueryBuilder';
+import { TableDependenciesView } from './TableDependenciesView';
 
 interface DatabaseViewProps {
   databaseId: string;
@@ -70,6 +77,9 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable }
     isDeleting: boolean;
     progress?: { current: number; total: number };
     error?: string;
+    dependencies?: TableDependenciesResponse;
+    loadingDependencies?: boolean;
+    confirmDependencies?: boolean;
   } | null>(null);
 
   useEffect(() => {
@@ -272,13 +282,31 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable }
   };
   
   // Delete handlers
-  const handleDeleteClick = () => {
+  const handleDeleteClick = async () => {
     if (selectedTables.length === 0) return;
     
     setDeleteDialogState({
       tableNames: selectedTables,
-      isDeleting: false
+      isDeleting: false,
+      loadingDependencies: true
     });
+
+    // Fetch dependencies
+    try {
+      const deps = await api.getTableDependencies(databaseId, selectedTables);
+      setDeleteDialogState(prev => prev ? {
+        ...prev,
+        dependencies: deps,
+        loadingDependencies: false
+      } : null);
+    } catch (err) {
+      console.error('Failed to load dependencies:', err);
+      setDeleteDialogState(prev => prev ? {
+        ...prev,
+        loadingDependencies: false,
+        error: 'Failed to load table dependencies. You can still proceed with deletion.'
+      } : null);
+    }
   };
   
   const handleDeleteTables = async () => {
@@ -748,7 +776,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable }
       {/* Delete Tables Dialog */}
       {deleteDialogState && (
         <Dialog open={true} onOpenChange={() => !deleteDialogState.isDeleting && setDeleteDialogState(null)}>
-          <DialogContent>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 {deleteDialogState.tableNames.length === 1
@@ -759,23 +787,108 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable }
                 This action cannot be undone. This will permanently delete the table{deleteDialogState.tableNames.length !== 1 ? 's' : ''} and all {deleteDialogState.tableNames.length !== 1 ? 'their' : 'its'} data.
               </DialogDescription>
             </DialogHeader>
-            <div className="py-4">
-              {deleteDialogState.tableNames.length === 1 ? (
-                <p className="text-sm">
-                  Table: <strong>{deleteDialogState.tableNames[0]}</strong>
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Tables to delete:</p>
-                  <ul className="text-sm list-disc list-inside max-h-40 overflow-y-auto">
-                    {deleteDialogState.tableNames.map((name) => (
-                      <li key={name}>{name}</li>
-                    ))}
-                  </ul>
+            <div className="py-4 space-y-4">
+              {/* Loading dependencies */}
+              {deleteDialogState.loadingDependencies && (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground mr-2" />
+                  <span className="text-sm text-muted-foreground">Checking dependencies...</span>
                 </div>
               )}
+
+              {/* Single table delete */}
+              {!deleteDialogState.loadingDependencies && deleteDialogState.tableNames.length === 1 && (
+                <div className="space-y-4">
+                  <p className="text-sm">
+                    Table: <strong>{deleteDialogState.tableNames[0]}</strong>
+                  </p>
+                  
+                  {deleteDialogState.dependencies && deleteDialogState.dependencies[deleteDialogState.tableNames[0]] && (
+                    <TableDependenciesView
+                      tableName={deleteDialogState.tableNames[0]}
+                      dependencies={deleteDialogState.dependencies[deleteDialogState.tableNames[0]]}
+                    />
+                  )}
+                </div>
+              )}
+
+              {/* Bulk delete with per-table accordion */}
+              {!deleteDialogState.loadingDependencies && deleteDialogState.tableNames.length > 1 && (
+                <div className="space-y-4">
+                  <p className="text-sm font-medium">Tables to delete ({deleteDialogState.tableNames.length}):</p>
+                  
+                  {deleteDialogState.dependencies && (
+                    <Accordion type="multiple" className="w-full">
+                      {deleteDialogState.tableNames.map((tableName) => {
+                        const deps = deleteDialogState.dependencies?.[tableName];
+                        const hasDeps = deps && (deps.inbound.length > 0 || deps.outbound.length > 0);
+                        const depCount = deps ? deps.inbound.length + deps.outbound.length : 0;
+                        
+                        return (
+                          <AccordionItem key={tableName} value={tableName}>
+                            <AccordionTrigger className="hover:no-underline">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium">{tableName}</span>
+                                {hasDeps && (
+                                  <span className="text-xs bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 px-2 py-0.5 rounded-full">
+                                    {depCount} {depCount === 1 ? 'dependency' : 'dependencies'}
+                                  </span>
+                                )}
+                              </div>
+                            </AccordionTrigger>
+                            <AccordionContent>
+                              {deps ? (
+                                <div className="pt-2">
+                                  <TableDependenciesView
+                                    tableName={tableName}
+                                    dependencies={deps}
+                                  />
+                                </div>
+                              ) : (
+                                <p className="text-sm text-muted-foreground pt-2">No dependencies</p>
+                              )}
+                            </AccordionContent>
+                          </AccordionItem>
+                        );
+                      })}
+                    </Accordion>
+                  )}
+                </div>
+              )}
+
+              {/* Confirmation checkbox for tables with dependencies */}
+              {!deleteDialogState.loadingDependencies && deleteDialogState.dependencies && (() => {
+                const hasDependencies = Object.values(deleteDialogState.dependencies).some(
+                  dep => dep.inbound.length > 0 || dep.outbound.length > 0
+                );
+                return hasDependencies && (
+                  <div className="flex items-start space-x-3 rounded-md border border-yellow-200 dark:border-yellow-900 bg-yellow-50 dark:bg-yellow-950/30 p-4">
+                    <Checkbox
+                      id="confirm-dependencies"
+                      checked={deleteDialogState.confirmDependencies || false}
+                      onCheckedChange={(checked) => setDeleteDialogState(prev => prev ? {
+                        ...prev,
+                        confirmDependencies: checked === true
+                      } : null)}
+                    />
+                    <div className="space-y-1 leading-none">
+                      <Label
+                        htmlFor="confirm-dependencies"
+                        className="text-sm font-medium cursor-pointer"
+                      >
+                        I understand that deleting {deleteDialogState.tableNames.length === 1 ? 'this table' : 'these tables'} will affect dependent tables
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Foreign key constraints may cause cascading deletions or prevent deletion entirely.
+                      </p>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Progress indicator */}
               {deleteDialogState.isDeleting && deleteDialogState.progress && (
-                <div className="mt-4 space-y-2">
+                <div className="space-y-2">
                   <p className="text-sm text-muted-foreground">
                     Deleting table {deleteDialogState.progress.current} of {deleteDialogState.progress.total}...
                   </p>
@@ -784,8 +897,10 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable }
                   />
                 </div>
               )}
+
+              {/* Error message */}
               {deleteDialogState.error && (
-                <div className="mt-4 bg-destructive/10 border border-destructive text-destructive px-3 py-2 rounded-lg text-sm">
+                <div className="bg-destructive/10 border border-destructive text-destructive px-3 py-2 rounded-lg text-sm">
                   {deleteDialogState.error}
                 </div>
               )}
@@ -801,7 +916,13 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable }
               <Button
                 variant="destructive"
                 onClick={handleDeleteTables}
-                disabled={deleteDialogState.isDeleting}
+                disabled={
+                  deleteDialogState.isDeleting ||
+                  deleteDialogState.loadingDependencies ||
+                  (deleteDialogState.dependencies && 
+                   Object.values(deleteDialogState.dependencies).some(dep => dep.inbound.length > 0 || dep.outbound.length > 0) &&
+                   !deleteDialogState.confirmDependencies)
+                }
               >
                 {deleteDialogState.isDeleting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 {deleteDialogState.isDeleting

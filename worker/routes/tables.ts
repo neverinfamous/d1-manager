@@ -768,6 +768,183 @@ export async function handleTableRoutes(
       });
     }
 
+    // Get table dependencies (foreign keys)
+    if (request.method === 'GET' && url.pathname === `/api/tables/${dbId}/dependencies`) {
+      const tablesParam = url.searchParams.get('tables');
+      if (!tablesParam) {
+        return new Response(JSON.stringify({ 
+          error: 'Tables parameter required' 
+        }), { 
+          status: 400,
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        });
+      }
+      
+      const tableNames = tablesParam.split(',').map(t => t.trim());
+      console.log('[Tables] Getting dependencies for tables:', tableNames);
+      
+      // Define types for dependencies
+      interface ForeignKeyDependency {
+        table: string;
+        column: string;
+        onDelete: string | null;
+        onUpdate: string | null;
+        rowCount: number;
+      }
+      
+      interface TableDependencies {
+        outbound: ForeignKeyDependency[];
+        inbound: ForeignKeyDependency[];
+      }
+      
+      // Mock response for local development
+      if (isLocalDev) {
+        const mockDependencies: Record<string, TableDependencies> = {};
+        tableNames.forEach(tableName => {
+          if (tableName === 'comments') {
+            mockDependencies[tableName] = {
+              outbound: [
+                { table: 'posts', column: 'post_id', onDelete: 'CASCADE', onUpdate: null, rowCount: 152 }
+              ],
+              inbound: []
+            };
+          } else if (tableName === 'posts') {
+            mockDependencies[tableName] = {
+              outbound: [
+                { table: 'users', column: 'user_id', onDelete: 'SET NULL', onUpdate: null, rowCount: 45 }
+              ],
+              inbound: [
+                { table: 'comments', column: 'post_id', onDelete: 'CASCADE', onUpdate: null, rowCount: 152 }
+              ]
+            };
+          } else {
+            mockDependencies[tableName] = {
+              outbound: [],
+              inbound: []
+            };
+          }
+        });
+        
+        return new Response(JSON.stringify({
+          result: mockDependencies,
+          success: true
+        }), {
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        });
+      }
+      
+      // Get dependencies for each table
+      const dependencies: Record<string, TableDependencies> = {};
+      
+      for (const tableName of tableNames) {
+        const sanitizedTable = sanitizeIdentifier(tableName);
+        
+        // Get outbound foreign keys (this table references others)
+        const outboundQuery = `PRAGMA foreign_key_list("${sanitizedTable}")`;
+        const outboundResult = await executeQueryViaAPI(dbId, outboundQuery, env);
+        const outboundFKs = outboundResult.results as Array<{
+          id: number;
+          seq: number;
+          table: string;
+          from: string;
+          to: string;
+          on_update: string;
+          on_delete: string;
+          match: string;
+        }>;
+        
+        // Process outbound FKs and get row counts
+        const outbound: ForeignKeyDependency[] = [];
+        const processedOutbound = new Map<string, ForeignKeyDependency>();
+        
+        for (const fk of outboundFKs) {
+          const key = `${fk.table}_${fk.from}`;
+          if (!processedOutbound.has(key)) {
+            // Get row count for this table
+            const countQuery = `SELECT COUNT(*) as count FROM "${sanitizedTable}"`;
+            const countResult = await executeQueryViaAPI(dbId, countQuery, env);
+            const rowCount = (countResult.results[0] as { count: number })?.count || 0;
+            
+            processedOutbound.set(key, {
+              table: fk.table,
+              column: fk.from,
+              onDelete: fk.on_delete || null,
+              onUpdate: fk.on_update || null,
+              rowCount
+            });
+          }
+        }
+        
+        outbound.push(...processedOutbound.values());
+        
+        // Get inbound foreign keys (other tables reference this table)
+        // We need to check all tables in the database
+        const tableListQuery = "PRAGMA table_list";
+        const tableListResult = await executeQueryViaAPI(dbId, tableListQuery, env);
+        const allTables = (tableListResult.results as Array<{ name: string; type: string }>)
+          .filter(t => !t.name.startsWith('sqlite_') && !t.name.startsWith('_cf_') && t.type === 'table');
+        
+        const inbound: ForeignKeyDependency[] = [];
+        
+        for (const otherTable of allTables) {
+          if (otherTable.name === tableName) continue;
+          
+          const sanitizedOtherTable = sanitizeIdentifier(otherTable.name);
+          const fkQuery = `PRAGMA foreign_key_list("${sanitizedOtherTable}")`;
+          const fkResult = await executeQueryViaAPI(dbId, fkQuery, env);
+          const fks = fkResult.results as Array<{
+            id: number;
+            seq: number;
+            table: string;
+            from: string;
+            to: string;
+            on_update: string;
+            on_delete: string;
+            match: string;
+          }>;
+          
+          for (const fk of fks) {
+            if (fk.table === tableName) {
+              // This table is referenced by otherTable
+              // Get row count for the other table
+              const countQuery = `SELECT COUNT(*) as count FROM "${sanitizedOtherTable}"`;
+              const countResult = await executeQueryViaAPI(dbId, countQuery, env);
+              const rowCount = (countResult.results[0] as { count: number })?.count || 0;
+              
+              inbound.push({
+                table: otherTable.name,
+                column: fk.from,
+                onDelete: fk.on_delete || null,
+                onUpdate: fk.on_update || null,
+                rowCount
+              });
+            }
+          }
+        }
+        
+        dependencies[tableName] = {
+          outbound,
+          inbound
+        };
+      }
+      
+      return new Response(JSON.stringify({
+        result: dependencies,
+        success: true
+      }), {
+        headers: {
+          'Content-Type': 'application/json',
+          ...corsHeaders
+        }
+      });
+    }
+
     // Route not found
     return new Response(JSON.stringify({ 
       error: 'Route not found' 
