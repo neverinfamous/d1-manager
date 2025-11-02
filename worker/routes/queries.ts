@@ -228,10 +228,23 @@ export async function handleQueryRoutes(
   } catch (err) {
     // Log full error details on server only
     console.error('[Queries] Error:', err);
-    // Return generic error to client (security: don't expose stack traces)
+    
+    // Extract useful error message
+    let errorMessage = 'Unable to execute query. Please check your SQL syntax and try again.';
+    if (err instanceof Error) {
+      // Parse D1 error message if available
+      errorMessage = err.message;
+      // Try to extract the actual D1 error from the response text
+      const match = errorMessage.match(/"message":"([^"]+)"/);
+      if (match) {
+        errorMessage = match[1];
+      }
+    }
+    
+    // Return error to client with helpful message
     return new Response(JSON.stringify({ 
       error: 'Query operation failed',
-      message: 'Unable to execute query. Please check your SQL syntax and try again.'
+      message: errorMessage
     }), { 
       status: 500,
       headers: {
