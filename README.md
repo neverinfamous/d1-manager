@@ -260,6 +260,18 @@ Click the theme toggle button in the header to cycle through modes. Your prefere
 
 ## 📝 Development Notes
 
+### Protected System Database
+
+The `d1-manager-metadata` database is automatically hidden from the UI and protected from all operations (view, delete, rename, export). This internal database stores query history and saved queries for the application. Protection ensures:
+
+- **Hidden from List** - Does not appear in the database list
+- **Delete Protection** - Returns 403 Forbidden if deletion is attempted
+- **Rename Protection** - Returns 403 Forbidden if rename is attempted  
+- **Export Protection** - Silently skipped in bulk export operations
+- **Info Protection** - Returns 404 Not Found if info is requested
+
+This safeguards the demo site and production deployments from accidental or malicious deletion of critical application data.
+
 ### Mock Data in Local Development
 
 The Worker automatically detects localhost requests and returns mock data including sample databases (`dev-database`, `test-database`), tables (`users`, `posts`, `comments`), realistic schemas, query results, and simulated export/import operations. This allows full UI testing without Cloudflare credentials.

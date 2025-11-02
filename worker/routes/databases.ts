@@ -1,6 +1,9 @@
 import type { Env, D1DatabaseInfo } from '../types';
 import { CF_API } from '../types';
 
+// Protected database name - this database is internal to d1-manager and hidden from users
+const PROTECTED_DATABASE_NAME = 'd1-manager-metadata';
+
 export async function handleDatabaseRoutes(
   request: Request,
   env: Env,
@@ -75,9 +78,12 @@ export async function handleDatabaseRoutes(
       
       const data = await response.json() as { result: D1DatabaseInfo[]; success: boolean };
       
+      // Filter out the metadata database (internal to d1-manager)
+      const filteredDatabases = data.result.filter(db => db.name !== PROTECTED_DATABASE_NAME);
+      
       // Enhance database info with table count by querying each database
       const enhancedDatabases = await Promise.all(
-        data.result.map(async (db) => {
+        filteredDatabases.map(async (db) => {
           try {
             // Query PRAGMA table_list to get table count
             const tableListResponse = await fetch(
@@ -156,7 +162,22 @@ export async function handleDatabaseRoutes(
         throw new Error(`Failed to get database info: ${response.status}`);
       }
       
-      const data = await response.json();
+      const data = await response.json() as { result: D1DatabaseInfo };
+      
+      // Filter out metadata database info
+      if (data.result.name === PROTECTED_DATABASE_NAME) {
+        console.warn('[Databases] Attempted to access protected metadata database info');
+        return new Response(JSON.stringify({
+          error: 'Database not found',
+          message: 'The requested database does not exist or is not accessible.'
+        }), {
+          status: 404,
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        });
+      }
       
       return new Response(JSON.stringify(data), {
         headers: {
@@ -242,6 +263,30 @@ export async function handleDatabaseRoutes(
         });
       }
       
+      // Protect metadata database from deletion
+      // First, get the database info to check its name
+      const dbInfoResponse = await fetch(
+        `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database/${dbId}`,
+        { headers: cfHeaders }
+      );
+      
+      if (dbInfoResponse.ok) {
+        const dbInfo = await dbInfoResponse.json() as { result: D1DatabaseInfo };
+        if (dbInfo.result.name === PROTECTED_DATABASE_NAME) {
+          console.warn('[Databases] Attempted to delete protected metadata database');
+          return new Response(JSON.stringify({
+            error: 'Cannot delete protected system database',
+            message: `The ${PROTECTED_DATABASE_NAME} database is required for application functionality and cannot be deleted.`
+          }), {
+            status: 403,
+            headers: {
+              'Content-Type': 'application/json',
+              ...corsHeaders
+            }
+          });
+        }
+      }
+      
       const response = await fetch(
         `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database/${dbId}`,
         {
@@ -296,6 +341,21 @@ export async function handleDatabaseRoutes(
       
       for (const dbId of body.databaseIds) {
         try {
+          // Check if this is the protected metadata database
+          const dbInfoResponse = await fetch(
+            `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database/${dbId}`,
+            { headers: cfHeaders }
+          );
+          
+          if (dbInfoResponse.ok) {
+            const dbInfo = await dbInfoResponse.json() as { result: D1DatabaseInfo };
+            if (dbInfo.result.name === PROTECTED_DATABASE_NAME) {
+              console.warn(`[Databases] Skipping export of protected metadata database: ${dbId}`);
+              continue; // Skip this database
+            }
+          }
+          
+
           // Start export with polling
           const startResponse = await fetch(
             `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database/${dbId}/export`,
@@ -500,6 +560,29 @@ export async function handleDatabaseRoutes(
             ...corsHeaders
           }
         });
+      }
+      
+      // Protect metadata database from being renamed
+      const dbInfoResponse = await fetch(
+        `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database/${dbId}`,
+        { headers: cfHeaders }
+      );
+      
+      if (dbInfoResponse.ok) {
+        const dbInfo = await dbInfoResponse.json() as { result: D1DatabaseInfo };
+        if (dbInfo.result.name === PROTECTED_DATABASE_NAME) {
+          console.warn('[Databases] Attempted to rename protected metadata database');
+          return new Response(JSON.stringify({
+            error: 'Cannot rename protected system database',
+            message: `The ${PROTECTED_DATABASE_NAME} database is required for application functionality and cannot be renamed.`
+          }), {
+            status: 403,
+            headers: {
+              'Content-Type': 'application/json',
+              ...corsHeaders
+            }
+          });
+        }
       }
       
       let newDbId: string | null = null;
