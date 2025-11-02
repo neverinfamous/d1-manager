@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Play, Loader2, Download, History, Save, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -31,6 +32,7 @@ export function QueryConsole({ databaseId, databaseName }: QueryConsoleProps) {
   const [result, setResult] = useState<QueryResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [executing, setExecuting] = useState(false);
+  const [skipValidation, setSkipValidation] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [showSavedQueries, setShowSavedQueries] = useState(false);
   const [queryName, setQueryName] = useState('');
@@ -50,7 +52,7 @@ export function QueryConsole({ databaseId, databaseName }: QueryConsoleProps) {
       setError(null);
       
       const startTime = performance.now();
-      const response = await executeQuery(databaseId, query);
+      const response = await executeQuery(databaseId, query, [], skipValidation);
       const endTime = performance.now();
 
       // Response is already unwrapped by api.ts: { results: [], meta: {}, success: boolean }
@@ -259,9 +261,24 @@ export function QueryConsole({ databaseId, databaseName }: QueryConsoleProps) {
             className="w-full h-48 p-4 font-mono text-sm bg-muted rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-ring"
             aria-label="SQL Query Input"
           />
-          <p className="text-xs text-muted-foreground mt-2">
-            Press Ctrl+Enter (Cmd+Enter on Mac) to execute
-          </p>
+          <div className="flex items-center justify-between mt-3">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="skip-validation"
+                checked={skipValidation}
+                onCheckedChange={(checked) => setSkipValidation(checked === true)}
+              />
+              <Label
+                htmlFor="skip-validation"
+                className="text-xs font-normal cursor-pointer text-muted-foreground"
+              >
+                Skip validation (allows DROP, DELETE without confirmation)
+              </Label>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Press Ctrl+Enter (Cmd+Enter on Mac) to execute
+            </p>
+          </div>
         </CardContent>
       </Card>
 
