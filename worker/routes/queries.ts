@@ -110,7 +110,10 @@ export async function handleQueryRoutes(
         const duration = Date.now() - startTime;
         const errorMsg = parseD1Error(err);
         
-        // Store error in query history
+        // Log full error details on server only
+        console.error('[Queries] Query execution error:', errorMsg);
+        
+        // Store error in query history (with full details)
         if (!isLocalDev && userEmail) {
           await storeQueryHistory(
             dbId,
@@ -123,10 +126,13 @@ export async function handleQueryRoutes(
           ).catch(histErr => console.error('[Queries] Failed to store error in history:', histErr));
         }
         
-        // Return error response directly instead of re-throwing
+        // Sanitize error message for client (remove stack traces and sensitive details)
+        const sanitizedMessage = sanitizeErrorMessage(errorMsg);
+        
+        // Return sanitized error response
         return new Response(JSON.stringify({ 
           error: 'Query execution failed',
-          message: errorMsg
+          message: sanitizedMessage
         }), { 
           status: 400,
           headers: {
@@ -352,5 +358,40 @@ async function storeQueryHistory(
     console.error('[Queries] Failed to store query history:', err);
     // Don't fail the request if history storage fails
   }
+}
+
+/**
+ * Sanitize error messages to prevent stack trace exposure
+ * Removes sensitive information while keeping useful error details
+ */
+function sanitizeErrorMessage(errorMsg: string): string {
+  // Extract just the D1 error message if present (from JSON error response)
+  const d1ErrorMatch = errorMsg.match(/"message":"([^"]+)"/);
+  if (d1ErrorMatch) {
+    return d1ErrorMatch[1];
+  }
+  
+  // Remove stack traces (lines starting with "at " or containing file paths)
+  const lines = errorMsg.split('\n');
+  const sanitizedLines = lines.filter(line => {
+    const trimmed = line.trim();
+    return !trimmed.startsWith('at ') && 
+           !trimmed.includes('file://') && 
+           !trimmed.includes('.ts:') &&
+           !trimmed.includes('.js:');
+  });
+  
+  // Get the first line (main error message)
+  const mainMessage = sanitizedLines[0] || errorMsg;
+  
+  // Remove "Query failed: 400 -" prefix if present
+  const cleaned = mainMessage.replace(/^Query failed: \d+ - /, '');
+  
+  // If the message is too generic, provide a more helpful one
+  if (cleaned.length < 10 || cleaned === 'Unknown error') {
+    return 'Query execution failed. Please check your SQL syntax and try again.';
+  }
+  
+  return cleaned;
 }
 
