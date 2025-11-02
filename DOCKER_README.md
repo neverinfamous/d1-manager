@@ -6,7 +6,7 @@
 ![Version](https://img.shields.io/badge/version-v1.0.0-green)
 ![Status](https://img.shields.io/badge/status-Production%2FStable-brightgreen)
 
-**Version:** 1.0.0 | **Last Updated:** November 2, 2025  
+**Version:** 1.0.0 | **Last Updated:** November 2, 2025 - 8:39 AM EST  
 **Base Image:** Node.js 18-alpine | **Architecture:** linux/amd64, linux/arm64
 
 A fully containerized version of the D1 Database Manager for Cloudflare. This Docker image provides a modern, full-featured web application for managing Cloudflare D1 databases with enterprise-grade authentication via Cloudflare Access (Zero Trust).
