@@ -1,15 +1,20 @@
 # D1 Database Manager - Docker Edition
 
-[![Docker](https://img.shields.io/badge/Docker-Ready-blue?logo=docker)](https://hub.docker.com)
 [![GitHub](https://img.shields.io/badge/GitHub-neverinfamous/d1--manager-blue?logo=github)](https://github.com/neverinfamous/d1-manager)
+[![Docker Pulls](https://img.shields.io/docker/pulls/writenotenow/d1-manager)](https://hub.docker.com/r/writenotenow/d1-manager)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 ![Version](https://img.shields.io/badge/version-v1.0.0-green)
 ![Status](https://img.shields.io/badge/status-Production%2FStable-brightgreen)
+[![Security](https://img.shields.io/badge/Security-Enhanced-green.svg)](https://github.com/neverinfamous/d1-manager/blob/main/SECURITY.md)
 
 **Version:** 1.0.0 | **Last Updated:** November 2, 2025 - 8:45 AM EST  
 **Base Image:** Node.js 18-alpine | **Architecture:** linux/amd64, linux/arm64
 
 A fully containerized version of the D1 Database Manager for Cloudflare. This Docker image provides a modern, full-featured web application for managing Cloudflare D1 databases with enterprise-grade authentication via Cloudflare Access (Zero Trust).
+
+**🎯 [Try the Live Demo](https://d1.adamic.tech/)** - See D1 Database Manager in action
+
+**🚀 Docker Deployment:** Run the development server in a containerized environment for testing and local development.
 
 ---
 
@@ -845,7 +850,7 @@ d1.yourdomain.com {
 ### Support
 - 🐛 **Bug Reports:** [GitHub Issues](https://github.com/neverinfamous/d1-manager/issues)
 - 💬 **Discussions:** [GitHub Discussions](https://github.com/neverinfamous/d1-manager/discussions)
-- 📧 **Email:** support@example.com
+- 📧 **Email:** admin@adamic.tech
 
 ### Community
 - **Docker Hub:** [Image Repository](https://hub.docker.com/r/writenotenow/d1-manager)
