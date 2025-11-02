@@ -112,8 +112,9 @@ export async function handleQueryRoutes(
         
         // Log full error details on server only
         console.error('[Queries] Query execution error:', errorMsg);
+        console.error('[Queries] Full error object:', err);
         
-        // Store error in query history (with full details)
+        // Store error in query history (with full details for server-side tracking)
         if (!isLocalDev && userEmail) {
           await storeQueryHistory(
             dbId,
@@ -129,7 +130,8 @@ export async function handleQueryRoutes(
         // Sanitize error message for client (remove stack traces and sensitive details)
         const sanitizedMessage = sanitizeErrorMessage(errorMsg);
         
-        // Return sanitized error response
+        // Return generic error response with sanitized message
+        // Do not expose stack traces or internal details to clients
         return new Response(JSON.stringify({ 
           error: 'Query execution failed',
           message: sanitizedMessage
@@ -242,25 +244,18 @@ export async function handleQueryRoutes(
     });
 
   } catch (err) {
-    // Log full error details on server only
+    // Log full error details on server only - do not expose to client
     console.error('[Queries] Error:', err);
     
-    // Extract useful error message
-    let errorMessage = 'Unable to execute query. Please check your SQL syntax and try again.';
-    if (err instanceof Error) {
-      // Parse D1 error message if available
-      errorMessage = err.message;
-      // Try to extract the actual D1 error from the response text
-      const match = errorMessage.match(/"message":"([^"]+)"/);
-      if (match) {
-        errorMessage = match[1];
-      }
-    }
+    // Parse and sanitize error message - never expose raw error objects to clients
+    const rawErrorMsg = parseD1Error(err);
+    const sanitizedMessage = sanitizeErrorMessage(rawErrorMsg);
     
-    // Return error to client with helpful message
+    // Return generic error with sanitized message only
+    // This prevents stack trace exposure to end users
     return new Response(JSON.stringify({ 
       error: 'Query operation failed',
-      message: errorMessage
+      message: sanitizedMessage
     }), { 
       status: 500,
       headers: {
@@ -362,34 +357,72 @@ async function storeQueryHistory(
 
 /**
  * Sanitize error messages to prevent stack trace exposure
- * Removes sensitive information while keeping useful error details
+ * Removes all sensitive information including stack traces, file paths, and internal details
+ * Only returns safe, user-friendly error messages
  */
 function sanitizeErrorMessage(errorMsg: string): string {
+  // Log original error for debugging (server-side only)
+  console.log('[Sanitize] Original error:', errorMsg);
+  
   // Extract just the D1 error message if present (from JSON error response)
   const d1ErrorMatch = errorMsg.match(/"message":"([^"]+)"/);
   if (d1ErrorMatch) {
-    return d1ErrorMatch[1];
+    const extractedMsg = d1ErrorMatch[1];
+    // Further sanitize the extracted message
+    return sanitizeSimpleMessage(extractedMsg);
   }
   
   // Remove stack traces (lines starting with "at " or containing file paths)
   const lines = errorMsg.split('\n');
   const sanitizedLines = lines.filter(line => {
     const trimmed = line.trim();
+    // Filter out stack trace lines, file paths, and internal references
     return !trimmed.startsWith('at ') && 
            !trimmed.includes('file://') && 
            !trimmed.includes('.ts:') &&
-           !trimmed.includes('.js:');
+           !trimmed.includes('.js:') &&
+           !trimmed.includes('node_modules') &&
+           !trimmed.includes('Error:') && // Remove "Error:" prefixes
+           !trimmed.match(/^\s*at\s+/) && // Remove indented "at" lines
+           !trimmed.match(/\(.+:\d+:\d+\)/); // Remove (file:line:col) patterns
   });
   
-  // Get the first line (main error message)
-  const mainMessage = sanitizedLines[0] || errorMsg;
+  // Get the first non-empty line (main error message)
+  const mainMessage = sanitizedLines.find(line => line.trim().length > 0) || '';
   
-  // Remove "Query failed: 400 -" prefix if present
-  const cleaned = mainMessage.replace(/^Query failed: \d+ - /, '');
+  return sanitizeSimpleMessage(mainMessage);
+}
+
+/**
+ * Sanitize a simple error message string
+ * Removes common error prefixes and ensures message is user-friendly
+ */
+function sanitizeSimpleMessage(message: string): string {
+  // Remove common error prefixes
+  let cleaned = message
+    .replace(/^Query failed: \d+ - /, '')
+    .replace(/^Error: /, '')
+    .replace(/^TypeError: /, '')
+    .replace(/^ReferenceError: /, '')
+    .replace(/^SyntaxError: /, '')
+    .trim();
   
-  // If the message is too generic, provide a more helpful one
-  if (cleaned.length < 10 || cleaned === 'Unknown error') {
+  // Remove any remaining file paths or line numbers
+  cleaned = cleaned.replace(/\s+at\s+.+$/, '').trim();
+  cleaned = cleaned.replace(/\(.+:\d+:\d+\)/, '').trim();
+  
+  // If the message is too generic, empty, or potentially unsafe, provide a safe default
+  if (!cleaned || 
+      cleaned.length < 10 || 
+      cleaned === 'Unknown error' ||
+      cleaned.includes('undefined') ||
+      cleaned.includes('null')) {
     return 'Query execution failed. Please check your SQL syntax and try again.';
+  }
+  
+  // Limit message length to prevent overly verbose errors
+  if (cleaned.length > 200) {
+    cleaned = cleaned.substring(0, 197) + '...';
   }
   
   return cleaned;

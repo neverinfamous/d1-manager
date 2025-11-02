@@ -324,10 +324,13 @@ export async function handleSavedQueriesRoutes(
     });
 
   } catch (err) {
+    // Log full error details on server only - do not expose to client
     console.error('[SavedQueries] Error:', err);
+    
+    // Return generic error to client (security: don't expose stack traces or internal details)
     return new Response(JSON.stringify({ 
       error: 'Saved queries operation failed',
-      message: err instanceof Error ? err.message : 'Unknown error'
+      message: 'Unable to complete saved queries operation. Please try again.'
     }), { 
       status: 500,
       headers: {
