@@ -83,6 +83,14 @@ export interface QueryHistoryEntry {
   error?: string
 }
 
+// Optimize result types
+export interface OptimizeResult {
+  operation: string
+  success: boolean
+  duration_ms: number
+  message: string
+}
+
 class APIService {
   /**
    * List all D1 databases
@@ -341,6 +349,85 @@ class APIService {
       console.error('Database rename failed:', error)
       throw new Error(error instanceof Error ? error.message : 'Failed to rename database')
     }
+  }
+
+  /**
+   * Optimize multiple databases (VACUUM and/or ANALYZE)
+   */
+  async optimizeDatabases(
+    databaseIds: string[],
+    options: {
+      runVacuum: boolean
+      runAnalyze: boolean
+    },
+    onProgress?: (completed: number, total: number, operation: string) => void
+  ): Promise<{ 
+    succeeded: Array<{ id: string; name: string; vacuumResult?: OptimizeResult; analyzeResult?: OptimizeResult }>, 
+    failed: Array<{ id: string; name: string; error: string }> 
+  }> {
+    const succeeded: Array<{ id: string; name: string; vacuumResult?: OptimizeResult; analyzeResult?: OptimizeResult }> = []
+    const failed: Array<{ id: string; name: string; error: string }> = []
+    
+    for (let i = 0; i < databaseIds.length; i++) {
+      const dbId = databaseIds[i]
+      
+      try {
+        // Get database name for progress reporting
+        const dbInfo = await this.getDatabaseInfo(dbId)
+        
+        const result: { vacuumResult?: OptimizeResult; analyzeResult?: OptimizeResult } = {}
+        
+        // Run VACUUM if enabled
+        if (options.runVacuum) {
+          onProgress?.(i + 1, databaseIds.length, `VACUUM on ${dbInfo.name}`)
+          const vacuumResponse = await fetch(`${WORKER_API}/api/databases/${dbId}/optimize`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ operation: 'vacuum' })
+          })
+          
+          if (!vacuumResponse.ok) {
+            throw new Error(`VACUUM failed: ${vacuumResponse.statusText}`)
+          }
+          
+          const vacuumData = await vacuumResponse.json()
+          result.vacuumResult = vacuumData.result
+        }
+        
+        // Run ANALYZE if enabled
+        if (options.runAnalyze) {
+          onProgress?.(i + 1, databaseIds.length, `ANALYZE on ${dbInfo.name}`)
+          const analyzeResponse = await fetch(`${WORKER_API}/api/databases/${dbId}/optimize`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ operation: 'analyze' })
+          })
+          
+          if (!analyzeResponse.ok) {
+            throw new Error(`ANALYZE failed: ${analyzeResponse.statusText}`)
+          }
+          
+          const analyzeData = await analyzeResponse.json()
+          result.analyzeResult = analyzeData.result
+        }
+        
+        succeeded.push({
+          id: dbId,
+          name: dbInfo.name,
+          ...result
+        })
+      } catch (err) {
+        failed.push({
+          id: dbId,
+          name: 'Unknown',
+          error: err instanceof Error ? err.message : 'Unknown error'
+        })
+      }
+    }
+    
+    return { succeeded, failed }
   }
 
   /**
