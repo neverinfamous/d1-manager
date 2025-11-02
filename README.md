@@ -44,10 +44,10 @@ A modern, full-featured web application for managing Cloudflare D1 databases wit
   - **Bulk Export** - Export multiple tables as SQL/CSV in a ZIP archive
   - **Bulk Delete** - Delete multiple tables with progress tracking
 - **Column Management** - Advanced schema modification capabilities
-  - **Add Column** - Add new columns to existing tables
-  - **Rename Column** - Rename columns with ALTER TABLE
-  - **Modify Column** - Change column type, constraints, and defaults
-  - **Drop Column** - Remove columns from tables
+  - **Add Column** - Add new columns to existing tables with type, constraints, and defaults
+  - **Rename Column** - Rename columns using ALTER TABLE RENAME COLUMN
+  - **Modify Column** - Change column type, NOT NULL constraints, and default values (uses table recreation)
+  - **Drop Column** - Remove columns from tables (uses ALTER TABLE DROP COLUMN)
 
 #### Query Console
 - **SQL Editor** - Execute custom SQL queries against any database
@@ -306,6 +306,80 @@ The D1 Manager supports bulk operations on both databases and tables:
 - Reports any failures while continuing with remaining tables
 - Cannot be undone - use with caution
 
+### Column Management
+
+The D1 Manager provides comprehensive column management capabilities directly from the table schema view. Each column row displays action buttons for rename, modify, and delete operations.
+
+**How to Access Column Operations:**
+
+1. Navigate to a database and open a table
+2. View the Schema section showing all columns
+3. Each column row has three action buttons on the right:
+   - **Edit (Pencil icon)** - Rename the column
+   - **Settings (Gear icon)** - Modify column type and constraints
+   - **Delete (Trash icon)** - Remove the column from the table
+
+**Add Column:**
+
+- Click the "Add Column" button in the Schema section header
+- Fill in the column details:
+  - **Column Name** - Must be unique within the table
+  - **Type** - TEXT, INTEGER, REAL, BLOB, or NUMERIC
+  - **Default Value** - Optional default value for existing rows
+  - **NOT NULL** - Enforce non-null constraint (requires default value if table has data)
+- Uses `ALTER TABLE ADD COLUMN` for efficient column addition
+- New column will have NULL values for existing rows unless a default is specified
+
+**Rename Column:**
+
+- Click the Edit button on any column row
+- Enter the new column name
+- Validates for uniqueness and valid identifiers
+- Uses `ALTER TABLE RENAME COLUMN` (SQLite 3.25.0+)
+- Fast operation with no data loss
+
+**Modify Column Type/Constraints:**
+
+- Click the Settings button on any column row
+- **⚠️ Important: Table Recreation Required**
+- Displays a warning about the table recreation process
+- Modify:
+  - **Column Type** - Change from TEXT to INTEGER, etc.
+  - **NOT NULL Constraint** - Add or remove NOT NULL
+  - **Default Value** - Set or change default value
+- Process:
+  1. Creates a temporary table with the new column definition
+  2. Copies all data with appropriate type conversions
+  3. Drops the original table
+  4. Renames the temporary table to the original name
+- Automatically refreshes the schema after completion
+- **Recommendation:** Backup your database before modifying column types
+
+**Delete Column:**
+
+- Click the Delete button on any column row
+- Shows confirmation dialog with data loss warning
+- Cannot delete if it's the only column in the table (button is disabled)
+- Uses `ALTER TABLE DROP COLUMN` (SQLite 3.35.0+)
+- Permanently removes the column and all its data
+- **Recommendation:** Backup your database before deleting columns
+
+**SQLite Version Support:**
+
+- **ADD COLUMN** - Supported in all SQLite versions
+- **RENAME COLUMN** - Requires SQLite 3.25.0+ (Cloudflare D1 supported)
+- **DROP COLUMN** - Requires SQLite 3.35.0+ (Cloudflare D1 supported)
+- **MODIFY COLUMN** - Not natively supported; uses table recreation method
+
+**Important Notes:**
+
+- All column operations validate for potential conflicts before execution
+- Primary key columns can be renamed but require extra caution
+- Modifying column types may result in data loss if incompatible (e.g., TEXT to INTEGER with non-numeric data)
+- The modify operation uses table recreation, which temporarily duplicates the table
+- Indexes are preserved during rename and delete operations
+- Local development mode provides mock responses for testing without a real database
+
 ### Database Renaming
 
 The D1 Manager includes a database rename feature that uses a migration-based approach since Cloudflare's D1 API does not natively support renaming databases.
@@ -520,7 +594,12 @@ For more help, see [Cloudflare Workers Troubleshooting](https://developers.cloud
   - Rename, delete, clone, and export tables
   - Bulk operations with progress tracking
   - Export as SQL or CSV with format selection
-  - Column management (add, rename, modify, drop)
+- ✅ **Column management** - Full schema modification capabilities
+  - Add columns with type, constraints, and defaults
+  - Rename columns (ALTER TABLE RENAME COLUMN)
+  - Modify column types and constraints (table recreation)
+  - Delete columns (ALTER TABLE DROP COLUMN)
+  - Always-visible action buttons with validation
 
 ---
 
