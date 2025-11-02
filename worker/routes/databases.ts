@@ -710,9 +710,9 @@ export async function handleDatabaseRoutes(
         let sql: string;
         
         if (body.operation === 'vacuum') {
-          sql = 'VACUUM;';
+          sql = 'VACUUM';
         } else if (body.operation === 'analyze') {
-          sql = 'PRAGMA optimize;';
+          sql = 'PRAGMA optimize';
         } else {
           throw new Error(`Invalid operation: ${body.operation}`);
         }
