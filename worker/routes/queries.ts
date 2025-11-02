@@ -120,10 +120,20 @@ export async function handleQueryRoutes(
             errorMsg,
             userEmail,
             env
-          );
+          ).catch(histErr => console.error('[Queries] Failed to store error in history:', histErr));
         }
         
-        throw err;
+        // Return error response directly instead of re-throwing
+        return new Response(JSON.stringify({ 
+          error: 'Query execution failed',
+          message: errorMsg
+        }), { 
+          status: 400,
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        });
       }
     }
 
