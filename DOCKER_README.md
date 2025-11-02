@@ -19,7 +19,7 @@ A fully containerized version of the D1 Database Manager for Cloudflare. This Do
 
 ```bash
 # Pull the latest image
-docker pull yourusername/d1-manager:latest
+docker pull writenotenow/d1-manager:latest
 
 # Run with environment variables
 docker run -d \
@@ -29,7 +29,7 @@ docker run -d \
   -e TEAM_DOMAIN=https://yourteam.cloudflareaccess.com \
   -e POLICY_AUD=your_cloudflare_access_aud_tag \
   --name d1-manager \
-  yourusername/d1-manager:latest
+  writenotenow/d1-manager:latest
 ```
 
 Access the application at `http://localhost:8080`
@@ -43,7 +43,7 @@ version: '3.8'
 
 services:
   d1-manager:
-    image: yourusername/d1-manager:latest
+    image: writenotenow/d1-manager:latest
     container_name: d1-manager
     ports:
       - "8080:8080"
@@ -179,7 +179,7 @@ docker run -d \
   -e POLICY_AUD=your_aud_tag \
   --name d1-manager \
   --restart unless-stopped \
-  yourusername/d1-manager:latest
+  writenotenow/d1-manager:latest
 ```
 
 **With custom port:**
@@ -192,7 +192,7 @@ docker run -d \
   -e TEAM_DOMAIN=https://yourteam.cloudflareaccess.com \
   -e POLICY_AUD=your_aud_tag \
   --name d1-manager \
-  yourusername/d1-manager:latest
+  writenotenow/d1-manager:latest
 ```
 
 **With logging enabled:**
@@ -205,7 +205,7 @@ docker run -d \
   -e TEAM_DOMAIN=https://yourteam.cloudflareaccess.com \
   -e POLICY_AUD=your_aud_tag \
   --name d1-manager \
-  yourusername/d1-manager:latest
+  writenotenow/d1-manager:latest
 ```
 
 ### Docker Compose
@@ -216,7 +216,7 @@ version: '3.8'
 
 services:
   d1-manager:
-    image: yourusername/d1-manager:latest
+    image: writenotenow/d1-manager:latest
     container_name: d1-manager
     ports:
       - "8080:8080"
@@ -248,7 +248,7 @@ version: '3.8'
 
 services:
   d1-manager:
-    image: yourusername/d1-manager:latest
+    image: writenotenow/d1-manager:latest
     container_name: d1-manager
     expose:
       - "8080"
@@ -293,7 +293,7 @@ spec:
     spec:
       containers:
       - name: d1-manager
-        image: yourusername/d1-manager:latest
+        image: writenotenow/d1-manager:latest
         ports:
         - containerPort: 8080
         env:
@@ -451,7 +451,7 @@ version: '3.8'
 
 services:
   d1-manager:
-    image: yourusername/d1-manager:latest
+    image: writenotenow/d1-manager:latest
     networks:
       - backend
     environment:
@@ -625,7 +625,7 @@ version: '3.8'
 
 services:
   d1-manager:
-    image: yourusername/d1-manager:latest
+    image: writenotenow/d1-manager:latest
     logging:
       driver: "json-file"
       options:
@@ -639,7 +639,7 @@ version: '3.8'
 
 services:
   d1-manager:
-    image: yourusername/d1-manager:latest
+    image: writenotenow/d1-manager:latest
     logging:
       driver: syslog
       options:
@@ -667,14 +667,14 @@ docker stats
 
 ```bash
 # Pull latest image
-docker pull yourusername/d1-manager:latest
+docker pull writenotenow/d1-manager:latest
 
 # Stop and remove old container
 docker stop d1-manager
 docker rm d1-manager
 
 # Start new container with same configuration
-docker run -d [same options as before] yourusername/d1-manager:latest
+docker run -d [same options as before] writenotenow/d1-manager:latest
 ```
 
 ### Using Docker Compose
@@ -694,7 +694,7 @@ version: '3.8'
 
 services:
   d1-manager:
-    image: yourusername/d1-manager:1.0.0  # Pin to specific version
+    image: writenotenow/d1-manager:1.0.0  # Pin to specific version
     # ... rest of configuration
 ```
 
@@ -705,7 +705,7 @@ version: '3.8'
 
 services:
   d1-manager:
-    image: yourusername/d1-manager:latest
+    image: writenotenow/d1-manager:latest
     # ... your configuration
 
   watchtower:
@@ -758,9 +758,9 @@ The Dockerfile uses a multi-stage build for optimal size:
 
 | Tag | Description | Use Case |
 |-----|-------------|----------|
-| `latest` | Latest stable release | Development/Testing |
-| `1.0.0` | Specific version number | Production (recommended) |
-| `sha-XX.X` | Specific commit SHA | Reproducible builds |
+| `latest` | Latest stable release from main branch | Development/Testing |
+| `v1.0.0` | Specific version number (matches README version) | Production (recommended) |
+| `sha-XXXXXX` | Short commit SHA (12 chars) | Reproducible builds and security audits |
 
 ---
 
@@ -803,7 +803,7 @@ version: '3.8'
 
 services:
   d1-manager:
-    image: yourusername/d1-manager:latest
+    image: writenotenow/d1-manager:latest
     networks:
       - traefik-network
     environment:
@@ -848,7 +848,7 @@ d1.yourdomain.com {
 - 📧 **Email:** support@example.com
 
 ### Community
-- **Docker Hub:** [Image Repository](https://hub.docker.com/r/yourusername/d1-manager)
+- **Docker Hub:** [Image Repository](https://hub.docker.com/r/writenotenow/d1-manager)
 - **GitHub:** [Source Code](https://github.com/neverinfamous/d1-manager)
 - **License:** [MIT License](https://github.com/neverinfamous/d1-manager/blob/main/LICENSE)
 
