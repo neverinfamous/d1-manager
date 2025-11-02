@@ -127,17 +127,62 @@ export async function handleTableRoutes(
       const tableName = decodeURIComponent(pathParts[5]);
       const limit = parseInt(url.searchParams.get('limit') || '100');
       const offset = parseInt(url.searchParams.get('offset') || '0');
-      console.log('[Tables] Getting data for table:', tableName, 'limit:', limit, 'offset:', offset);
+      
+      // Parse filter parameters from URL
+      const filters: Record<string, { type: string; value?: string }> = {};
+      for (const [key, value] of url.searchParams.entries()) {
+        if (key.startsWith('filter_')) {
+          const columnName = key.substring(7); // Remove 'filter_' prefix
+          const filterValue = url.searchParams.get(`filterValue_${columnName}`);
+          filters[columnName] = {
+            type: value,
+            value: filterValue || undefined
+          };
+        }
+      }
+      
+      console.log('[Tables] Getting data for table:', tableName, 'limit:', limit, 'offset:', offset, 'filters:', filters);
       
       // Mock response for local development
       if (isLocalDev) {
+        let mockData = [
+          { id: 1, email: 'user1@example.com', name: 'User One', created_at: new Date().toISOString() },
+          { id: 2, email: 'user2@example.com', name: 'User Two', created_at: new Date().toISOString() }
+        ];
+        
+        // Apply mock filtering
+        if (Object.keys(filters).length > 0) {
+          mockData = mockData.filter(row => {
+            for (const [columnName, filter] of Object.entries(filters)) {
+              const cellValue = row[columnName as keyof typeof row];
+              if (!cellValue) continue;
+              
+              const value = String(cellValue).toLowerCase();
+              const filterVal = (filter.value || '').toLowerCase();
+              
+              switch (filter.type) {
+                case 'contains':
+                  if (!value.includes(filterVal)) return false;
+                  break;
+                case 'equals':
+                  if (value !== filterVal) return false;
+                  break;
+                case 'startsWith':
+                  if (!value.startsWith(filterVal)) return false;
+                  break;
+                case 'endsWith':
+                  if (!value.endsWith(filterVal)) return false;
+                  break;
+              }
+            }
+            return true;
+          });
+        }
+        
         return new Response(JSON.stringify({
-          result: [
-            { id: 1, email: 'user1@example.com', name: 'User One', created_at: new Date().toISOString() },
-            { id: 2, email: 'user2@example.com', name: 'User Two', created_at: new Date().toISOString() }
-          ],
+          result: mockData,
           meta: {
-            rows_read: 2,
+            rows_read: mockData.length,
             rows_written: 0
           },
           success: true
@@ -150,7 +195,38 @@ export async function handleTableRoutes(
       }
       
       const sanitizedTable = sanitizeIdentifier(tableName);
-      const query = `SELECT * FROM "${sanitizedTable}" LIMIT ${limit} OFFSET ${offset}`;
+      
+      // Build WHERE clause from filters if any
+      let whereClause = '';
+      if (Object.keys(filters).length > 0) {
+        // Get table schema for validation
+        const schemaResult = await executeQueryViaAPI(dbId, `PRAGMA table_info("${sanitizedTable}")`, env);
+        const schema = schemaResult.results as Array<{
+          cid: number;
+          name: string;
+          type: string;
+          notnull: number;
+          dflt_value: string | null;
+          pk: number;
+        }>;
+        
+        // Import buildWhereClause
+        const { buildWhereClause } = await import('../utils/helpers');
+        
+        // Convert filters to FilterCondition format
+        const filterConditions: Record<string, import('../utils/helpers').FilterCondition> = {};
+        for (const [columnName, filter] of Object.entries(filters)) {
+          filterConditions[columnName] = {
+            type: filter.type as import('../utils/helpers').FilterCondition['type'],
+            value: filter.value
+          };
+        }
+        
+        const { whereClause: clause } = buildWhereClause(filterConditions, schema);
+        whereClause = clause;
+      }
+      
+      const query = `SELECT * FROM "${sanitizedTable}"${whereClause} LIMIT ${limit} OFFSET ${offset}`;
       const result = await executeQueryViaAPI(dbId, query, env);
       
       return new Response(JSON.stringify({

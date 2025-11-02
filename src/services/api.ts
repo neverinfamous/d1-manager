@@ -36,6 +36,14 @@ export interface IndexInfo {
   partial: number
 }
 
+// Filter types for row-level filtering
+export interface FilterCondition {
+  type: 'contains' | 'equals' | 'notEquals' | 'gt' | 'gte' | 'lt' | 'lte' | 
+        'isNull' | 'isNotNull' | 'startsWith' | 'endsWith'
+  value?: string | number
+  value2?: string | number // For range filters (future: between operator)
+}
+
 // Foreign key dependency types
 export interface ForeignKeyDependency {
   table: string
@@ -375,10 +383,26 @@ class APIService {
     databaseId: string,
     tableName: string,
     limit: number = 100,
-    offset: number = 0
+    offset: number = 0,
+    filters?: Record<string, FilterCondition>
   ): Promise<QueryResult<T>> {
+    // Build URL with filter parameters
+    const params = new URLSearchParams()
+    params.set('limit', String(limit))
+    params.set('offset', String(offset))
+    
+    // Add filter parameters if provided
+    if (filters) {
+      for (const [columnName, filter] of Object.entries(filters)) {
+        params.set(`filter_${columnName}`, filter.type)
+        if (filter.value !== undefined && filter.value !== null && filter.value !== '') {
+          params.set(`filterValue_${columnName}`, String(filter.value))
+        }
+      }
+    }
+    
     const response = await fetch(
-      `${WORKER_API}/api/tables/${databaseId}/data/${encodeURIComponent(tableName)}?limit=${limit}&offset=${offset}`,
+      `${WORKER_API}/api/tables/${databaseId}/data/${encodeURIComponent(tableName)}?${params.toString()}`,
       { credentials: 'include' }
     )
     
@@ -853,8 +877,13 @@ export const api = new APIService()
 // Export individual methods for convenience
 export const listTables = (databaseId: string) => api.listTables(databaseId)
 export const getTableSchema = (databaseId: string, tableName: string) => api.getTableSchema(databaseId, tableName)
-export const getTableData = <T = Record<string, unknown>>(databaseId: string, tableName: string, limit?: number, offset?: number) => 
-  api.getTableData<T>(databaseId, tableName, limit, offset)
+export const getTableData = <T = Record<string, unknown>>(
+  databaseId: string, 
+  tableName: string, 
+  limit?: number, 
+  offset?: number,
+  filters?: Record<string, FilterCondition>
+) => api.getTableData<T>(databaseId, tableName, limit, offset, filters)
 export const executeQuery = <T = Record<string, unknown>>(
   databaseId: string, 
   query: string, 

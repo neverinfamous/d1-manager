@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, RefreshCw, Download, Trash2, Edit, Plus, Loader2, Columns, Settings } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Download, Trash2, Edit, Plus, Loader2, Columns, Settings, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -20,7 +20,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { getTableSchema, getTableData, executeQuery, type ColumnInfo, api } from '@/services/api';
+import { getTableSchema, getTableData, executeQuery, type ColumnInfo, type FilterCondition, api } from '@/services/api';
+import { FilterBar } from '@/components/FilterBar';
+import { deserializeFilters, serializeFilters, getActiveFilterCount } from '@/utils/filters';
 
 interface TableViewProps {
   databaseId: string;
@@ -48,6 +50,10 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
   const [deletingRow, setDeletingRow] = useState<Record<string, unknown> | null>(null);
   const [deleting, setDeleting] = useState(false);
   
+  // Filter state
+  const [filters, setFilters] = useState<Record<string, FilterCondition>>({});
+  const [showFilters, setShowFilters] = useState(false);
+  
   // Column management state
   const [showAddColumnDialog, setShowAddColumnDialog] = useState(false);
   const [addColumnValues, setAddColumnValues] = useState({
@@ -73,10 +79,29 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
   const [deletingColumn, setDeletingColumn] = useState<ColumnInfo | null>(null);
   const [deletingColumnInProgress, setDeletingColumnInProgress] = useState(false);
 
+  // Sync filters with URL on mount
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlFilters = deserializeFilters(params);
+    
+    if (Object.keys(urlFilters).length > 0) {
+      setFilters(urlFilters);
+      setShowFilters(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  
+  // Update URL when filters change
+  useEffect(() => {
+    const params = serializeFilters(filters);
+    const newUrl = `${window.location.pathname}${params.toString() ? '?' + params.toString() : ''}`;
+    window.history.replaceState({}, '', newUrl);
+  }, [filters]);
+  
   useEffect(() => {
     loadTableData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [databaseId, tableName, page]);
+  }, [databaseId, tableName, page, filters]);
 
   const loadTableData = async () => {
     try {
@@ -86,7 +111,7 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
       // Load schema and data in parallel
       const [schemaResult, dataResult] = await Promise.all([
         getTableSchema(databaseId, tableName),
-        getTableData(databaseId, tableName, rowsPerPage, (page - 1) * rowsPerPage)
+        getTableData(databaseId, tableName, rowsPerPage, (page - 1) * rowsPerPage, filters)
       ]);
       
       setSchema(schemaResult);
@@ -96,6 +121,11 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
     } finally {
       setLoading(false);
     }
+  };
+  
+  const handleFiltersChange = (newFilters: Record<string, FilterCondition>) => {
+    setFilters(newFilters);
+    setPage(1); // Reset to first page when filters change
   };
 
   const formatValue = (value: unknown): string => {
@@ -464,12 +494,26 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
             <h2 className="text-3xl font-semibold">{tableName}</h2>
             <p className="text-sm text-muted-foreground">
               {databaseName} • {data.length} {data.length === 1 ? 'row' : 'rows'}
+              {getActiveFilterCount(filters) > 0 && ' (filtered)'}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="icon" onClick={loadTableData}>
             <RefreshCw className="h-4 w-4" />
+          </Button>
+          <Button 
+            variant={showFilters ? "default" : "outline"} 
+            onClick={() => setShowFilters(!showFilters)}
+            className="relative"
+          >
+            <Filter className="h-4 w-4 mr-2" />
+            Filters
+            {getActiveFilterCount(filters) > 0 && (
+              <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center">
+                {getActiveFilterCount(filters)}
+              </span>
+            )}
           </Button>
           <Button variant="outline" onClick={handleExportCSV} disabled={data.length === 0}>
             <Download className="h-4 w-4 mr-2" />
@@ -481,6 +525,15 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
           </Button>
         </div>
       </div>
+
+      {/* Filter Bar */}
+      {!loading && showFilters && schema.length > 0 && (
+        <FilterBar
+          columns={schema}
+          filters={filters}
+          onFiltersChange={handleFiltersChange}
+        />
+      )}
 
       {/* Schema Info */}
       {!loading && schema.length > 0 && (
@@ -588,11 +641,19 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
           <CardContent className="p-0">
             {data.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12">
-                <p className="text-sm text-muted-foreground mb-4">No rows in this table</p>
-                <Button onClick={handleOpenInsertDialog}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Insert First Row
-                </Button>
+                <p className="text-sm text-muted-foreground mb-4">
+                  {getActiveFilterCount(filters) > 0 ? 'No rows match your filters' : 'No rows in this table'}
+                </p>
+                {getActiveFilterCount(filters) > 0 ? (
+                  <Button variant="outline" onClick={() => setFilters({})}>
+                    Clear Filters
+                  </Button>
+                ) : (
+                  <Button onClick={handleOpenInsertDialog}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Insert First Row
+                  </Button>
+                )}
               </div>
             ) : (
               <div className="overflow-x-auto">
