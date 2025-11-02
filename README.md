@@ -653,6 +653,43 @@ For more help, see [Cloudflare Workers Troubleshooting](https://developers.cloud
   - Modify column types and constraints (table recreation)
   - Delete columns (ALTER TABLE DROP COLUMN)
   - Always-visible action buttons with validation
+- ✅ **Table dependencies viewer** - Foreign key relationship analysis before deletion
+  - Shows inbound/outbound dependencies with row counts
+  - Displays cascade behavior (CASCADE, RESTRICT, SET NULL, etc.)
+  - Requires confirmation when dependencies exist
+  - Per-table collapsible view in bulk operations
+
+---
+
+## 🔮 Planned Work
+
+### Table Dependencies Enhancements
+- **Cascade Impact Simulator** - Preview the exact count of affected rows across the entire dependency chain
+  - Real-time calculation of cascading deletions through multiple levels
+  - Visual tree showing which rows in which tables will be affected
+  - "Dry run" mode to see impact without executing deletion
+  - Export impact report as JSON or text summary
+  
+- **Force Delete Mode** - Advanced developer option to bypass foreign key constraints
+  - Explicit toggle: "Enable Force Delete (Ignore Foreign Keys)"
+  - Requires developer mode activation in settings
+  - Shows additional warning: "⚠️ DANGER: This will leave orphaned references"
+  - Uses `PRAGMA foreign_keys = OFF` temporarily during operation
+  - Logs all bypassed constraints for audit trail
+  
+- **Quick Navigation Links** - Navigate to dependent tables directly from dependency viewer
+  - "Show dependent table details" links on each dependency
+  - Click to open table schema view in current or new tab
+  - "View all X rows in [table_name]" link with pre-filtered query
+  - Breadcrumb navigation to easily return to original context
+  - Keyboard shortcuts for rapid navigation (Ctrl+Click for new tab)
+
+### Other Planned Features
+- **Index analyzer** - Suggest missing indexes based on foreign keys
+- **Relationship diagram** - Visual graph of table relationships
+- **Constraint validator** - Check for orphaned records and broken references
+- **Dependency export** - Export schema relationships as documentation
+- **Circular dependency detector** - Identify and warn about circular FK chains
 
 ---
 
