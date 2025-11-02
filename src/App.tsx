@@ -441,7 +441,7 @@ export default function App() {
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div 
             className="flex items-center gap-3 cursor-pointer"
-            onClick={() => setCurrentView({ type: 'list' })}
+            onClick={() => window.location.href = 'https://d1.adamic.tech/'}
           >
             <Database className="h-8 w-8 text-primary" />
             <div>

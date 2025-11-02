@@ -88,7 +88,6 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
       setFilters(urlFilters);
       setShowFilters(true);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   
   // Update URL when filters change
@@ -547,6 +546,14 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
               </Button>
             </div>
             <div className="space-y-2">
+              {/* Column headers */}
+              <div className="flex items-center gap-4 text-xs font-medium text-muted-foreground uppercase tracking-wider pb-2 border-b">
+                <div className="min-w-[200px]">Column</div>
+                <div className="min-w-[100px]">Type</div>
+                <div className="min-w-[80px]">Nullable</div>
+                <div className="flex-1">Default</div>
+                <div className="w-[108px] text-right">Actions</div>
+              </div>
               {schema.map((col) => (
                 <div key={col.cid} className="flex items-center gap-4 text-sm">
                   <div className="flex items-center gap-2 min-w-[200px]">
