@@ -2,10 +2,10 @@ name: Build and Push Docker Images
 
 on:
   push:
-    branches: [ main ]
+    branches: [ master ]
     tags: [ 'v*' ]
   pull_request:
-    branches: [ main ]
+    branches: [ master ]
 
 env:
   REGISTRY: docker.io
@@ -32,7 +32,7 @@ jobs:
       deployments: write  # Required for deployment tracking
     
     environment:
-      name: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && 'production' || '' }}
+      name: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/master' && 'production' || '' }}
       url: https://hub.docker.com/r/writenotenow/d1-manager
 
     steps:
@@ -75,7 +75,7 @@ jobs:
         tags: |
           # When pushing Git tag v1.0.0, create only: v1.0.0 (exact version)
           type=semver,pattern=v{{version}}
-          # When pushing to main branch, use version from README + latest
+          # When pushing to master branch, use version from README + latest
           type=raw,value=v${{ steps.version.outputs.version }},enable={{is_default_branch}}
           type=raw,value=latest,enable={{is_default_branch}}
           # SHA-pinned tags for security (reduced to first 12 chars for faster upload)
@@ -154,7 +154,7 @@ jobs:
 
     # Update Docker Hub description (optional - can be done manually)
     - name: Update Docker Hub Description
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      if: github.event_name == 'push' && github.ref == 'refs/heads/master'
       uses: peter-evans/dockerhub-description@v5
       continue-on-error: true
       timeout-minutes: 5
@@ -166,7 +166,7 @@ jobs:
         short-description: "Manage Cloudflare D1 databases — SQL console, table designer, bulk operations, GitHub SSO"
     
     - name: Deployment Summary
-      if: success() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+      if: success() && github.event_name == 'push' && github.ref == 'refs/heads/master'
       run: |
         echo "✅ Successfully published Docker images to production"
         echo "🐳 Registry: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
