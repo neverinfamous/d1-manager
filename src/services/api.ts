@@ -345,6 +345,48 @@ class APIService {
   }
 
   /**
+   * Optimize multiple databases (ANALYZE only - VACUUM not supported via D1 REST API)
+   */
+  async optimizeDatabases(
+    databaseIds: string[],
+    onProgress?: (completed: number, total: number, operation: string) => void
+  ): Promise<{ 
+    succeeded: Array<{ id: string; name: string }>, 
+    failed: Array<{ id: string; name: string; error: string }> 
+  }> {
+    const succeeded: Array<{ id: string; name: string }> = []
+    const failed: Array<{ id: string; name: string; error: string }> = []
+    
+    for (let i = 0; i < databaseIds.length; i++) {
+      const dbId = databaseIds[i]
+      
+      try {
+        // Get database name for progress reporting
+        const dbInfo = await this.getDatabaseInfo(dbId)
+        
+        onProgress?.(i + 1, databaseIds.length, `ANALYZE on ${dbInfo.name}`)
+        
+        // Run PRAGMA optimize via query execution
+        await this.executeQuery(dbId, 'PRAGMA optimize')
+        
+        succeeded.push({
+          id: dbId,
+          name: dbInfo.name
+        })
+      } catch (err) {
+        const dbInfo = await this.getDatabaseInfo(dbId).catch(() => ({ name: 'Unknown' }))
+        failed.push({
+          id: dbId,
+          name: dbInfo.name,
+          error: err instanceof Error ? err.message : 'Unknown error'
+        })
+      }
+    }
+    
+    return { succeeded, failed }
+  }
+
+  /**
    * List tables in a database
    */
   async listTables(databaseId: string): Promise<TableInfo[]> {

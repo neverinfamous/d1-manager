@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { api, type D1Database } from './services/api'
 import { auth } from './services/auth'
 import { useTheme } from './hooks/useTheme'
-import { Database, Plus, Moon, Sun, Monitor, Loader2, Code, GitCompare, Upload, Download, Trash2, Pencil } from 'lucide-react'
+import { Database, Plus, Moon, Sun, Monitor, Loader2, Code, GitCompare, Upload, Download, Trash2, Pencil, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
@@ -84,6 +84,15 @@ export default function App() {
     isRenaming: boolean
     currentStep?: string
     progress?: number
+    error?: string
+  } | null>(null)
+
+  // Optimize operation state
+  const [optimizeDialogState, setOptimizeDialogState] = useState<{
+    databaseIds: string[]
+    databaseNames: string[]
+    isOptimizing: boolean
+    currentProgress?: { current: number; total: number; operation: string }
     error?: string
   } | null>(null)
 
@@ -381,6 +390,50 @@ export default function App() {
     }
   }
 
+  const handleOptimizeClick = () => {
+    if (selectedDatabases.length === 0) return
+    
+    const selectedDbData = databases.filter(db => selectedDatabases.includes(db.uuid))
+    
+    setOptimizeDialogState({
+      databaseIds: selectedDatabases,
+      databaseNames: selectedDbData.map(db => db.name),
+      isOptimizing: false
+    })
+  }
+
+  const confirmOptimize = async () => {
+    if (!optimizeDialogState) return
+    
+    setOptimizeDialogState(prev => prev ? { ...prev, isOptimizing: true, error: undefined } : null)
+    setError('')
+    
+    try {
+      const result = await api.optimizeDatabases(
+        optimizeDialogState.databaseIds,
+        (current, total, operation) => {
+          setOptimizeDialogState(prev => prev ? {
+            ...prev,
+            currentProgress: { current, total, operation }
+          } : null)
+        }
+      )
+      
+      // Show errors if any
+      if (result.failed.length > 0) {
+        setError(`Some databases failed to optimize:\n${result.failed.map(f => `${f.name}: ${f.error}`).join('\n')}`)
+      }
+      
+      // Clear selection and close dialog
+      setSelectedDatabases([])
+      setOptimizeDialogState(null)
+    } catch (err) {
+      setError('Failed to optimize databases')
+      console.error('Optimize error:', err)
+      setOptimizeDialogState(prev => prev ? { ...prev, isOptimizing: false } : null)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -523,6 +576,10 @@ export default function App() {
                   <>
                     <Button variant="outline" onClick={clearSelection}>
                       Clear Selection
+                    </Button>
+                    <Button variant="outline" onClick={handleOptimizeClick}>
+                      <Zap className="h-4 w-4 mr-2" />
+                      Optimize Selected
                     </Button>
                     <Button onClick={handleBulkDownload} disabled={bulkDownloadProgress !== null}>
                       <Download className="h-4 w-4 mr-2" />
@@ -913,6 +970,97 @@ export default function App() {
                   : deleteConfirmState.databaseNames.length === 1
                     ? 'Delete Database'
                     : `Delete ${deleteConfirmState.databaseNames.length} Databases`}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Optimize Databases Dialog */}
+      {optimizeDialogState && (
+        <Dialog open={true} onOpenChange={() => !optimizeDialogState.isOptimizing && setOptimizeDialogState(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                {optimizeDialogState.databaseNames.length === 1
+                  ? 'Optimize Database?'
+                  : `Optimize ${optimizeDialogState.databaseNames.length} Databases?`}
+              </DialogTitle>
+              <DialogDescription>
+                Run ANALYZE to update query statistics and improve query performance
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4 space-y-4">
+              {/* Database list */}
+              {optimizeDialogState.databaseNames.length === 1 ? (
+                <p className="text-sm">
+                  Database: <strong>{optimizeDialogState.databaseNames[0]}</strong>
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Databases to optimize:</p>
+                  <ul className="text-sm list-disc list-inside max-h-32 overflow-y-auto">
+                    {optimizeDialogState.databaseNames.map((name, index) => (
+                      <li key={index}>{name}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Info box */}
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-900 rounded-lg p-4">
+                <p className="text-sm text-blue-800 dark:text-blue-200">
+                  <strong>Operation:</strong> ANALYZE (PRAGMA optimize)
+                </p>
+                <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                  Updates query statistics for the SQLite query planner to improve query performance.
+                </p>
+              </div>
+
+              {/* Note about VACUUM */}
+              <div className="bg-muted/50 border rounded-lg p-3">
+                <p className="text-xs text-muted-foreground">
+                  <strong>Note:</strong> VACUUM is not available via D1 REST API. D1 automatically manages space reclamation. For manual VACUUM, use: <code className="text-xs bg-muted px-1 py-0.5 rounded">wrangler d1 execute &lt;database-name&gt; --remote --command="VACUUM"</code>
+                </p>
+              </div>
+
+              {/* Progress indicator */}
+              {optimizeDialogState.isOptimizing && optimizeDialogState.currentProgress && (
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    {optimizeDialogState.currentProgress.operation} (Database {optimizeDialogState.currentProgress.current} of {optimizeDialogState.currentProgress.total})
+                  </p>
+                  <Progress 
+                    value={(optimizeDialogState.currentProgress.current / optimizeDialogState.currentProgress.total) * 100} 
+                  />
+                </div>
+              )}
+
+              {/* Error message */}
+              {optimizeDialogState.error && (
+                <div className="bg-destructive/10 border border-destructive text-destructive px-3 py-2 rounded-lg text-sm">
+                  {optimizeDialogState.error}
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setOptimizeDialogState(null)}
+                disabled={optimizeDialogState.isOptimizing}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={confirmOptimize}
+                disabled={optimizeDialogState.isOptimizing}
+              >
+                {optimizeDialogState.isOptimizing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                {optimizeDialogState.isOptimizing 
+                  ? 'Optimizing...' 
+                  : optimizeDialogState.databaseNames.length === 1
+                    ? 'Optimize Database'
+                    : `Optimize ${optimizeDialogState.databaseNames.length} Databases`}
               </Button>
             </DialogFooter>
           </DialogContent>

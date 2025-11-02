@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Table, RefreshCw, Plus, Search, Loader2, Wand2, Copy, Download, Trash2, Pencil, Zap } from 'lucide-react';
+import { ArrowLeft, Table, RefreshCw, Plus, Search, Loader2, Wand2, Copy, Download, Trash2, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -80,16 +80,6 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable }
     dependencies?: TableDependenciesResponse;
     loadingDependencies?: boolean;
     confirmDependencies?: boolean;
-  } | null>(null);
-
-  // Optimize dialog state
-  const [optimizeDialogState, setOptimizeDialogState] = useState<{
-    isOptimizing: boolean;
-    runVacuum: boolean;
-    runAnalyze: boolean;
-    currentOperation?: string;
-    error?: string;
-    success?: string;
   } | null>(null);
 
   useEffect(() => {
@@ -291,80 +281,6 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable }
     }
   };
   
-  // Optimize handlers
-  const handleOptimizeClick = () => {
-    setOptimizeDialogState({
-      isOptimizing: false,
-      runVacuum: true,
-      runAnalyze: true
-    });
-  };
-
-  const confirmOptimize = async () => {
-    if (!optimizeDialogState) return;
-
-    // Validate at least one operation is selected
-    if (!optimizeDialogState.runVacuum && !optimizeDialogState.runAnalyze) {
-      setOptimizeDialogState(prev => prev ? {
-        ...prev,
-        error: 'Please select at least one operation (VACUUM or ANALYZE)'
-      } : null);
-      return;
-    }
-
-    setOptimizeDialogState(prev => prev ? {
-      ...prev,
-      isOptimizing: true,
-      error: undefined,
-      success: undefined
-    } : null);
-
-    try {
-      const operations: string[] = [];
-
-      // Run VACUUM if selected
-      if (optimizeDialogState.runVacuum) {
-        setOptimizeDialogState(prev => prev ? {
-          ...prev,
-          currentOperation: 'Running VACUUM...'
-        } : null);
-        
-        await api.executeQuery(databaseId, 'VACUUM');
-        operations.push('VACUUM');
-      }
-
-      // Run ANALYZE if selected
-      if (optimizeDialogState.runAnalyze) {
-        setOptimizeDialogState(prev => prev ? {
-          ...prev,
-          currentOperation: 'Running ANALYZE...'
-        } : null);
-        
-        await api.executeQuery(databaseId, 'PRAGMA optimize');
-        operations.push('ANALYZE');
-      }
-
-      setOptimizeDialogState(prev => prev ? {
-        ...prev,
-        isOptimizing: false,
-        currentOperation: undefined,
-        success: `Database optimized successfully! Operations completed: ${operations.join(', ')}`
-      } : null);
-
-      // Auto-close after 2 seconds on success
-      setTimeout(() => {
-        setOptimizeDialogState(null);
-      }, 2000);
-    } catch (err) {
-      setOptimizeDialogState(prev => prev ? {
-        ...prev,
-        isOptimizing: false,
-        currentOperation: undefined,
-        error: err instanceof Error ? err.message : 'Failed to optimize database'
-      } : null);
-    }
-  };
-
   // Delete handlers
   const handleDeleteClick = async () => {
     if (selectedTables.length === 0) return;
@@ -459,10 +375,6 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable }
             <>
               <Button variant="outline" size="icon" onClick={loadTables}>
                 <RefreshCw className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" onClick={handleOptimizeClick}>
-                <Zap className="h-4 w-4 mr-2" />
-                Optimize
               </Button>
               <Button onClick={() => setShowSchemaDesigner(true)}>
                 <Plus className="h-4 w-4 mr-2" />
@@ -855,112 +767,6 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable }
               >
                 {exportDialogState.isExporting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 {exportDialogState.isExporting ? 'Exporting...' : 'Export'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
-
-      {/* Optimize Database Dialog */}
-      {optimizeDialogState && (
-        <Dialog open={true} onOpenChange={() => !optimizeDialogState.isOptimizing && setOptimizeDialogState(null)}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Optimize Database</DialogTitle>
-              <DialogDescription>
-                Run optimization operations to improve database performance and reclaim space
-              </DialogDescription>
-            </DialogHeader>
-            <div className="py-4 space-y-4">
-              {/* Operation selection */}
-              <div className="space-y-3 border rounded-lg p-4 bg-muted/30">
-                <p className="text-sm font-medium">Select operations to run:</p>
-                
-                <div className="flex items-start space-x-3">
-                  <Checkbox
-                    id="run-vacuum"
-                    checked={optimizeDialogState.runVacuum}
-                    onCheckedChange={(checked) => setOptimizeDialogState(prev => prev ? {
-                      ...prev,
-                      runVacuum: checked === true,
-                      error: undefined
-                    } : null)}
-                    disabled={optimizeDialogState.isOptimizing}
-                  />
-                  <div className="grid gap-1.5 leading-none">
-                    <label
-                      htmlFor="run-vacuum"
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                    >
-                      VACUUM
-                    </label>
-                    <p className="text-xs text-muted-foreground">
-                      Reclaim unused space and defragment the database file
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start space-x-3">
-                  <Checkbox
-                    id="run-analyze"
-                    checked={optimizeDialogState.runAnalyze}
-                    onCheckedChange={(checked) => setOptimizeDialogState(prev => prev ? {
-                      ...prev,
-                      runAnalyze: checked === true,
-                      error: undefined
-                    } : null)}
-                    disabled={optimizeDialogState.isOptimizing}
-                  />
-                  <div className="grid gap-1.5 leading-none">
-                    <label
-                      htmlFor="run-analyze"
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                    >
-                      ANALYZE
-                    </label>
-                    <p className="text-xs text-muted-foreground">
-                      Update query statistics to optimize query performance
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Progress indicator */}
-              {optimizeDialogState.isOptimizing && optimizeDialogState.currentOperation && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  {optimizeDialogState.currentOperation}
-                </div>
-              )}
-
-              {/* Success message */}
-              {optimizeDialogState.success && (
-                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-900 text-green-800 dark:text-green-200 px-3 py-2 rounded-lg text-sm">
-                  {optimizeDialogState.success}
-                </div>
-              )}
-
-              {/* Error message */}
-              {optimizeDialogState.error && (
-                <div className="bg-destructive/10 border border-destructive text-destructive px-3 py-2 rounded-lg text-sm">
-                  {optimizeDialogState.error}
-                </div>
-              )}
-            </div>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setOptimizeDialogState(null)}
-                disabled={optimizeDialogState.isOptimizing}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={confirmOptimize}
-                disabled={optimizeDialogState.isOptimizing}
-              >
-                {optimizeDialogState.isOptimizing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                {optimizeDialogState.isOptimizing ? 'Optimizing...' : 'Optimize Database'}
               </Button>
             </DialogFooter>
           </DialogContent>
