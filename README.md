@@ -57,11 +57,13 @@ A modern, full-featured web application for managing Cloudflare D1 databases wit
   - **Per-Table View** - Collapsible accordion in bulk operations for detailed impact analysis
 
 #### Query Console
-- **SQL Editor** - Execute custom SQL queries against any database
-- **Results Display** - Formatted table output with column headers
-- **Execution Metrics** - Shows execution time and row count
-- **Keyboard Shortcuts** - Ctrl+Enter to execute queries
-- **History** - Query history tracking (backend ready)
+- **SQL Editor** - Execute custom SQL queries with syntax highlighting
+- **Results Display** - Formatted table output with column headers and execution metrics
+- **Keyboard Shortcuts** - Ctrl+Enter (Cmd+Enter on Mac) to execute
+- **Skip Validation** - Optional checkbox to bypass validation for DROP/DELETE operations
+- **Query Management** - Save, load, and manage frequently used queries
+- **CSV Export** - Export query results directly to CSV files
+- **History Tracking** - Automatic query execution history (backend ready)
 
 #### User Experience
 - **Dark/Light/System Themes** - Automatic theme switching with persistence
@@ -242,77 +244,23 @@ Click the theme toggle button in the header to cycle through modes. Your prefere
 
 ### Mock Data in Local Development
 
-The Worker automatically detects localhost requests and returns mock data:
-- **Sample Databases:** `dev-database`, `test-database`
-- **Sample Tables:** `users`, `posts`, `comments`
-- **Sample Schema:** Realistic column structures
-- **Query Results:** Formatted response data
-- **Export Operations:** Returns mock SQL content
-- **Import Operations:** Simulates database creation/import
-
-This allows full UI testing without connecting to actual Cloudflare D1 databases.
+The Worker automatically detects localhost requests and returns mock data including sample databases (`dev-database`, `test-database`), tables (`users`, `posts`, `comments`), realistic schemas, query results, and simulated export/import operations. This allows full UI testing without Cloudflare credentials.
 
 ### Bulk Operations
 
-The D1 Manager supports bulk operations on both databases and tables:
+The D1 Manager supports efficient bulk operations on both databases and tables with multi-select checkboxes, progress tracking, and ZIP archive generation.
 
-#### Database Bulk Operations
+#### Database Operations
+- **Multi-select** with "Select All" option and visual selection indicators
+- **Bulk Download** - ZIP archive of SQL dumps using D1's export API
+- **Bulk Delete** - Sequential deletion with progress tracking and error reporting
+- **Upload/Import** - Create new databases or import into existing ones (up to 5GB SQL files)
 
-**To use database bulk operations:**
-1. Click checkboxes on database cards to select databases (or use "Select All")
-2. Selected databases show a blue ring border
-3. Action buttons appear in the toolbar:
-   - **Download Selected** - Exports databases as SQL files in a ZIP archive
-   - **Delete Selected** - Deletes multiple databases with confirmation
-   - **Upload Database** - Import SQL files (always visible)
-
-**Download Process:**
-- Uses D1's polling export API to generate SQL dumps
-- Creates a timestamped ZIP file containing all selected databases
-- Progress tracking from preparation through download completion
-
-**Upload Process:**
-- Accepts `.sql` files up to 5GB
-- Two modes:
-  - **Create New Database** - Creates a new database from SQL file
-  - **Import into Existing** - Imports SQL into selected existing database
-- Automatically refreshes database list after successful upload
-
-**Delete Process:**
-- Shows confirmation dialog with list of databases to delete
-- Sequential deletion with progress tracking
-- Reports any failures while continuing with remaining databases
-
-#### Table Bulk Operations
-
-**To use table bulk operations:**
-1. Navigate to a database's table view
-2. Click checkboxes on table cards to select tables (or use "Select All")
-3. Selected tables show a blue ring border
-4. Action buttons appear in the toolbar:
-   - **Clone Selected** - Duplicate multiple tables with custom names
-   - **Export Selected** - Export tables as SQL or CSV files
-   - **Delete Selected** - Delete multiple tables with confirmation
-
-**Clone Process:**
-- Opens dialog to specify new names for each cloned table
-- Suggested names pre-filled (e.g., `users_copy`)
-- Copies table structure, data, and indexes
-- Progress tracking for multiple tables
-- Automatically refreshes table list after completion
-
-**Export Process:**
-- Choose between SQL (structure + data) or CSV (data only) format
-- Single table: Downloads immediately
-- Multiple tables: Creates ZIP file with all exports
-- Real-time progress tracking
-- Timestamped filenames
-
-**Delete Process:**
-- Shows confirmation dialog with list of tables to delete
-- Sequential deletion with progress tracking
-- Reports any failures while continuing with remaining tables
-- Cannot be undone - use with caution
+#### Table Operations  
+- **Multi-select** with visual selection feedback
+- **Bulk Clone** - Duplicate tables with custom names, including structure, data, and indexes
+- **Bulk Export** - SQL or CSV format, single file or ZIP archive for multiple tables
+- **Bulk Delete** - Sequential deletion with dependency analysis (see below)
 
 ### Table Dependencies Viewer
 
@@ -361,151 +309,39 @@ When you attempt to delete a table (single or bulk), the system automatically:
 
 ### Column Management
 
-The D1 Manager provides comprehensive column management capabilities directly from the table schema view. Each column row displays action buttons for rename, modify, and delete operations.
+Comprehensive schema modification from the table view with always-visible action buttons on each column row.
 
-**How to Access Column Operations:**
-
-1. Navigate to a database and open a table
-2. View the Schema section showing all columns
-3. Each column row has three action buttons on the right:
-   - **Edit (Pencil icon)** - Rename the column
-   - **Settings (Gear icon)** - Modify column type and constraints
-   - **Delete (Trash icon)** - Remove the column from the table
-
-**Add Column:**
-
-- Click the "Add Column" button in the Schema section header
-- Fill in the column details:
-  - **Column Name** - Must be unique within the table
-  - **Type** - TEXT, INTEGER, REAL, BLOB, or NUMERIC
-  - **Default Value** - Optional default value for existing rows
-  - **NOT NULL** - Enforce non-null constraint (requires default value if table has data)
-- Uses `ALTER TABLE ADD COLUMN` for efficient column addition
-- New column will have NULL values for existing rows unless a default is specified
-
-**Rename Column:**
-
-- Click the Edit button on any column row
-- Enter the new column name
-- Validates for uniqueness and valid identifiers
-- Uses `ALTER TABLE RENAME COLUMN` (SQLite 3.25.0+)
-- Fast operation with no data loss
-
-**Modify Column Type/Constraints:**
-
-- Click the Settings button on any column row
-- **⚠️ Important: Table Recreation Required**
-- Displays a warning about the table recreation process
-- Modify:
-  - **Column Type** - Change from TEXT to INTEGER, etc.
-  - **NOT NULL Constraint** - Add or remove NOT NULL
-  - **Default Value** - Set or change default value
-- Process:
-  1. Creates a temporary table with the new column definition
-  2. Copies all data with appropriate type conversions
-  3. Drops the original table
-  4. Renames the temporary table to the original name
-- Automatically refreshes the schema after completion
-- **Recommendation:** Backup your database before modifying column types
-
-**Delete Column:**
-
-- Click the Delete button on any column row
-- Shows confirmation dialog with data loss warning
-- Cannot delete if it's the only column in the table (button is disabled)
-- Uses `ALTER TABLE DROP COLUMN` (SQLite 3.35.0+)
-- Permanently removes the column and all its data
-- **Recommendation:** Backup your database before deleting columns
-
-**SQLite Version Support:**
-
-- **ADD COLUMN** - Supported in all SQLite versions
-- **RENAME COLUMN** - Requires SQLite 3.25.0+ (Cloudflare D1 supported)
-- **DROP COLUMN** - Requires SQLite 3.35.0+ (Cloudflare D1 supported)
-- **MODIFY COLUMN** - Not natively supported; uses table recreation method
+**Operations:**
+- **Add Column** - Define name, type (TEXT/INTEGER/REAL/BLOB/NUMERIC), constraints, and default values
+- **Rename Column** - Fast operation using `ALTER TABLE RENAME COLUMN` (SQLite 3.25.0+)
+- **Modify Type/Constraints** - Uses table recreation method with automatic data migration
+- **Delete Column** - Uses `ALTER TABLE DROP COLUMN` (SQLite 3.35.0+), validates for single-column tables
 
 **Important Notes:**
-
-- All column operations validate for potential conflicts before execution
-- Primary key columns can be renamed but require extra caution
-- Modifying column types may result in data loss if incompatible (e.g., TEXT to INTEGER with non-numeric data)
-- The modify operation uses table recreation, which temporarily duplicates the table
-- Indexes are preserved during rename and delete operations
-- Local development mode provides mock responses for testing without a real database
+- Modifying column types uses table recreation (temporary duplication), which may result in data loss for incompatible conversions
+- Indexes are preserved during operations
+- Backup recommended before destructive changes
+- All operations validate for conflicts before execution
 
 ### Database Renaming
 
-The D1 Manager includes a database rename feature that uses a migration-based approach since Cloudflare's D1 API does not natively support renaming databases.
+Migration-based approach with automatic export/import since D1 doesn't natively support renaming.
 
-**How It Works:**
+**Process:** Validates name → Creates new database → Exports data → Imports → Verifies → Deletes original
 
-The rename operation performs the following steps automatically:
-1. **Validates** the new database name for uniqueness and Cloudflare naming requirements
-2. **Creates** a new database with the desired name
-3. **Exports** all data from the original database using D1's export API
-4. **Imports** the exported data into the new database
-5. **Verifies** the import was successful
-6. **Deletes** the original database upon successful migration
+**Safety Features:**
+- Backup warning with one-click download button
+- Mandatory confirmation checkbox
+- Real-time progress tracking
+- Automatic rollback on failure
+- Name validation (3-63 chars, lowercase a-z, 0-9, hyphens, no leading/trailing hyphens)
 
-**Important Safety Features:**
+**Note:** Temporary duplication during migration counts toward quota. Always backup first.
 
-- ⚠️ **Backup Warning** - The UI prominently warns users to download a backup before renaming
-- 📥 **One-Click Backup** - Convenient "Download Backup Now" button in the rename dialog
-- ✅ **Confirmation Checkbox** - Users must acknowledge they have backed up the database
-- 🔄 **Progress Tracking** - Real-time progress updates throughout the migration process
-- 🔙 **Automatic Rollback** - If any step fails, the new database is automatically deleted
-- 📝 **Validation** - Name validation ensures compliance with Cloudflare's requirements
+### Authentication & Development
 
-**Best Practices:**
-
-1. **Always backup first** - Download a backup of your database before renaming
-2. **Choose off-peak times** - Rename during low-traffic periods if possible
-3. **Test with small databases** - If unsure, test the rename process with a small test database first
-4. **Monitor the process** - Watch the progress indicators to ensure smooth operation
-5. **Verify after rename** - Check that all tables and data are present in the renamed database
-
-**Limitations:**
-
-- **Migration time** - Large databases may take several minutes to migrate
-- **Temporary duplication** - Both databases exist briefly during the migration (counts toward quota)
-- **No rollback after deletion** - Once the original database is deleted, the rename cannot be undone
-- **Downtime** - Applications using the database should be updated to use the new name after renaming
-
-**Database Naming Requirements:**
-
-- Must be 3-63 characters long
-- Can only contain lowercase letters (a-z), numbers (0-9), and hyphens (-)
-- Cannot start or end with a hyphen
-- Must be unique across your Cloudflare account
-
-**What Happens If Rename Fails:**
-
-If the rename operation fails at any step:
-- The original database remains untouched
-- The new database (if created) is automatically deleted
-- A detailed error message explains what went wrong
-- You can retry the operation after addressing the issue
-
-**Recovery from Partial Failure:**
-
-If the original database was deleted but you need to recover:
-1. The new database with the desired name should still exist with all your data
-2. If you downloaded a backup (as recommended), you can import it to a new database
-3. Contact Cloudflare support if you need assistance with data recovery
-
-### Authentication
-
-- **Production:** Cloudflare Access JWT validation on every API request
-- **Local Development:** Authentication bypassed for `localhost` requests
-- **Zero Trust Integration:** Supports GitHub OAuth and other identity providers
-
-### MCP Servers
-
-This project was built using the following Model Context Protocol (MCP) servers:
-- **desktop-commander** - File operations, terminal commands, and local development
-- **shadcn** - UI component installation and configuration
-- **cloudflare-docs** - D1 API documentation and best practices
-- **cloudflare-bindings** - Testing with real Cloudflare D1 databases
+- **Production:** Cloudflare Access JWT validation with Zero Trust integration (GitHub OAuth, etc.)
+- **Local Development:** Auth bypassed for localhost, mock data for testing
 
 ---
 
