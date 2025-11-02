@@ -75,12 +75,42 @@ export async function handleDatabaseRoutes(
       
       const data = await response.json() as { result: D1DatabaseInfo[]; success: boolean };
       
-      // Enhance database info with size and table count if possible
-      // Note: This requires querying each database individually which isn't possible
-      // without dynamic bindings, so we'll return basic info for now
+      // Enhance database info with table count by querying each database
+      const enhancedDatabases = await Promise.all(
+        data.result.map(async (db) => {
+          try {
+            // Query PRAGMA table_list to get table count
+            const tableListResponse = await fetch(
+              `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database/${db.uuid}/query`,
+              {
+                method: 'POST',
+                headers: cfHeaders,
+                body: JSON.stringify({ sql: "SELECT COUNT(*) as count FROM (SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%')" })
+              }
+            );
+            
+            if (tableListResponse.ok) {
+              const tableData = await tableListResponse.json() as {
+                result: Array<{ results: Array<{ count: number }>; success: boolean }>;
+                success: boolean;
+              };
+              
+              if (tableData.success && tableData.result?.[0]?.results?.[0]) {
+                const tableCount = tableData.result[0].results[0].count;
+                return { ...db, num_tables: tableCount };
+              }
+            }
+          } catch (err) {
+            console.error(`[Databases] Failed to get table count for ${db.name}:`, err);
+          }
+          
+          // Return database without table count if query failed
+          return db;
+        })
+      );
       
       return new Response(JSON.stringify({
-        result: data.result,
+        result: enhancedDatabases,
         success: data.success
       }), {
         headers: {
