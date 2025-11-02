@@ -9,9 +9,7 @@ A modern, full-featured web application for managing Cloudflare D1 databases wit
 
 ## 🎯 Features
 
-### ✅ Phase 1 - Basic Functionality (Complete)
-
-#### Database Management
+### Database Management
 - **List & Browse** - View all D1 databases with metadata (created date, size, table count)
 - **Create Database** - Interactive dialog for creating new databases
 - **Rename Database** - Rename databases with migration-based approach (see details below)
@@ -476,44 +474,50 @@ For more help, see [Cloudflare Workers Troubleshooting](https://developers.cloud
 
 ## 📋 Roadmap
 
-### ✅ Phase 1 - Basic Functionality (COMPLETE)
-- ✅ Database list, create, rename, delete
-- ✅ Table browsing with search
-- ✅ Table data viewer with pagination
-- ✅ SQL query console with execution
-- ✅ Visual schema designer for table creation
-- ✅ Dark/Light/System theme support
-- ✅ Local development with mock data
+### ✅ Completed Features
+- Database list, create, rename, delete with migration-based approach
+- Table browsing with search and schema viewer
+- Table data viewer with pagination and type-aware filtering
+- SQL query console with execution, history, and CSV export
+- Visual schema designer for table creation
+- Dark/Light/System theme support
+- Local development with mock data
+- Cross-database search capabilities
+- Visual query builder with saved queries
+- Database comparison with detailed schema diffs
+- Migration wizard for database-to-database transfers
+- Backup/Restore UI (ready for Time Travel API integration)
+- Analytics dashboard structure
+- Multi-database operations (bulk download, delete, upload)
+- Complete table management with multi-select, rename, delete, clone, and export
+- Full column management (add, rename, modify, delete columns)
+- Table dependencies viewer with foreign key relationship analysis
 
-### ✅ Phase 2 - Advanced Features (COMPLETE)
-- ✅ **Cross-database search** - Search text across all databases
-- ✅ **Visual query builder** - Build queries visually with saved queries
-- ✅ **Database comparison** - Compare schemas with detailed diffs
-- ✅ **Migration wizard** - 5-step wizard for database-to-database migrations
-- ✅ **Backup/Restore** - UI ready for Time Travel API integration
-- ✅ **Analytics** - Dashboard structure prepared for production
-- ✅ **Multi-database operations** - Bulk download, delete, and upload capabilities
-- ✅ **Table CRUD enhancements** - Complete table management with multi-select
-  - Rename, delete, clone, and export tables
-  - Bulk operations with progress tracking
-  - Export as SQL or CSV with format selection
-- ✅ **Column management** - Full schema modification capabilities
-  - Add columns with type, constraints, and defaults
-  - Rename columns (ALTER TABLE RENAME COLUMN)
-  - Modify column types and constraints (table recreation)
-  - Delete columns (ALTER TABLE DROP COLUMN)
-  - Always-visible action buttons with validation
-- ✅ **Table dependencies viewer** - Foreign key relationship analysis before deletion
-  - Shows inbound/outbound dependencies with row counts
-  - Displays cascade behavior (CASCADE, RESTRICT, SET NULL, etc.)
-  - Requires confirmation when dependencies exist
-  - Per-table collapsible view in bulk operations
+### 🔮 Planned Features
 
----
+#### Foreign Key Management
+- **Foreign Key Visualizer / Editor** - Visual graph and editing interface for table relationships
+- **Cascade Impact Simulator** - Preview exact count of affected rows across entire dependency chain
+  - Real-time calculation of cascading deletions through multiple levels
+  - Visual tree showing which rows in which tables will be affected
+  - "Dry run" mode to see impact without executing deletion
+  - Export impact report as JSON or text summary
+- **Force Delete Mode** - Advanced developer option to bypass foreign key constraints
+  - Explicit toggle: "Enable Force Delete (Ignore Foreign Keys)"
+  - Requires developer mode activation in settings
+  - Uses `PRAGMA foreign_keys = OFF` temporarily during operation
+  - Logs all bypassed constraints for audit trail
+- **Quick Navigation Links** - Navigate to dependent tables directly from dependency viewer
+  - "Show dependent table details" links on each dependency
+  - Click to open table schema view in current or new tab
+  - "View all X rows in [table_name]" link with pre-filtered query
+  - Breadcrumb navigation to easily return to original context
+- **Relationship diagram** - Visual graph of table relationships
+- **Constraint validator** - Check for orphaned records and broken references
+- **Dependency export** - Export schema relationships as documentation
+- **Circular dependency detector** - Identify and warn about circular FK chains
 
-## 🔮 Planned Work
-
-### Full-Text Search (FTS5)
+#### Full-Text Search (FTS5)
 - **FTS5 Virtual Table Management** - Create and manage D1 FTS5 full-text search indexes
   - Detect existing FTS5 tables with special UI indicator
   - Wizard to create FTS5 virtual tables from existing tables
@@ -523,31 +527,9 @@ For more help, see [Cloudflare Workers Troubleshooting](https://developers.cloud
   - Highlight matching terms in search results
   - Performance metrics (query time, rank scores)
 
-### Table Dependencies Enhancements
-- **Cascade Impact Simulator** - Preview exact count of affected rows across entire dependency chain
-  - Real-time calculation of cascading deletions through multiple levels
-  - Visual tree showing which rows in which tables will be affected
-  - "Dry run" mode to see impact without executing deletion
-  - Export impact report as JSON or text summary
-  
-- **Force Delete Mode** - Advanced developer option to bypass foreign key constraints
-  - Explicit toggle: "Enable Force Delete (Ignore Foreign Keys)"
-  - Requires developer mode activation in settings
-  - Uses `PRAGMA foreign_keys = OFF` temporarily during operation
-  - Logs all bypassed constraints for audit trail
-  
-- **Quick Navigation Links** - Navigate to dependent tables directly from dependency viewer
-  - "Show dependent table details" links on each dependency
-  - Click to open table schema view in current or new tab
-  - "View all X rows in [table_name]" link with pre-filtered query
-  - Breadcrumb navigation to easily return to original context
-
-### Other Planned Features
+#### Other Enhancements
+- **Undo / Rollback Last Operation** - Revert recent changes with one click
 - **Index analyzer** - Suggest missing indexes based on foreign keys and filter usage
-- **Relationship diagram** - Visual graph of table relationships
-- **Constraint validator** - Check for orphaned records and broken references
-- **Dependency export** - Export schema relationships as documentation
-- **Circular dependency detector** - Identify and warn about circular FK chains
 - **Advanced Row Filters** - OR logic, BETWEEN operator, IN clause, filter presets
 
 ---
