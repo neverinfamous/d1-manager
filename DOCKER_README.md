@@ -14,6 +14,8 @@ A fully containerized version of the D1 Database Manager for Cloudflare. This Do
 
 **🎯 [Try the Live Demo](https://d1.adamic.tech/)** - See D1 Database Manager in action
 
+**📰 [Read the v1.0.0 Release Article](https://adamic.tech/articles/2025-11-02-d1-manager-v1-0-0)** - Learn more about features, architecture, and deployment
+
 **🚀 Docker Deployment:** Run the development server in a containerized environment for testing and local development.
 
 ---

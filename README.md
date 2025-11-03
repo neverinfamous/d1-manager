@@ -16,6 +16,8 @@ A modern, full-featured web application for managing Cloudflare D1 databases wit
 
 **🎯 [Try the Live Demo](https://d1.adamic.tech/)** - See D1 Database Manager in action
 
+**📰 [Read the v1.0.0 Release Article](https://adamic.tech/articles/2025-11-02-d1-manager-v1-0-0)** - Learn more about features, architecture, and deployment
+
 ---
 
 ## 🎯 Features
