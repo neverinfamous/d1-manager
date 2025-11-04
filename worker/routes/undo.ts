@@ -47,7 +47,7 @@ export async function handleUndoRoutes(
   url: URL,
   corsHeaders: HeadersInit,
   isLocalDev: boolean,
-  _userEmail: string | null
+  _userEmail: string | null // eslint-disable-line @typescript-eslint/no-unused-vars
 ): Promise<Response> {
   console.log('[Undo] Handling undo operation');
 

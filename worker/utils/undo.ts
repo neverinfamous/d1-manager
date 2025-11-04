@@ -323,7 +323,7 @@ async function restoreDroppedTable(
 async function restoreDroppedColumn(
   _dbId: string,
   snapshot: UndoSnapshot,
-  _env: Env
+  _env: Env // eslint-disable-line @typescript-eslint/no-unused-vars
 ): Promise<void> {
   if (!snapshot.columnData) {
     throw new Error('Invalid snapshot: missing columnData');
@@ -347,7 +347,7 @@ async function restoreDroppedColumn(
 async function restoreDeletedRows(
   _dbId: string,
   snapshot: UndoSnapshot,
-  _env: Env
+  _env: Env // eslint-disable-line @typescript-eslint/no-unused-vars
 ): Promise<void> {
   if (!snapshot.rowData) {
     throw new Error('Invalid snapshot: missing rowData');
