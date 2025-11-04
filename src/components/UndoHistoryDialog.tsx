@@ -45,6 +45,7 @@ export function UndoHistoryDialog({
     if (open) {
       loadHistory();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, databaseId]);
 
   const loadHistory = async () => {

@@ -47,7 +47,7 @@ export async function handleUndoRoutes(
   url: URL,
   corsHeaders: HeadersInit,
   isLocalDev: boolean,
-  userEmail: string | null
+  _userEmail: string | null
 ): Promise<Response> {
   console.log('[Undo] Handling undo operation');
 

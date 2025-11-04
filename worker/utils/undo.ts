@@ -121,7 +121,6 @@ export async function captureColumnSnapshot(
   env: Env
 ): Promise<UndoSnapshot> {
   const sanitizedTable = sanitizeIdentifier(tableName);
-  const sanitizedColumn = sanitizeIdentifier(columnName);
 
   // 1. Get column info from PRAGMA table_info
   const schemaResult = await executeQueryViaAPI(
@@ -322,15 +321,13 @@ async function restoreDroppedTable(
  * Restore a dropped column from snapshot
  */
 async function restoreDroppedColumn(
-  dbId: string,
+  _dbId: string,
   snapshot: UndoSnapshot,
-  env: Env
+  _env: Env
 ): Promise<void> {
   if (!snapshot.columnData) {
     throw new Error('Invalid snapshot: missing columnData');
   }
-
-  const { columnName, columnType, notNull, defaultValue, rowData } = snapshot.columnData;
 
   // Extract table name - we need to get it from the snapshot or pass it separately
   // For now, we'll assume it's available in the undo_history entry
@@ -348,9 +345,9 @@ async function restoreDroppedColumn(
  * Restore deleted rows from snapshot
  */
 async function restoreDeletedRows(
-  dbId: string,
+  _dbId: string,
   snapshot: UndoSnapshot,
-  env: Env
+  _env: Env
 ): Promise<void> {
   if (!snapshot.rowData) {
     throw new Error('Invalid snapshot: missing rowData');
