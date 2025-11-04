@@ -1064,3 +1064,74 @@ export const deleteSavedQuery = async (id: number): Promise<void> => {
   }
 }
 
+// Cascade Impact Simulation Types
+export interface CascadePath {
+  id: string
+  sourceTable: string
+  targetTable: string
+  action: string
+  depth: number
+  affectedRows: number
+  column: string
+}
+
+export interface AffectedTable {
+  tableName: string
+  action: string
+  rowsBefore: number
+  rowsAfter: number
+  depth: number
+}
+
+export interface CascadeWarning {
+  type: string
+  message: string
+  severity: 'low' | 'medium' | 'high'
+}
+
+export interface CascadeConstraint {
+  table: string
+  message: string
+}
+
+export interface CircularDependency {
+  tables: string[]
+  message: string
+}
+
+export interface CascadeSimulationResult {
+  targetTable: string
+  whereClause?: string
+  totalAffectedRows: number
+  maxDepth: number
+  cascadePaths: CascadePath[]
+  affectedTables: AffectedTable[]
+  warnings: CascadeWarning[]
+  constraints: CascadeConstraint[]
+  circularDependencies: CircularDependency[]
+}
+
+// Cascade Impact Simulation API
+export const simulateCascadeImpact = async (
+  databaseId: string,
+  targetTable: string,
+  whereClause?: string
+): Promise<CascadeSimulationResult> => {
+  const response = await fetch(`${WORKER_API}/api/tables/${databaseId}/simulate-cascade`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    credentials: 'include',
+    body: JSON.stringify({ targetTable, whereClause })
+  })
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+    throw new Error(error.error || `Failed to simulate cascade: ${response.status}`)
+  }
+  
+  const data = await response.json() as { result: CascadeSimulationResult, success: boolean }
+  return data.result
+}
+

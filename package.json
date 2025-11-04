@@ -19,16 +19,21 @@
     "@radix-ui/react-select": "^2.2.6",
     "@radix-ui/react-slot": "^1.2.3",
     "class-variance-authority": "^0.7.1",
+    "dagre": "^0.8.5",
+    "html2canvas": "^1.4.1",
     "jose": "^6.1.0",
+    "jspdf": "^3.0.3",
     "jszip": "^3.10.1",
     "lucide-react": "^0.548.0",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "reactflow": "^11.11.4"
   },
   "devDependencies": {
     "@babel/core": "^7.28.5",
     "@cloudflare/workers-types": "^4.20251014.0",
     "@eslint/js": "^9.13.0",
+    "@types/dagre": "^0.7.53",
     "@types/node": "24.9.1",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",

@@ -72,6 +72,12 @@ A modern, full-featured web application for managing Cloudflare D1 databases wit
   - **Row Count Estimates** - Shows number of rows affected by cascade operations
   - **Confirmation Required** - Mandatory acknowledgment checkbox when dependencies exist
   - **Per-Table View** - Collapsible accordion in bulk operations for detailed impact analysis
+- **Cascade Impact Simulator** - Interactive visualization of DELETE operation impacts
+  - **Interactive Graph Visualization** - ReactFlow-powered dependency graph with color-coded nodes
+  - **Theoretical Simulation** - Non-destructive analysis with recursive traversal and circular dependency detection
+  - **Detailed Impact Analysis** - Total affected rows, cascade depth, table-by-table breakdown
+  - **Multi-Format Export** - CSV, JSON, Text, and PDF reports with visual graph
+  - **Available** - In delete dialogs for both rows (TableView) and tables (DatabaseView)
 
 #### Query Console
 - **SQL Editor** - Execute custom SQL queries with syntax highlighting
@@ -237,6 +243,7 @@ d1-manager/
 | Tailwind CSS | 3.4.18 | Utility-first CSS framework |
 | shadcn/ui | Latest | Pre-built component library |
 | Lucide React | Latest | Icon library |
+| ReactFlow | Latest | Interactive graph visualization |
 
 ### Backend
 | Technology | Version | Purpose |
@@ -344,6 +351,62 @@ When you attempt to delete a table (single or bulk), the system automatically:
 - Helps understand database schema relationships
 - Provides row count impact for informed decisions
 - Works seamlessly in both local development (mock data) and production
+
+### Cascade Impact Simulator
+
+The D1 Manager includes a comprehensive **Cascade Impact Simulator** that provides an interactive visualization of DELETE operations before execution, offering unprecedented transparency into foreign key relationships and cascade impacts.
+
+**Key Features:**
+
+- **Interactive Graph Visualization** - ReactFlow-powered dependency graph with color-coded nodes:
+  - 🔴 Red nodes - Source tables/rows being deleted
+  - 🟡 Yellow nodes - CASCADE operations (data will be deleted)
+  - 🔵 Blue nodes - SET NULL operations (foreign keys will be nullified)
+  - ⚪ Gray nodes - RESTRICT/NO ACTION (no automatic changes)
+  
+- **Theoretical Simulation** - Non-destructive analysis that:
+  - Performs recursive graph traversal to identify all affected tables
+  - Detects circular dependency chains
+  - Implements depth limiting to prevent infinite loops
+  - Calculates theoretical impact without modifying data
+  
+- **Detailed Impact Analysis** - Comprehensive reporting including:
+  - Total affected rows across all tables
+  - Maximum cascade depth in the dependency chain
+  - Table-by-table breakdown with row counts and actions
+  - Warning system with severity levels (Info, Warning, Critical)
+  - Visual indicators for each operation type
+  
+- **Multi-Format Export** - Generate reports in multiple formats:
+  - **CSV** - Spreadsheet-compatible data for analysis
+  - **JSON** - Structured data for programmatic use
+  - **Text** - Human-readable summary report
+  - **PDF** - Professional report with embedded graph visualization
+
+**Access Points:**
+
+- **Table Delete Dialogs** - Available when deleting tables in DatabaseView
+- **Row Delete Operations** - Available when deleting rows with foreign key constraints in TableView
+- **Single & Bulk Operations** - Works for both individual and multi-select deletions
+
+**Use Cases:**
+
+- Preview the full impact of deleting a table or row before committing
+- Understand complex foreign key relationships visually
+- Generate documentation of database dependencies
+- Audit cascade operations for compliance requirements
+- Train team members on database schema relationships
+
+**Example Scenarios:**
+
+1. **Deleting a User** - See all related orders, comments, and sessions that will be affected
+2. **Dropping a Parent Table** - Visualize the cascade to all child tables
+3. **Bulk Deletions** - Understand the combined impact of removing multiple entities
+4. **Circular Dependencies** - Identify and understand circular foreign key chains
+
+**Technical Details:**
+
+The simulator uses `PRAGMA foreign_key_list()` to extract relationship metadata, then builds a directed graph representing the dependency structure. It recursively traverses the graph, simulating DELETE operations and tracking affected rows at each level. The visualization uses ReactFlow for interactive node manipulation, zooming, and panning. Export functionality leverages jsPDF for PDF generation with embedded canvas snapshots of the graph.
 
 ### Column Management
 
@@ -518,45 +581,75 @@ For more help, see [Cloudflare Workers Troubleshooting](https://developers.cloud
 - Complete table management with multi-select, rename, delete, clone, and export
 - Full column management (add, rename, modify, delete columns)
 - Table dependencies viewer with foreign key relationship analysis
+- **Cascade Impact Simulator** - Interactive graph visualization with ReactFlow, multi-format export (CSV/JSON/Text/PDF), and theoretical impact analysis
 
-### 🔮 Planned Features
+## 🔮 Planned Features (Prioritized by Expected Benefit)
 
-#### Foreign Key Management
-- **Foreign Key Visualizer / Editor** - Visual graph and editing interface for table relationships
-- **Cascade Impact Simulator** - Preview exact count of affected rows across entire dependency chain
-  - Real-time calculation of cascading deletions through multiple levels
-  - Visual tree showing which rows in which tables will be affected
-  - "Dry run" mode to see impact without executing deletion
-  - Export impact report as JSON or text summary
-- **Force Delete Mode** - Advanced developer option to bypass foreign key constraints
-  - Explicit toggle: "Enable Force Delete (Ignore Foreign Keys)"
-  - Requires developer mode activation in settings
-  - Uses `PRAGMA foreign_keys = OFF` temporarily during operation
-  - Logs all bypassed constraints for audit trail
-- **Quick Navigation Links** - Navigate to dependent tables directly from dependency viewer
-  - "Show dependent table details" links on each dependency
-  - Click to open table schema view in current or new tab
-  - "View all X rows in [table_name]" link with pre-filtered query
-  - Breadcrumb navigation to easily return to original context
-- **Relationship diagram** - Visual graph of table relationships
-- **Constraint validator** - Check for orphaned records and broken references
-- **Dependency export** - Export schema relationships as documentation
-- **Circular dependency detector** - Identify and warn about circular FK chains
+### 1. **Undo / Rollback Last Operation**
 
-#### Full-Text Search (FTS5)
-- **FTS5 Virtual Table Management** - Create and manage D1 FTS5 full-text search indexes
-  - Detect existing FTS5 tables with special UI indicator
-  - Wizard to create FTS5 virtual tables from existing tables
-  - Configure tokenizers (porter, unicode61, trigram) and options
-  - Rebuild index UI for content updates
-  - Query builder with MATCH syntax support and ranking (bm25)
-  - Highlight matching terms in search results
-  - Performance metrics (query time, rank scores)
+**Benefit:** ⭐⭐⭐⭐½ **Difficulty:** 🔴 *High*
+Instantly revert recent schema or data changes for safer experimentation.
+➡️ *Adds IDE-like confidence and protects users from destructive mistakes.*
 
-#### Other Enhancements
-- **Undo / Rollback Last Operation** - Revert recent changes with one click
-- **Index analyzer** - Suggest missing indexes based on foreign keys and filter usage
-- **Advanced Row Filters** - OR logic, BETWEEN operator, IN clause, filter presets
+### 2. **Foreign Key Visualizer / Editor**
+
+**Benefit:** ⭐⭐⭐⭐½ **Difficulty:** 🔴 *High*
+Interactive graph to view and edit table relationships in real time.
+➡️ *Provides intuitive schema control and clear relational insight.*
+
+### 3. **FTS5 Virtual Table Management**
+
+**Benefit:** ⭐⭐⭐⭐ **Difficulty:** 🔴 *High*
+Create and manage full-text search indexes (FTS5) with tokenizers, ranking (bm25), highlighting, and query performance metrics.
+➡️ *Adds deep search and analytics capabilities.*
+
+### 4. **Constraint Validator**
+
+**Benefit:** ⭐⭐⭐⭐ **Difficulty:** 🟡 *Medium*
+Detect orphaned records and broken foreign key references before destructive operations.
+➡️ *Enhances data safety and schema integrity.*
+
+### 5. **Index Analyzer**
+
+**Benefit:** ⭐⭐⭐½ **Difficulty:** 🟡 *Medium*
+Suggest missing or suboptimal indexes based on schema and query patterns.
+➡️ *Improves database performance and developer awareness.*
+
+### 6. **Relationship Diagram**
+
+**Benefit:** ⭐⭐⭐½ **Difficulty:** 🟡 *Medium*
+Auto-generate an ER-style diagram showing all table relationships.
+➡️ *Gives quick visual understanding of complex schemas.*
+
+### 7. **Advanced Row Filters**
+
+**Benefit:** ⭐⭐⭐ **Difficulty:** 🟡 *Medium*
+Add OR logic, BETWEEN, IN, and preset filters in the data browser.
+➡️ *Refines query flexibility and precision.*
+
+### 8. **Quick Navigation Links**
+
+**Benefit:** ⭐⭐½ **Difficulty:** 🟢 *Low*
+Add direct navigation between dependent tables with breadcrumbs.
+➡️ *Smooths workflow and enhances usability.*
+
+### 9. **Circular Dependency Detector**
+
+**Benefit:** ⭐⭐½ **Difficulty:** 🟡 *Medium*
+Detect and warn users about circular foreign key chains.
+➡️ *Prevents schema design pitfalls.*
+
+### 10. **Dependency Export**
+
+**Benefit:** ⭐⭐ **Difficulty:** 🟢 *Low*
+Export schema relationships as JSON or documentation files.
+➡️ *Useful for audits and documentation.*
+
+### 11. **Force Delete Mode**
+
+**Benefit:** ⭐ **Difficulty:** 🟢 *Low*
+Developer-only toggle to bypass FK constraints (with audit logging).
+➡️ *Low-value, niche power-user feature for controlled environments.*
 
 ---
 

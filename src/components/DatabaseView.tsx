@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Table, RefreshCw, Plus, Search, Loader2, Wand2, Copy, Download, Trash2, Pencil } from 'lucide-react';
+import { ArrowLeft, Table, RefreshCw, Plus, Search, Loader2, Wand2, Copy, Download, Trash2, Pencil, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -26,6 +26,7 @@ import { api } from '@/services/api';
 import { SchemaDesigner } from './SchemaDesigner';
 import { QueryBuilder } from './QueryBuilder';
 import { TableDependenciesView } from './TableDependenciesView';
+import { CascadeImpactSimulator } from './CascadeImpactSimulator';
 
 interface DatabaseViewProps {
   databaseId: string;
@@ -81,6 +82,10 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable }
     loadingDependencies?: boolean;
     confirmDependencies?: boolean;
   } | null>(null);
+  
+  // Cascade simulator state
+  const [showCascadeSimulator, setShowCascadeSimulator] = useState(false);
+  const [cascadeSimulatorTable, setCascadeSimulatorTable] = useState<string>('');
 
   useEffect(() => {
     loadTables();
@@ -290,7 +295,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable }
       isDeleting: false,
       loadingDependencies: true
     });
-
+    
     // Fetch dependencies
     try {
       const deps = await api.getTableDependencies(databaseId, selectedTables);
@@ -307,6 +312,11 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable }
         error: 'Failed to load table dependencies. You can still proceed with deletion.'
       } : null);
     }
+  };
+
+  const handleSimulateCascadeImpact = (tableName: string) => {
+    setCascadeSimulatorTable(tableName);
+    setShowCascadeSimulator(true);
   };
   
   const handleDeleteTables = async () => {
@@ -803,6 +813,21 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable }
                     Table: <strong>{deleteDialogState.tableNames[0]}</strong>
                   </p>
                   
+                  <div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleSimulateCascadeImpact(deleteDialogState.tableNames[0])}
+                      className="w-full"
+                    >
+                      <AlertTriangle className="h-4 w-4 mr-2" />
+                      Simulate Cascade Impact
+                    </Button>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Preview the full cascade impact of deleting this table
+                    </p>
+                  </div>
+                  
                   {deleteDialogState.dependencies && deleteDialogState.dependencies[deleteDialogState.tableNames[0]] && (
                     <TableDependenciesView
                       tableName={deleteDialogState.tableNames[0]}
@@ -935,6 +960,14 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable }
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Cascade Impact Simulator */}
+      <CascadeImpactSimulator
+        databaseId={databaseId}
+        targetTable={cascadeSimulatorTable}
+        open={showCascadeSimulator}
+        onClose={() => setShowCascadeSimulator(false)}
+      />
     </div>
   );
 }

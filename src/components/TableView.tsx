@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, RefreshCw, Download, Trash2, Edit, Plus, Loader2, Columns, Settings, Filter } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Download, Trash2, Edit, Plus, Loader2, Columns, Settings, Filter, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -23,6 +23,7 @@ import {
 import { getTableSchema, getTableData, executeQuery, type ColumnInfo, type FilterCondition, api } from '@/services/api';
 import { FilterBar } from '@/components/FilterBar';
 import { deserializeFilters, serializeFilters, getActiveFilterCount } from '@/utils/filters';
+import { CascadeImpactSimulator } from '@/components/CascadeImpactSimulator';
 
 interface TableViewProps {
   databaseId: string;
@@ -78,6 +79,10 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
   const [showDeleteColumnDialog, setShowDeleteColumnDialog] = useState(false);
   const [deletingColumn, setDeletingColumn] = useState<ColumnInfo | null>(null);
   const [deletingColumnInProgress, setDeletingColumnInProgress] = useState(false);
+  
+  // Cascade simulator state
+  const [showCascadeSimulator, setShowCascadeSimulator] = useState(false);
+  const [cascadeSimulatorWhereClause, setCascadeSimulatorWhereClause] = useState<string | undefined>();
 
   // Sync filters with URL on mount
   useEffect(() => {
@@ -259,6 +264,22 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
   const handleOpenDeleteDialog = (row: Record<string, unknown>) => {
     setDeletingRow(row);
     setShowDeleteDialog(true);
+  };
+
+  const handleSimulateCascadeImpact = () => {
+    // Build WHERE clause from primary keys of the row being deleted
+    if (!deletingRow) return;
+    
+    const pkColumns = schema.filter(col => col.pk > 0);
+    if (pkColumns.length === 0) return;
+    
+    const whereClause = pkColumns.map(col => {
+      const value = deletingRow[col.name];
+      return `"${col.name}" = ${typeof value === 'number' ? value : `'${String(value).replace(/'/g, "''")}'`}`;
+    }).join(' AND ');
+    
+    setCascadeSimulatorWhereClause(whereClause);
+    setShowCascadeSimulator(true);
   };
 
   const handleDeleteRow = async () => {
@@ -895,6 +916,20 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
                   </div>
                 ))}
               </div>
+              <div className="mt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSimulateCascadeImpact}
+                  className="w-full"
+                >
+                  <AlertTriangle className="h-4 w-4 mr-2" />
+                  Simulate Cascade Impact
+                </Button>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Preview which tables and rows will be affected by this deletion
+                </p>
+              </div>
             </div>
           )}
           {error && (
@@ -1182,6 +1217,15 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Cascade Impact Simulator */}
+      <CascadeImpactSimulator
+        databaseId={databaseId}
+        targetTable={tableName}
+        whereClause={cascadeSimulatorWhereClause}
+        open={showCascadeSimulator}
+        onClose={() => setShowCascadeSimulator(false)}
+      />
     </div>
   );
 }

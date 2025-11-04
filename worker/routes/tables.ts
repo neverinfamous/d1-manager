@@ -1021,6 +1021,151 @@ export async function handleTableRoutes(
       });
     }
 
+    // Simulate cascade impact for deletion
+    if (request.method === 'POST' && url.pathname === `/api/tables/${dbId}/simulate-cascade`) {
+      console.log('[Tables] Simulating cascade impact');
+      
+      const body = await request.json() as {
+        targetTable: string;
+        whereClause?: string;
+      };
+      
+      if (!body.targetTable) {
+        return new Response(JSON.stringify({ 
+          error: 'Target table is required' 
+        }), { 
+          status: 400,
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        });
+      }
+      
+      // Mock response for local development
+      if (isLocalDev) {
+        // Provide comprehensive mock data with circular dependencies
+        const mockSimulation = {
+          targetTable: body.targetTable,
+          whereClause: body.whereClause,
+          totalAffectedRows: 287,
+          maxDepth: 3,
+          cascadePaths: [
+            {
+              id: 'path-1',
+              sourceTable: body.targetTable,
+              targetTable: 'comments',
+              action: 'CASCADE',
+              depth: 1,
+              affectedRows: 152,
+              column: 'post_id'
+            },
+            {
+              id: 'path-2',
+              sourceTable: body.targetTable,
+              targetTable: 'likes',
+              action: 'CASCADE',
+              depth: 1,
+              affectedRows: 89,
+              column: 'post_id'
+            },
+            {
+              id: 'path-3',
+              sourceTable: 'comments',
+              targetTable: 'comment_likes',
+              action: 'CASCADE',
+              depth: 2,
+              affectedRows: 45,
+              column: 'comment_id'
+            },
+            {
+              id: 'path-4',
+              sourceTable: body.targetTable,
+              targetTable: 'users',
+              action: 'SET NULL',
+              depth: 1,
+              affectedRows: 1,
+              column: 'last_post_id'
+            }
+          ],
+          affectedTables: [
+            {
+              tableName: body.targetTable,
+              action: 'DELETE',
+              rowsBefore: 1,
+              rowsAfter: 0,
+              depth: 0
+            },
+            {
+              tableName: 'comments',
+              action: 'CASCADE',
+              rowsBefore: 152,
+              rowsAfter: 0,
+              depth: 1
+            },
+            {
+              tableName: 'likes',
+              action: 'CASCADE',
+              rowsBefore: 89,
+              rowsAfter: 0,
+              depth: 1
+            },
+            {
+              tableName: 'comment_likes',
+              action: 'CASCADE',
+              rowsBefore: 45,
+              rowsAfter: 0,
+              depth: 2
+            },
+            {
+              tableName: 'users',
+              action: 'SET NULL',
+              rowsBefore: 1,
+              rowsAfter: 1,
+              depth: 1
+            }
+          ],
+          warnings: [
+            {
+              type: 'high_impact',
+              message: 'Deletion will cascade to 286 additional rows across 4 tables',
+              severity: 'high'
+            },
+            {
+              type: 'deep_cascade',
+              message: 'Cascade chain reaches depth of 3 levels',
+              severity: 'medium'
+            }
+          ],
+          constraints: [],
+          circularDependencies: []
+        };
+        
+        return new Response(JSON.stringify({
+          result: mockSimulation,
+          success: true
+        }), {
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        });
+      }
+      
+      // Perform cascade simulation
+      const simulation = await simulateCascadeImpact(dbId, body.targetTable, body.whereClause, env);
+      
+      return new Response(JSON.stringify({
+        result: simulation,
+        success: true
+      }), {
+        headers: {
+          'Content-Type': 'application/json',
+          ...corsHeaders
+        }
+      });
+    }
+
     // Route not found
     return new Response(JSON.stringify({ 
       error: 'Route not found' 
@@ -1154,6 +1299,288 @@ async function recreateTableWithModifiedColumn(
     }
     throw err;
   }
+}
+
+/**
+ * Simulate cascade impact of deleting rows from a table
+ */
+async function simulateCascadeImpact(
+  dbId: string,
+  targetTable: string,
+  whereClause: string | undefined,
+  env: Env
+): Promise<{
+  targetTable: string;
+  whereClause?: string;
+  totalAffectedRows: number;
+  maxDepth: number;
+  cascadePaths: Array<{
+    id: string;
+    sourceTable: string;
+    targetTable: string;
+    action: string;
+    depth: number;
+    affectedRows: number;
+    column: string;
+  }>;
+  affectedTables: Array<{
+    tableName: string;
+    action: string;
+    rowsBefore: number;
+    rowsAfter: number;
+    depth: number;
+  }>;
+  warnings: Array<{
+    type: string;
+    message: string;
+    severity: 'low' | 'medium' | 'high';
+  }>;
+  constraints: Array<{
+    table: string;
+    message: string;
+  }>;
+  circularDependencies: Array<{
+    tables: string[];
+    message: string;
+  }>;
+}> {
+  const sanitizedTable = sanitizeIdentifier(targetTable);
+  const maxDepth = 10; // Prevent infinite loops
+  
+  // Count rows that will be deleted from target table
+  const whereCondition = whereClause ? ` WHERE ${whereClause}` : '';
+  const countQuery = `SELECT COUNT(*) as count FROM "${sanitizedTable}"${whereCondition}`;
+  const countResult = await executeQueryViaAPI(dbId, countQuery, env);
+  const targetRowCount = (countResult.results[0] as { count: number })?.count || 0;
+  
+  if (targetRowCount === 0) {
+    // No rows to delete, return empty simulation
+    return {
+      targetTable,
+      whereClause,
+      totalAffectedRows: 0,
+      maxDepth: 0,
+      cascadePaths: [],
+      affectedTables: [],
+      warnings: [],
+      constraints: [],
+      circularDependencies: []
+    };
+  }
+  
+  // Get all tables in database
+  const tableListResult = await executeQueryViaAPI(dbId, "PRAGMA table_list", env);
+  const allTables = (tableListResult.results as Array<{ name: string; type: string }>)
+    .filter(t => !t.name.startsWith('sqlite_') && !t.name.startsWith('_cf_') && t.type === 'table');
+  
+  // Build dependency graph
+  const cascadePaths: Array<{
+    id: string;
+    sourceTable: string;
+    targetTable: string;
+    action: string;
+    depth: number;
+    affectedRows: number;
+    column: string;
+  }> = [];
+  
+  const affectedTablesMap = new Map<string, {
+    tableName: string;
+    action: string;
+    rowsBefore: number;
+    rowsAfter: number;
+    depth: number;
+  }>();
+  
+  const warnings: Array<{
+    type: string;
+    message: string;
+    severity: 'low' | 'medium' | 'high';
+  }> = [];
+  
+  const constraints: Array<{
+    table: string;
+    message: string;
+  }> = [];
+  
+  const circularDeps: Set<string> = new Set();
+  
+  // Add target table to affected tables
+  affectedTablesMap.set(targetTable, {
+    tableName: targetTable,
+    action: 'DELETE',
+    rowsBefore: targetRowCount,
+    rowsAfter: 0,
+    depth: 0
+  });
+  
+  // Recursively analyze cascade impact using BFS
+  const queue: Array<{ table: string; depth: number; parentRows: number }> = [
+    { table: targetTable, depth: 0, parentRows: targetRowCount }
+  ];
+  const visited = new Set<string>();
+  const pathMap = new Map<string, Set<string>>(); // Track paths for circular detection
+  
+  let totalAffected = targetRowCount;
+  let currentMaxDepth = 0;
+  
+  while (queue.length > 0) {
+    const { table: currentTable, depth, parentRows } = queue.shift()!;
+    
+    if (depth >= maxDepth) {
+      warnings.push({
+        type: 'max_depth',
+        message: `Cascade analysis stopped at depth ${maxDepth} to prevent infinite loops`,
+        severity: 'high'
+      });
+      break;
+    }
+    
+    currentMaxDepth = Math.max(currentMaxDepth, depth);
+    
+    // Find all tables that reference the current table
+    for (const otherTable of allTables) {
+      if (otherTable.name === currentTable) continue;
+      
+      const sanitizedOtherTable = sanitizeIdentifier(otherTable.name);
+      const fkQuery = `PRAGMA foreign_key_list("${sanitizedOtherTable}")`;
+      const fkResult = await executeQueryViaAPI(dbId, fkQuery, env);
+      const fks = fkResult.results as Array<{
+        id: number;
+        seq: number;
+        table: string;
+        from: string;
+        to: string;
+        on_update: string;
+        on_delete: string;
+        match: string;
+      }>;
+      
+      for (const fk of fks) {
+        if (fk.table !== currentTable) continue;
+        
+        const action = fk.on_delete || 'NO ACTION';
+        
+        // Check for circular dependencies
+        if (!pathMap.has(currentTable)) {
+          pathMap.set(currentTable, new Set());
+        }
+        pathMap.get(currentTable)!.add(otherTable.name);
+        
+        // Detect cycles
+        if (visited.has(otherTable.name) && pathMap.has(otherTable.name)) {
+          const cycle = [currentTable, otherTable.name];
+          circularDeps.add(cycle.join(' -> '));
+        }
+        
+        // Count affected rows in the referencing table
+        const refCountQuery = `SELECT COUNT(*) as count FROM "${sanitizedOtherTable}"`;
+        const refCountResult = await executeQueryViaAPI(dbId, refCountQuery, env);
+        const refRowCount = (refCountResult.results[0] as { count: number })?.count || 0;
+        
+        // Calculate actual affected rows (simplified - assumes all rows reference parent)
+        const affectedRows = Math.min(refRowCount, parentRows);
+        
+        if (affectedRows > 0) {
+          // Add to cascade paths
+          cascadePaths.push({
+            id: `path-${cascadePaths.length + 1}`,
+            sourceTable: currentTable,
+            targetTable: otherTable.name,
+            action: action.toUpperCase(),
+            depth: depth + 1,
+            affectedRows,
+            column: fk.from
+          });
+          
+          // Handle different cascade actions
+          if (action.toUpperCase() === 'CASCADE') {
+            totalAffected += affectedRows;
+            
+            // Add to affected tables
+            if (!affectedTablesMap.has(otherTable.name)) {
+              affectedTablesMap.set(otherTable.name, {
+                tableName: otherTable.name,
+                action: 'CASCADE',
+                rowsBefore: refRowCount,
+                rowsAfter: refRowCount - affectedRows,
+                depth: depth + 1
+              });
+            }
+            
+            // Continue traversal for CASCADE
+            if (!visited.has(otherTable.name)) {
+              queue.push({ 
+                table: otherTable.name, 
+                depth: depth + 1, 
+                parentRows: affectedRows 
+              });
+            }
+          } else if (action.toUpperCase() === 'SET NULL' || action.toUpperCase() === 'SET DEFAULT') {
+            // Rows are updated, not deleted
+            if (!affectedTablesMap.has(otherTable.name)) {
+              affectedTablesMap.set(otherTable.name, {
+                tableName: otherTable.name,
+                action: action.toUpperCase(),
+                rowsBefore: refRowCount,
+                rowsAfter: refRowCount, // Rows remain but are updated
+                depth: depth + 1
+              });
+            }
+          } else if (action.toUpperCase() === 'RESTRICT' || action.toUpperCase() === 'NO ACTION') {
+            // These will prevent deletion
+            constraints.push({
+              table: otherTable.name,
+              message: `Table "${otherTable.name}" has ${affectedRows} row(s) with RESTRICT constraint that will prevent deletion`
+            });
+          }
+        }
+      }
+    }
+    
+    visited.add(currentTable);
+  }
+  
+  // Generate warnings based on analysis
+  if (totalAffected > targetRowCount) {
+    const additionalRows = totalAffected - targetRowCount;
+    warnings.push({
+      type: 'high_impact',
+      message: `Deletion will cascade to ${additionalRows} additional row(s) across ${affectedTablesMap.size - 1} table(s)`,
+      severity: additionalRows > 100 ? 'high' : additionalRows > 10 ? 'medium' : 'low'
+    });
+  }
+  
+  if (currentMaxDepth > 2) {
+    warnings.push({
+      type: 'deep_cascade',
+      message: `Cascade chain reaches depth of ${currentMaxDepth} levels`,
+      severity: currentMaxDepth > 5 ? 'high' : 'medium'
+    });
+  }
+  
+  if (circularDeps.size > 0) {
+    warnings.push({
+      type: 'circular_dependency',
+      message: `Detected ${circularDeps.size} circular dependency path(s)`,
+      severity: 'medium'
+    });
+  }
+  
+  return {
+    targetTable,
+    whereClause,
+    totalAffectedRows: totalAffected,
+    maxDepth: currentMaxDepth,
+    cascadePaths,
+    affectedTables: Array.from(affectedTablesMap.values()),
+    warnings,
+    constraints,
+    circularDependencies: Array.from(circularDeps).map(path => ({
+      tables: path.split(' -> '),
+      message: `Circular reference detected: ${path}`
+    }))
+  };
 }
 
 /**
