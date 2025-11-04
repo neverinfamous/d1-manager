@@ -1,7 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import ReactFlow, {
-  Node,
-  Edge,
   Controls,
   Background,
   MiniMap,
@@ -9,8 +7,7 @@ import ReactFlow, {
   useEdgesState,
   useReactFlow,
   ReactFlowProvider,
-  Panel,
-  MarkerType
+  Panel
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { Loader2, Download, LayoutGrid, Network as NetworkIcon, FileJson, FileImage } from 'lucide-react';
@@ -92,7 +89,7 @@ function ERDiagramContent({ databaseId, databaseName, onTableSelect }: ERDiagram
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   
-  const { fitView, getNodes, getEdges } = useReactFlow();
+  const { fitView } = useReactFlow();
   
   // Load foreign keys and enrich with schema data
   const loadDiagramData = useCallback(async () => {
@@ -129,11 +126,12 @@ function ERDiagramContent({ databaseId, databaseName, onTableSelect }: ERDiagram
           console.error(`Failed to load schema for ${node.label}:`, err);
           // Use basic column info from node if schema fetch fails
           columnsMap[node.label] = node.columns.map(col => ({
+            cid: 0,
             name: col.name,
             type: col.type,
-            notnull: false,
+            notnull: 0,
             dflt_value: null,
-            pk: col.isPK,
+            pk: col.isPK ? 1 : 0,
             isForeignKey: false
           }));
         }
@@ -162,7 +160,7 @@ function ERDiagramContent({ databaseId, databaseName, onTableSelect }: ERDiagram
         columns: (enrichedColumns[node.label] || []).map(col => ({
           name: col.name,
           type: col.type,
-          isPK: col.pk
+          isPK: Boolean(col.pk)
         }))
       })),
       edges: graphData.edges
@@ -227,7 +225,14 @@ function ERDiagramContent({ databaseId, databaseName, onTableSelect }: ERDiagram
         tables: graphData?.nodes.map(node => ({
           name: node.label,
           rowCount: node.rowCount,
-          columns: enrichedColumns[node.label] || []
+          columns: (enrichedColumns[node.label] || []).map(col => ({
+            name: col.name,
+            type: col.type,
+            notnull: Boolean(col.notnull),
+            dflt_value: col.dflt_value,
+            pk: Boolean(col.pk),
+            isForeignKey: col.isForeignKey
+          }))
         })) || [],
         relationships: graphData?.edges.map(edge => ({
           sourceTable: edge.source,
@@ -309,7 +314,7 @@ function ERDiagramContent({ databaseId, databaseName, onTableSelect }: ERDiagram
         <Background />
         <Controls />
         <MiniMap 
-          nodeColor={(node) => {
+          nodeColor={() => {
             return 'hsl(var(--primary))';
           }}
           maskColor="rgba(0, 0, 0, 0.1)"
