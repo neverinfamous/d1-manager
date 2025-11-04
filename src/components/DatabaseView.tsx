@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Table, RefreshCw, Plus, Search, Loader2, Wand2, Copy, Download, Trash2, Pencil, AlertTriangle, Network, Sparkles } from 'lucide-react';
+import { ArrowLeft, Table, RefreshCw, Plus, Search, Loader2, Wand2, Copy, Download, Trash2, Pencil, AlertTriangle, Network, Sparkles, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -30,6 +30,7 @@ import { CascadeImpactSimulator } from './CascadeImpactSimulator';
 import { ForeignKeyVisualizer } from './ForeignKeyVisualizer';
 import { FTS5Manager } from './FTS5Manager';
 import { ConstraintValidator } from './ConstraintValidator';
+import { IndexAnalyzer } from './IndexAnalyzer';
 
 interface DatabaseViewProps {
   databaseId: string;
@@ -45,7 +46,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSchemaDesigner, setShowSchemaDesigner] = useState(false);
-  const [activeTab, setActiveTab] = useState<'tables' | 'builder' | 'relationships' | 'fts5' | 'constraints'>('tables');
+  const [activeTab, setActiveTab] = useState<'tables' | 'builder' | 'relationships' | 'fts5' | 'constraints' | 'performance'>('tables');
   
   // Selection state
   const [selectedTables, setSelectedTables] = useState<string[]>([]);
@@ -413,6 +414,14 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
               <AlertTriangle className="h-4 w-4 mr-2" />
               Constraints
             </Button>
+            <Button
+              variant={activeTab === 'performance' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setActiveTab('performance')}
+            >
+              <Zap className="h-4 w-4 mr-2" />
+              Performance
+            </Button>
           </div>
           {activeTab === 'tables' && (
             <>
@@ -437,6 +446,8 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
         <FTS5Manager databaseId={databaseId} databaseName={databaseName} />
       ) : activeTab === 'constraints' ? (
         <ConstraintValidator databaseId={databaseId} databaseName={databaseName} />
+      ) : activeTab === 'performance' ? (
+        <IndexAnalyzer databaseId={databaseId} databaseName={databaseName} />
       ) : (
         <>
           {/* Search Bar */}

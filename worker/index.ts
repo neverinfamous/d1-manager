@@ -8,6 +8,7 @@ import { handleSavedQueriesRoutes } from './routes/saved-queries';
 import { handleUndoRoutes } from './routes/undo';
 import { handleFTS5Routes } from './routes/fts5';
 import { handleConstraintRoutes } from './routes/constraints';
+import { handleIndexRoutes } from './routes/indexes';
 import { trackDatabaseAccess } from './utils/database-tracking';
 
 async function handleApiRequest(request: Request, env: Env): Promise<Response> {
@@ -92,6 +93,10 @@ async function handleApiRequest(request: Request, env: Env): Promise<Response> {
 
   if (url.pathname.startsWith('/api/constraints/')) {
     return await handleConstraintRoutes(request, env, url, corsHeaders, isLocalDev, userEmail);
+  }
+
+  if (url.pathname.startsWith('/api/indexes/')) {
+    return await handleIndexRoutes(request, env, url, corsHeaders, isLocalDev);
   }
 
   // Serve frontend assets

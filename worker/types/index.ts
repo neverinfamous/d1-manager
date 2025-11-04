@@ -188,3 +188,32 @@ export interface FixResult {
   error?: string;
 }
 
+// Index Analyzer types
+export interface IndexRecommendation {
+  tableName: string;
+  columnName: string;
+  indexType: 'single' | 'composite';
+  compositeColumns?: string[];
+  priority: 'high' | 'medium' | 'low';
+  rationale: string;
+  estimatedImpact: string;
+  suggestedSQL: string;
+}
+
+export interface IndexAnalysisResult {
+  recommendations: IndexRecommendation[];
+  existingIndexes: Array<{
+    tableName: string;
+    indexes: Array<{
+      name: string;
+      columns: string[];
+      unique: boolean;
+    }>;
+  }>;
+  statistics: {
+    totalRecommendations: number;
+    tablesWithoutIndexes: number;
+    averageQueryEfficiency?: number;
+  };
+}
+

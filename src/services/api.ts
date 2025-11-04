@@ -1580,6 +1580,35 @@ export interface FixResult {
   error?: string
 }
 
+// Index Analyzer types
+export interface IndexRecommendation {
+  tableName: string
+  columnName: string
+  indexType: 'single' | 'composite'
+  compositeColumns?: string[]
+  priority: 'high' | 'medium' | 'low'
+  rationale: string
+  estimatedImpact: string
+  suggestedSQL: string
+}
+
+export interface IndexAnalysisResult {
+  recommendations: IndexRecommendation[]
+  existingIndexes: Array<{
+    tableName: string
+    indexes: Array<{
+      name: string
+      columns: string[]
+      unique: boolean
+    }>
+  }>
+  statistics: {
+    totalRecommendations: number
+    tablesWithoutIndexes: number
+    averageQueryEfficiency?: number
+  }
+}
+
 /**
  * Validate all constraints in a database
  */
@@ -1647,5 +1676,46 @@ export const fixViolations = async (
   
   const data = await response.json() as { result: FixResult[], success: boolean }
   return data.result
+}
+
+/**
+ * Analyze indexes and get recommendations
+ */
+export const analyzeIndexes = async (databaseId: string): Promise<IndexAnalysisResult> => {
+  const response = await fetch(`${WORKER_API}/api/indexes/${databaseId}/analyze`, {
+    method: 'GET',
+    credentials: 'include'
+  })
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+    throw new Error(error.error || `Failed to analyze indexes: ${response.status}`)
+  }
+  
+  const data = await response.json() as IndexAnalysisResult & { success: boolean }
+  return {
+    recommendations: data.recommendations,
+    existingIndexes: data.existingIndexes,
+    statistics: data.statistics
+  }
+}
+
+/**
+ * Create an index using the suggested SQL
+ */
+export const createIndex = async (databaseId: string, sql: string): Promise<void> => {
+  const response = await fetch(`${WORKER_API}/api/query/${databaseId}/execute`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    credentials: 'include',
+    body: JSON.stringify({ query: sql, skipValidation: true })
+  })
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+    throw new Error(error.error || `Failed to create index: ${response.status}`)
+  }
 }
 

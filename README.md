@@ -240,6 +240,9 @@ d1-manager/
   - Body: `{ onDelete?, onUpdate? }`
 - `DELETE /api/tables/:dbId/foreign-keys/:constraintName` - Remove a foreign key constraint
 
+### Index Analyzer
+- `GET /api/indexes/:dbId/analyze` - Analyze database and return index recommendations based on schema and query patterns
+
 ---
 
 ## 🎨 Technology Stack
@@ -635,47 +638,44 @@ For more help, see [Cloudflare Workers Troubleshooting](https://developers.cloud
   - **Guided Fix Workflow** - Apply fixes with explicit user confirmation
   - **Fix Strategies** - Delete orphans or set to NULL with impact preview
   - **Dedicated Tab** - Integrated as "Constraints" tab in database view
+- **Index Analyzer** - Intelligent index recommendations for optimal performance
+  - **Schema Analysis** - Detect foreign keys, unique constraints, and commonly queried column types
+  - **Query Pattern Detection** - Analyze query history to identify frequently filtered/joined columns
+  - **Priority Scoring** - High/Medium/Low recommendations based on query frequency and impact
+  - **Estimated Impact** - Clear explanations of expected performance improvements
+  - **One-Click Creation** - Generate and execute CREATE INDEX statements instantly
+  - **Existing Index Display** - View all current indexes organized by table
+  - **Statistics Dashboard** - Total recommendations, tables without indexes, query efficiency metrics
+  - **Performance Tab** - Dedicated index analysis interface in database view
   
 ## Planned Features (Prioritized by Expected Benefit)
 
-### 1. **Index Analyzer**
-
-**Benefit:** 3.5 **Difficulty:** *Medium*
-Suggest missing or suboptimal indexes based on schema and query patterns.
-*Improves database performance and developer awareness.*
-
-### 2. **Relationship Diagram**
-
+### 1. **Relationship Diagram**
 **Benefit:** 3.5 **Difficulty:** *Medium*
 Auto-generate an ER-style diagram showing all table relationships.
 *Gives quick visual understanding of complex schemas.*
 
-### 3. **Advanced Row Filters**
-
+### 2. **Advanced Row Filters**
 **Benefit:** 3 **Difficulty:** *Medium*
 Add OR logic, BETWEEN, IN, and preset filters in the data browser.
 *Refines query flexibility and precision.*
 
-### 4. **Quick Navigation Links**
-
+### 3. **Quick Navigation Links**
 **Benefit:** 2.5 **Difficulty:** *Low*
 Add direct navigation between dependent tables with breadcrumbs.
 *Smooths workflow and enhances usability.*
 
-### 5. **Circular Dependency Detector**
-
+### 4. **Circular Dependency Detector**
 **Benefit:** 2.5 **Difficulty:** *Medium*
 Detect and warn users about circular foreign key chains.
 *Prevents schema design pitfalls.*
 
-### 6. **Dependency Export**
-
+### 5. **Dependency Export**
 **Benefit:** 2 **Difficulty:** *Low*
 Export schema relationships as JSON or documentation files.
 *Useful for audits and documentation.*
 
-### 7. **Force Delete Mode**
-
+### 6. **Force Delete Mode**
 **Benefit:** 1 **Difficulty:** *Low*
 Developer-only toggle to bypass FK constraints (with audit logging).
 *Low-value, niche power-user feature for controlled environments.*

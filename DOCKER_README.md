@@ -104,6 +104,7 @@ This Docker image packages the complete D1 Database Manager with:
 - **Undo/Rollback System** - Restore dropped tables, columns, or deleted rows with 10-operation history per database
 - **FTS5 Full-Text Search** - Create and manage FTS5 virtual tables with tokenizers (unicode61, porter, trigram, ascii), BM25 ranking, highlighting, search operators, and performance metrics
 - **Constraint Validator** - Detect orphaned records, broken foreign keys, NOT NULL violations, and UNIQUE constraint violations with guided fix workflow
+- **Index Analyzer** - Intelligent index recommendations based on schema analysis and query patterns with priority scoring, impact estimation, and one-click creation
 - **Dark/Light Themes** - System-aware theme switching with persistence
 - **Responsive Design** - Works seamlessly on desktop, tablet, and mobile
 
