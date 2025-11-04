@@ -614,14 +614,20 @@ For more help, see [Cloudflare Workers Troubleshooting](https://developers.cloud
   - **Table Filtering** - Focus on specific tables and their relationships
   - **Column Display** - Shows table columns with types and primary key indicators
   - **Accessible Tab** - Integrated as "Relationships" tab alongside Tables and Query Builder
-
+- **FTS5 Virtual Table Management** - Full-text search with SQLite FTS5
+  - **Visual Schema Designer** - Create FTS5 tables with interactive column builder
+  - **Table Converter** - Convert existing tables to FTS5 with external content support
+  - **Multiple Tokenizers** - Unicode61, Porter, Trigram, and ASCII tokenization
+  - **Advanced Configuration** - Diacritic handling, separators, token characters, case sensitivity
+  - **Prefix Indexing** - Enable autocomplete with configurable prefix lengths
+  - **Dedicated Search Interface** - Advanced search UI with BM25 ranking and highlighting
+  - **Search Operators** - AND, OR, NOT, NEAR, phrase matching, column filters
+  - **Performance Metrics** - Execution time, efficiency, rows scanned with recommendations
+  - **Index Maintenance** - Rebuild and optimize operations with statistics
+  - **Sync Triggers** - Auto-generate triggers for external content tables
+  - **Full-Text Search Tab** - Dedicated FTS5 management interface in database view
+  
 ## 🔮 Planned Features (Prioritized by Expected Benefit)
-
-### 1. **FTS5 Virtual Table Management**
-
-**Benefit:** ⭐⭐⭐⭐ **Difficulty:** 🔴 *High*
-Create and manage full-text search indexes (FTS5) with tokenizers, ranking (bm25), highlighting, and query performance metrics.
-➡️ *Adds deep search and analytics capabilities.*
 
 ### 1. **Constraint Validator**
 

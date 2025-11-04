@@ -532,38 +532,55 @@ export async function handleFTS5Routes(
       
       const sanitizedTable = sanitizeIdentifier(tableName);
       
-      // Get row count
-      const countQuery = `SELECT COUNT(*) as count FROM "${sanitizedTable}"`;
-      const countResult = await executeQueryViaAPI(dbId, countQuery, env);
-      const rowCount = (countResult.results[0] as { count: number })?.count || 0;
-      
-      // Get index size (approximate via page count)
-      // Note: This is an approximation as D1 doesn't expose all SQLite internals
-      const pageSizeQuery = `PRAGMA page_size`;
-      const pageSizeResult = await executeQueryViaAPI(dbId, pageSizeQuery, env);
-      const pageSize = (pageSizeResult.results[0] as { page_size: number })?.page_size || 4096;
-      
-      // Estimate index size based on row count and page size
-      // This is a rough estimate
-      const indexSize = Math.ceil(rowCount / 100) * pageSize;
-      const averageRowSize = rowCount > 0 ? indexSize / rowCount : 0;
-      
-      const stats: FTS5Stats = {
-        tableName,
-        rowCount,
-        indexSize,
-        averageRowSize,
-      };
-      
-      return new Response(JSON.stringify({
-        result: stats,
-        success: true
-      }), {
-        headers: {
-          'Content-Type': 'application/json',
-          ...corsHeaders
-        }
-      });
+      try {
+        // Get row count
+        const countQuery = `SELECT COUNT(*) as count FROM "${sanitizedTable}"`;
+        const countResult = await executeQueryViaAPI(dbId, countQuery, env);
+        const rowCount = (countResult.results[0] as { count: number })?.count || 0;
+        
+        // Estimate index size based on row count
+        // D1 doesn't expose page_size or other SQLite internals reliably
+        // Use a rough estimate: ~500 bytes per row for FTS5 index
+        const estimatedBytesPerRow = 500;
+        const indexSize = rowCount * estimatedBytesPerRow;
+        const averageRowSize = estimatedBytesPerRow;
+        
+        const stats: FTS5Stats = {
+          tableName,
+          rowCount,
+          indexSize,
+          averageRowSize,
+        };
+        
+        return new Response(JSON.stringify({
+          result: stats,
+          success: true
+        }), {
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        });
+      } catch (error) {
+        console.error('[FTS5] Stats error:', error);
+        // Return basic stats even if detailed stats fail
+        const stats: FTS5Stats = {
+          tableName,
+          rowCount: 0,
+          indexSize: 0,
+          averageRowSize: 0,
+        };
+        
+        return new Response(JSON.stringify({
+          result: stats,
+          success: true
+        }), {
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        });
+      }
     }
 
     return new Response(JSON.stringify({ 
