@@ -7,7 +7,7 @@
 ![Status](https://img.shields.io/badge/status-Production%2FStable-brightgreen)
 [![Security](https://img.shields.io/badge/Security-Enhanced-green.svg)](https://github.com/neverinfamous/d1-manager/blob/main/SECURITY.md)
 
-**Version:** 1.0.0 | **Last Updated:** November 2, 2025 - 8:45 AM EST  
+**Version:** 1.0.0 | **Last Updated:** November 4, 2025 
 **Base Image:** Node.js 18-alpine | **Architecture:** linux/amd64, linux/arm64
 
 A fully containerized version of the D1 Database Manager for Cloudflare. This Docker image provides a modern, full-featured web application for managing Cloudflare D1 databases with enterprise-grade authentication via Cloudflare Access (Zero Trust).
@@ -97,6 +97,7 @@ This Docker image packages the complete D1 Database Manager with:
 - **Bulk Operations** - Multi-select operations for databases and tables (bulk download, delete, clone, export)
 - **Column Management** - Add, rename, modify, and delete columns with proper migration handling
 - **Dependency Analysis** - Foreign key relationship viewer before table deletion
+- **Cascade Impact Simulator** - Interactive graph visualization of DELETE operations with multi-format export (CSV/JSON/Text/PDF)
 - **Dark/Light Themes** - System-aware theme switching with persistence
 - **Responsive Design** - Works seamlessly on desktop, tablet, and mobile
 
@@ -109,6 +110,7 @@ This Docker image packages the complete D1 Database Manager with:
 - React 19.2.0 with TypeScript 5.9.3
 - Vite 7.1.12 for optimized production builds
 - Tailwind CSS + shadcn/ui for modern UI
+- ReactFlow for interactive graph visualization
 - Cloudflare Workers runtime for serverless API
 - SQLite-compatible D1 database engine
 

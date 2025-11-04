@@ -192,18 +192,11 @@ export function CascadeImpactSimulator({
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-7xl max-h-[90vh] p-0">
         <DialogHeader className="px-6 pt-6 pb-4 border-b">
-          <div className="flex items-center justify-between">
-            <div>
-              <DialogTitle>Cascade Impact Simulator</DialogTitle>
-              <DialogDescription>
-                Analyzing deletion impact for table <span className="font-mono font-semibold">{targetTable}</span>
-                {whereClause && <span className="ml-2 text-xs">with WHERE clause</span>}
-              </DialogDescription>
-            </div>
-            <Button variant="ghost" size="icon" onClick={onClose}>
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
+          <DialogTitle>Cascade Impact Simulator</DialogTitle>
+          <DialogDescription>
+            Analyzing deletion impact for table <span className="font-mono font-semibold">{targetTable}</span>
+            {whereClause && <span className="ml-2 text-xs">with WHERE clause</span>}
+          </DialogDescription>
         </DialogHeader>
 
         {loading && (

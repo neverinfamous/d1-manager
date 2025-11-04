@@ -9,7 +9,7 @@
 [![CodeQL](https://img.shields.io/badge/CodeQL-Passing-brightgreen.svg)](https://github.com/neverinfamous/d1-manager/security/code-scanning)
 [![Type Safety](https://img.shields.io/badge/TypeScript-Strict-blue.svg)](https://github.com/neverinfamous/d1-manager)
 
-**Last Updated:** November 2, 2025 | **Version:** 1.0.0 - 8:39 AM EST  
+**Last Updated:** November 4, 2025 | **Version:** 1.0.0
 **Tech Stack:** React 19.2.0 | Vite 7.1.12 | TypeScript 5.9.3 | Tailwind CSS | shadcn/ui | Cloudflare Workers + Zero Trust
 
 A modern, full-featured web application for managing Cloudflare D1 databases with enterprise-grade authentication via Cloudflare Access (Zero Trust). Similar in design and functionality to the R2 Bucket Manager, providing capabilities beyond the standard Cloudflare dashboard.
@@ -581,7 +581,7 @@ For more help, see [Cloudflare Workers Troubleshooting](https://developers.cloud
 - Complete table management with multi-select, rename, delete, clone, and export
 - Full column management (add, rename, modify, delete columns)
 - Table dependencies viewer with foreign key relationship analysis
-- **Cascade Impact Simulator** - Interactive graph visualization with ReactFlow, multi-format export (CSV/JSON/Text/PDF), and theoretical impact analysis
+- Cascade Impact Simulator - Interactive graph visualization with ReactFlow, multi-format export (CSV/JSON/Text/PDF), and theoretical impact analysis
 
 ## 🔮 Planned Features (Prioritized by Expected Benefit)
 
