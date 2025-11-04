@@ -42,7 +42,7 @@ import { UndoHistoryDialog } from './components/UndoHistoryDialog'
 type View = 
   | { type: 'list' }
   | { type: 'database'; databaseId: string; databaseName: string }
-  | { type: 'table'; databaseId: string; databaseName: string; tableName: string }
+  | { type: 'table'; databaseId: string; databaseName: string; tableName: string; navigationHistory?: Array<{ tableName: string; fkFilter?: string }>; fkFilter?: string }
   | { type: 'query'; databaseId: string; databaseName: string }
 
 export default function App() {
@@ -788,12 +788,46 @@ export default function App() {
             databaseId={currentView.databaseId}
             databaseName={currentView.databaseName}
             tableName={currentView.tableName}
+            navigationHistory={currentView.navigationHistory}
+            fkFilter={currentView.fkFilter}
             onBack={() => {
               setCurrentView({
                 type: 'database',
                 databaseId: currentView.databaseId,
                 databaseName: currentView.databaseName
               })
+            }}
+            onNavigateToRelatedTable={(refTable, refColumn, value) => {
+              // Add current table to navigation history
+              const history = currentView.navigationHistory || [];
+              const newHistory = [...history, { tableName: currentView.tableName, fkFilter: currentView.fkFilter }];
+              
+              // Navigate to the referenced table with FK filter
+              setCurrentView({
+                type: 'table',
+                databaseId: currentView.databaseId,
+                databaseName: currentView.databaseName,
+                tableName: refTable,
+                navigationHistory: newHistory,
+                fkFilter: `${refColumn}:${value}`
+              });
+            }}
+            onNavigateToHistoryTable={(index) => {
+              // Navigate back to a table in the history
+              const history = currentView.navigationHistory || [];
+              if (index < history.length) {
+                const targetEntry = history[index];
+                const newHistory = history.slice(0, index);
+                
+                setCurrentView({
+                  type: 'table',
+                  databaseId: currentView.databaseId,
+                  databaseName: currentView.databaseName,
+                  tableName: targetEntry.tableName,
+                  navigationHistory: newHistory,
+                  fkFilter: targetEntry.fkFilter
+                });
+              }
             }}
             onUndoableOperation={refreshUndoCount}
           />

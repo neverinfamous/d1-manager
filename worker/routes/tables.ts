@@ -153,6 +153,20 @@ export async function handleTableRoutes(
         }
       }
       
+      // Parse FK filter (format: column:value)
+      const fkFilter = url.searchParams.get('fkFilter');
+      if (fkFilter) {
+        const [column, value] = fkFilter.split(':');
+        if (column && value !== undefined) {
+          // Add FK filter as an equals filter
+          filters[column] = {
+            type: 'equals',
+            value: value,
+            logicOperator: 'AND'
+          };
+        }
+      }
+      
       console.log('[Tables] Getting data for table:', tableName, 'limit:', limit, 'offset:', offset, 'filters:', filters);
       
       // Mock response for local development
@@ -282,6 +296,84 @@ export async function handleTableRoutes(
       
       return new Response(JSON.stringify({
         result: result.results,
+        success: true
+      }), {
+        headers: {
+          'Content-Type': 'application/json',
+          ...corsHeaders
+        }
+      });
+    }
+
+    // Get foreign keys for a specific table
+    if (request.method === 'GET' && url.pathname.match(/^\/api\/tables\/[^/]+\/foreign-keys\/[^/]+$/)) {
+      const tableName = decodeURIComponent(pathParts[5]);
+      console.log('[Tables] Getting foreign keys for table:', tableName);
+      
+      // Mock response for local development
+      if (isLocalDev) {
+        return new Response(JSON.stringify({
+          result: {
+            foreignKeys: [
+              { column: 'user_id', refTable: 'users', refColumn: 'id', onDelete: 'CASCADE', onUpdate: 'NO ACTION' },
+              { column: 'category_id', refTable: 'categories', refColumn: 'id', onDelete: 'SET NULL', onUpdate: 'CASCADE' }
+            ]
+          },
+          success: true
+        }), {
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        });
+      }
+      
+      const sanitizedTable = sanitizeIdentifier(tableName);
+      const fkQuery = `PRAGMA foreign_key_list("${sanitizedTable}")`;
+      const result = await executeQueryViaAPI(dbId, fkQuery, env);
+      
+      // Transform the PRAGMA result to our desired format
+      const fks = result.results as Array<{
+        id: number;
+        seq: number;
+        table: string;
+        from: string;
+        to: string;
+        on_update: string;
+        on_delete: string;
+        match: string;
+      }>;
+      
+      // Group by FK constraint (id) and column
+      const foreignKeys: Array<{
+        column: string;
+        refTable: string;
+        refColumn: string;
+        onDelete: string | null;
+        onUpdate: string | null;
+      }> = [];
+      
+      const processed = new Map<string, typeof foreignKeys[0]>();
+      
+      for (const fk of fks) {
+        const key = `${fk.from}_${fk.table}_${fk.to}`;
+        if (!processed.has(key)) {
+          processed.set(key, {
+            column: fk.from,
+            refTable: fk.table,
+            refColumn: fk.to,
+            onDelete: fk.on_delete || null,
+            onUpdate: fk.on_update || null
+          });
+        }
+      }
+      
+      foreignKeys.push(...processed.values());
+      
+      return new Response(JSON.stringify({
+        result: {
+          foreignKeys
+        },
         success: true
       }), {
         headers: {

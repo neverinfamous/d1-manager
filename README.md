@@ -669,12 +669,15 @@ For more help, see [Cloudflare Workers Troubleshooting](https://developers.cloud
   - **Multi-Value Input** - Comma-separated list input with 100-value limit for performance
   - **Dynamic UI** - Two inputs for BETWEEN, textarea for IN, AND/OR toggle buttons
   - **SQL Injection Protection** - All new operators properly escaped and validated
+- **Foreign Key Navigation** - Direct navigation between dependent tables with breadcrumbs
+  - **Clickable FK Values** - Foreign key columns display as interactive links with visual indicators
+  - **Auto-Filtering** - Automatically applies filters when navigating via FK relationships
+  - **Breadcrumb Trail** - Shows navigation path (Database > Table1 > Table2 > Table3)
+  - **Smart Navigation** - Click to jump to referenced tables or use breadcrumbs to go back
+  - **Keyboard Shortcuts** - Alt+Left for back navigation through table history
+  - **Visual Indicators** - FK columns highlighted with link icons and tooltips showing references
   
 ## Planned Features
-
-### 1. Quick Navigation Links
-Add direct navigation between dependent tables with breadcrumbs
-- Smooths workflow and enhances usability
 
 ### 2. Circular Dependency Detector
 Detect and warn users about circular foreign key chains

@@ -527,6 +527,32 @@ class APIService {
   }
 
   /**
+   * Get foreign keys for a specific table
+   */
+  async getTableForeignKeys(
+    databaseId: string,
+    tableName: string
+  ): Promise<Array<{
+    column: string;
+    refTable: string;
+    refColumn: string;
+    onDelete: string | null;
+    onUpdate: string | null;
+  }>> {
+    const response = await fetch(
+      `${WORKER_API}/api/tables/${databaseId}/foreign-keys/${encodeURIComponent(tableName)}`,
+      { credentials: 'include' }
+    )
+    
+    if (!response.ok) {
+      throw new Error(`Failed to get table foreign keys: ${response.statusText}`)
+    }
+    
+    const data = await response.json()
+    return data.result?.foreignKeys || []
+  }
+
+  /**
    * Get table dependencies (foreign key relationships)
    */
   async getTableDependencies(
@@ -968,6 +994,7 @@ export const api = new APIService()
 // Export individual methods for convenience
 export const listTables = (databaseId: string) => api.listTables(databaseId)
 export const getTableSchema = (databaseId: string, tableName: string) => api.getTableSchema(databaseId, tableName)
+export const getTableForeignKeys = (databaseId: string, tableName: string) => api.getTableForeignKeys(databaseId, tableName)
 export const getTableData = <T = Record<string, unknown>>(
   databaseId: string, 
   tableName: string, 

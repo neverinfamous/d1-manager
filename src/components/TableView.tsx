@@ -20,20 +20,36 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { getTableSchema, getTableData, executeQuery, type ColumnInfo, type FilterCondition, api } from '@/services/api';
+import { getTableSchema, getTableData, getTableForeignKeys, executeQuery, type ColumnInfo, type FilterCondition, api } from '@/services/api';
 import { FilterBar } from '@/components/FilterBar';
 import { deserializeFilters, serializeFilters, getActiveFilterCount } from '@/utils/filters';
 import { CascadeImpactSimulator } from '@/components/CascadeImpactSimulator';
+import { BreadcrumbNavigation } from '@/components/BreadcrumbNavigation';
+import { ForeignKeyBadge } from '@/components/ForeignKeyBadge';
 
 interface TableViewProps {
   databaseId: string;
   databaseName: string;
   tableName: string;
+  navigationHistory?: Array<{ tableName: string; fkFilter?: string }>;
+  fkFilter?: string;
   onBack: () => void;
+  onNavigateToRelatedTable?: (refTable: string, refColumn: string, value: unknown) => void;
+  onNavigateToHistoryTable?: (index: number) => void;
   onUndoableOperation?: () => void;
 }
 
-export function TableView({ databaseId, databaseName, tableName, onBack, onUndoableOperation }: TableViewProps) {
+export function TableView({ 
+  databaseId, 
+  databaseName, 
+  tableName, 
+  navigationHistory,
+  fkFilter,
+  onBack, 
+  onNavigateToRelatedTable,
+  onNavigateToHistoryTable,
+  onUndoableOperation 
+}: TableViewProps) {
   const [schema, setSchema] = useState<ColumnInfo[]>([]);
   const [data, setData] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
@@ -55,6 +71,9 @@ export function TableView({ databaseId, databaseName, tableName, onBack, onUndoa
   // Filter state
   const [filters, setFilters] = useState<Record<string, FilterCondition>>({});
   const [showFilters, setShowFilters] = useState(false);
+  
+  // Foreign key state
+  const [foreignKeys, setForeignKeys] = useState<Record<string, { refTable: string; refColumn: string }>>({});
   
   // Column management state
   const [showAddColumnDialog, setShowAddColumnDialog] = useState(false);
@@ -95,6 +114,44 @@ export function TableView({ databaseId, databaseName, tableName, onBack, onUndoa
       setShowFilters(true);
     }
   }, []);
+  
+  // Apply FK filter from navigation
+  useEffect(() => {
+    if (fkFilter) {
+      const [column, value] = fkFilter.split(':');
+      if (column && value !== undefined) {
+        setFilters({
+          [column]: {
+            type: 'equals',
+            value: value
+          }
+        });
+        setShowFilters(true);
+      }
+    }
+  }, [fkFilter]);
+  
+  // Load foreign keys on mount
+  useEffect(() => {
+    const loadForeignKeys = async () => {
+      try {
+        const fks = await getTableForeignKeys(databaseId, tableName);
+        const fkMap: Record<string, { refTable: string; refColumn: string }> = {};
+        for (const fk of fks) {
+          fkMap[fk.column] = {
+            refTable: fk.refTable,
+            refColumn: fk.refColumn
+          };
+        }
+        setForeignKeys(fkMap);
+      } catch (err) {
+        console.error('Failed to load foreign keys:', err);
+        // Non-fatal error, just log it
+      }
+    };
+    
+    loadForeignKeys();
+  }, [databaseId, tableName]);
   
   // Update URL when filters change
   useEffect(() => {
@@ -515,6 +572,25 @@ export function TableView({ databaseId, databaseName, tableName, onBack, onUndoa
 
   return (
     <div className="space-y-6">
+      {/* Breadcrumb Navigation */}
+      {navigationHistory && navigationHistory.length > 0 && (
+        <BreadcrumbNavigation
+          databaseName={databaseName}
+          navigationHistory={[...navigationHistory, { tableName }]}
+          onNavigateToDatabase={onBack}
+          onNavigateToTable={(index) => {
+            if (onNavigateToHistoryTable) {
+              onNavigateToHistoryTable(index);
+            }
+          }}
+          onGoBack={() => {
+            if (navigationHistory.length > 0 && onNavigateToHistoryTable) {
+              onNavigateToHistoryTable(navigationHistory.length - 1);
+            }
+          }}
+        />
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -526,6 +602,7 @@ export function TableView({ databaseId, databaseName, tableName, onBack, onUndoa
             <p className="text-sm text-muted-foreground">
               {databaseName} • {data.length} {data.length === 1 ? 'row' : 'rows'}
               {getActiveFilterCount(filters) > 0 && ' (filtered)'}
+              {fkFilter && ' • Navigated from FK'}
             </p>
           </div>
         </div>
@@ -715,22 +792,40 @@ export function TableView({ databaseId, databaseName, tableName, onBack, onUndoa
                   <tbody className="divide-y divide-border">
                     {data.map((row, rowIndex) => (
                       <tr key={rowIndex} className="hover:bg-muted/50">
-                        {schema.map((col) => (
-                          <td
-                            key={`${rowIndex}-${col.cid}`}
-                            className="px-4 py-3 text-sm whitespace-nowrap"
-                          >
-                            <span
-                              className={
-                                row[col.name] === null
-                                  ? 'italic text-muted-foreground'
-                                  : ''
-                              }
+                        {schema.map((col) => {
+                          const isFK = foreignKeys[col.name];
+                          const cellValue = row[col.name];
+                          
+                          return (
+                            <td
+                              key={`${rowIndex}-${col.cid}`}
+                              className="px-4 py-3 text-sm whitespace-nowrap"
                             >
-                              {formatValue(row[col.name])}
-                            </span>
-                          </td>
-                        ))}
+                              {isFK && onNavigateToRelatedTable ? (
+                                <ForeignKeyBadge
+                                  value={cellValue}
+                                  refTable={isFK.refTable}
+                                  refColumn={isFK.refColumn}
+                                  onClick={() => {
+                                    if (cellValue !== null && cellValue !== undefined) {
+                                      onNavigateToRelatedTable(isFK.refTable, isFK.refColumn, cellValue);
+                                    }
+                                  }}
+                                />
+                              ) : (
+                                <span
+                                  className={
+                                    cellValue === null
+                                      ? 'italic text-muted-foreground'
+                                      : ''
+                                  }
+                                >
+                                  {formatValue(cellValue)}
+                                </span>
+                              )}
+                            </td>
+                          );
+                        })}
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-2">
                             <Button variant="ghost" size="icon" onClick={() => handleOpenEditDialog(row)} title="Edit row">
