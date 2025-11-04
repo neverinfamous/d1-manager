@@ -208,27 +208,32 @@ export async function saveUndoSnapshot(
     console.warn(`[Undo] Large snapshot detected: ${(sizeInBytes / 1024 / 1024).toFixed(2)}MB for ${targetTable}`);
   }
 
-  // Insert into undo_history
-  const stmt = env.METADATA.prepare(
-    `INSERT INTO undo_history (database_id, operation_type, target_table, target_column, description, snapshot_data, user_email)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).bind(dbId, operationType, targetTable, targetColumn, description, snapshotData, userEmail);
+  try {
+    // Insert into undo_history
+    const stmt = env.METADATA.prepare(
+      `INSERT INTO undo_history (database_id, operation_type, target_table, target_column, description, snapshot_data, user_email)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).bind(dbId, operationType, targetTable, targetColumn, description, snapshotData, userEmail);
 
-  await stmt.run();
+    await stmt.run();
 
-  // Clean up old history (keep last 10 per database)
-  const cleanupStmt = env.METADATA.prepare(
-    `DELETE FROM undo_history 
-     WHERE database_id = ? 
-     AND id NOT IN (
-       SELECT id FROM undo_history 
+    // Clean up old history (keep last 10 per database)
+    const cleanupStmt = env.METADATA.prepare(
+      `DELETE FROM undo_history 
        WHERE database_id = ? 
-       ORDER BY executed_at DESC 
-       LIMIT 10
-     )`
-  ).bind(dbId, dbId);
+       AND id NOT IN (
+         SELECT id FROM undo_history 
+         WHERE database_id = ? 
+         ORDER BY executed_at DESC 
+         LIMIT 10
+       )`
+    ).bind(dbId, dbId);
 
-  await cleanupStmt.run();
+    await cleanupStmt.run();
+  } catch (err) {
+    // Log error but don't fail the main operation
+    console.error('[Undo] Failed to save undo snapshot (table may not exist yet):', err);
+  }
 }
 
 /**

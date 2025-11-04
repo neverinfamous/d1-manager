@@ -107,26 +107,40 @@ export async function handleUndoRoutes(
       }
 
       // Query undo history from metadata database
-      const stmt = env.METADATA.prepare(
-        `SELECT id, database_id, operation_type, target_table, target_column, description, executed_at, user_email
-         FROM undo_history
-         WHERE database_id = ?
-         ORDER BY executed_at DESC
-         LIMIT 10`
-      ).bind(dbId);
+      try {
+        const stmt = env.METADATA.prepare(
+          `SELECT id, database_id, operation_type, target_table, target_column, description, executed_at, user_email
+           FROM undo_history
+           WHERE database_id = ?
+           ORDER BY executed_at DESC
+           LIMIT 10`
+        ).bind(dbId);
 
-      const result = await stmt.all();
-      const history = result.results as Omit<UndoHistoryEntry, 'snapshot_data'>[];
+        const result = await stmt.all();
+        const history = result.results as Omit<UndoHistoryEntry, 'snapshot_data'>[];
 
-      return new Response(JSON.stringify({
-        history,
-        success: true
-      }), {
-        headers: {
-          'Content-Type': 'application/json',
-          ...corsHeaders
-        }
-      });
+        return new Response(JSON.stringify({
+          history,
+          success: true
+        }), {
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        });
+      } catch (dbErr) {
+        // If table doesn't exist yet, return empty history
+        console.log('[Undo] Table may not exist yet, returning empty history:', dbErr);
+        return new Response(JSON.stringify({
+          history: [],
+          success: true
+        }), {
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        });
+      }
     }
 
     // POST /api/undo/:dbId/restore/:undoId - Restore from undo snapshot
@@ -148,11 +162,25 @@ export async function handleUndoRoutes(
       }
 
       // Get the undo entry
-      const stmt = env.METADATA.prepare(
-        `SELECT * FROM undo_history WHERE id = ? AND database_id = ?`
-      ).bind(undoId, dbId);
+      let result: UndoHistoryEntry | null = null;
+      try {
+        const stmt = env.METADATA.prepare(
+          `SELECT * FROM undo_history WHERE id = ? AND database_id = ?`
+        ).bind(undoId, dbId);
 
-      const result = await stmt.first() as UndoHistoryEntry | null;
+        result = await stmt.first() as UndoHistoryEntry | null;
+      } catch (dbErr) {
+        console.log('[Undo] Table may not exist yet:', dbErr);
+        return new Response(JSON.stringify({
+          error: 'Undo entry not found'
+        }), {
+          status: 404,
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        });
+      }
 
       if (!result) {
         return new Response(JSON.stringify({
@@ -221,21 +249,35 @@ export async function handleUndoRoutes(
       }
 
       // Delete all undo history for this database
-      const stmt = env.METADATA.prepare(
-        `DELETE FROM undo_history WHERE database_id = ?`
-      ).bind(dbId);
+      try {
+        const stmt = env.METADATA.prepare(
+          `DELETE FROM undo_history WHERE database_id = ?`
+        ).bind(dbId);
 
-      const result = await stmt.run();
+        const result = await stmt.run();
 
-      return new Response(JSON.stringify({
-        success: true,
-        cleared: result.meta.changes
-      }), {
-        headers: {
-          'Content-Type': 'application/json',
-          ...corsHeaders
-        }
-      });
+        return new Response(JSON.stringify({
+          success: true,
+          cleared: result.meta.changes
+        }), {
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        });
+      } catch (dbErr) {
+        // If table doesn't exist yet, return success with 0 cleared
+        console.log('[Undo] Table may not exist yet:', dbErr);
+        return new Response(JSON.stringify({
+          success: true,
+          cleared: 0
+        }), {
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        });
+      }
     }
 
     // Unknown endpoint
