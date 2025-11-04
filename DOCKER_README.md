@@ -95,7 +95,7 @@ This Docker image packages the complete D1 Database Manager with:
 - **Full Database Management** - List, create, rename, delete, and optimize D1 databases
 - **Advanced Table Operations** - Browse, create, modify, clone, and export tables with visual schema designer
 - **SQL Query Console** - Execute queries with syntax highlighting, history, and CSV export
-- **Row-Level Filtering** - Type-aware filtering with server-side SQL WHERE clauses
+- **Row-Level Filtering** - Type-aware filtering with OR logic, BETWEEN, IN operators, and preset templates
 - **Bulk Operations** - Multi-select operations for databases and tables (bulk download, delete, clone, export)
 - **Column Management** - Add, rename, modify, and delete columns with proper migration handling
 - **Foreign Key Visualizer/Editor** - Interactive graph-based relationship management with dual layout system (hierarchical/force-directed), add/modify/delete constraints, type validation, orphan detection, and color-coded edges

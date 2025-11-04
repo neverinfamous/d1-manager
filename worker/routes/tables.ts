@@ -131,14 +131,24 @@ export async function handleTableRoutes(
       const offset = parseInt(url.searchParams.get('offset') || '0');
       
       // Parse filter parameters from URL
-      const filters: Record<string, { type: string; value?: string }> = {};
+      const filters: Record<string, { type: string; value?: string; value2?: string; values?: (string | number)[]; logicOperator?: 'AND' | 'OR' }> = {};
       for (const [key, value] of url.searchParams.entries()) {
         if (key.startsWith('filter_')) {
           const columnName = key.substring(7); // Remove 'filter_' prefix
           const filterValue = url.searchParams.get(`filterValue_${columnName}`);
+          const filterValue2 = url.searchParams.get(`filterValue2_${columnName}`);
+          const filterValues = url.searchParams.get(`filterValues_${columnName}`);
+          const filterLogic = url.searchParams.get(`filterLogic_${columnName}`);
+          
           filters[columnName] = {
             type: value,
-            value: filterValue || undefined
+            value: filterValue || undefined,
+            value2: filterValue2 || undefined,
+            values: filterValues ? filterValues.split(',').map(v => {
+              const num = Number(v);
+              return isNaN(num) ? v : num;
+            }).slice(0, 100) : undefined, // Limit to 100 values
+            logicOperator: (filterLogic as 'AND' | 'OR') || undefined
           };
         }
       }
@@ -220,7 +230,10 @@ export async function handleTableRoutes(
         for (const [columnName, filter] of Object.entries(filters)) {
           filterConditions[columnName] = {
             type: filter.type as import('../utils/helpers').FilterCondition['type'],
-            value: filter.value
+            value: filter.value,
+            value2: filter.value2,
+            values: filter.values,
+            logicOperator: filter.logicOperator
           };
         }
         

@@ -41,11 +41,14 @@ A modern, full-featured web application for managing Cloudflare D1 databases wit
 - **Table Schema** - Detailed column information with types, primary keys, constraints
 - **Table Data** - Paginated table browser (50 rows per page)
 - **Row-Level Filtering** - Advanced type-aware filtering with server-side SQL WHERE clauses
-  - **Type-Aware Operators** - TEXT (contains, equals, starts/ends with), INTEGER/REAL (=, >, <, ≥, ≤), NULL checks
-  - **Filter Bar UI** - Inline filters above table with one input per column
+  - **Type-Aware Operators** - TEXT (contains, equals, starts/ends with, IN), INTEGER/REAL (=, >, <, ≥, ≤, BETWEEN, IN), NULL checks
+  - **Advanced Operators** - BETWEEN for ranges, IN for multiple values, NOT BETWEEN, NOT IN
+  - **OR Logic** - Combine filters with AND or OR operators for complex queries
+  - **Filter Bar UI** - Inline filters above table with dynamic inputs per operator type
+  - **Filter Presets** - Built-in templates (last 7/30 days, ranges) and custom saved presets
   - **URL Persistence** - Filters stored in query params for shareable filtered views
-  - **SQL Injection Protection** - Proper escaping and parameterization
-  - **Active Indicators** - Badge count, highlighted inputs, "(filtered)" label
+  - **SQL Injection Protection** - Proper escaping and parameterization for all operators
+  - **Active Indicators** - Badge count, highlighted inputs, "(filtered)" label, logic operator badges
 - **Visual Schema Designer** - Create tables with visual column builder
   - Define column names and types (TEXT, INTEGER, REAL, BLOB, etc.)
   - Set primary keys and NOT NULL constraints
@@ -656,33 +659,34 @@ For more help, see [Cloudflare Workers Troubleshooting](https://developers.cloud
   - **Relationship Visualization** - Color-coded edges for CASCADE, RESTRICT, SET NULL
   - **Read-Only Mode** - Focus on understanding schema without accidental edits
   - **Zoom & Pan** - ReactFlow controls with minimap for large schemas
+- **Advanced Row Filters** - Enhanced filtering with OR logic, BETWEEN, IN operators, and presets
+  - **OR Logic** - Combine filters with AND or OR operators for complex query conditions
+  - **BETWEEN Operator** - Range queries for numeric and date columns (e.g., age BETWEEN 18 AND 65)
+  - **IN Operator** - Filter by multiple specific values (e.g., status IN ('active', 'pending'))
+  - **NOT BETWEEN/NOT IN** - Inverse range and list operations
+  - **Filter Presets** - Built-in templates (last 7/30 days, this month/year, ranges 0-100, positive values)
+  - **Custom Presets** - Save and manage your own filter combinations in localStorage
+  - **Multi-Value Input** - Comma-separated list input with 100-value limit for performance
+  - **Dynamic UI** - Two inputs for BETWEEN, textarea for IN, AND/OR toggle buttons
+  - **SQL Injection Protection** - All new operators properly escaped and validated
   
 ## Planned Features
 
-### 1. **Advanced Row Filters**
-**Benefit:** 3 **Difficulty:** *Medium*
-Add OR logic, BETWEEN, IN, and preset filters in the data browser.
-*Refines query flexibility and precision.*
+### 1. Quick Navigation Links
+Add direct navigation between dependent tables with breadcrumbs
+- Smooths workflow and enhances usability
 
-### 2. **Quick Navigation Links**
-**Benefit:** 2.5 **Difficulty:** *Low*
-Add direct navigation between dependent tables with breadcrumbs.
-*Smooths workflow and enhances usability.*
+### 2. Circular Dependency Detector
+Detect and warn users about circular foreign key chains
+- Prevents schema design pitfalls
 
-### 3. **Circular Dependency Detector**
-**Benefit:** 2.5 **Difficulty:** *Medium*
-Detect and warn users about circular foreign key chains.
-*Prevents schema design pitfalls.*
+### 3. Dependency Export
+Export schema relationships as JSON or documentation files
+- Useful for audits and documentation
 
-### 4. **Dependency Export**
-**Benefit:** 2 **Difficulty:** *Low*
-Export schema relationships as JSON or documentation files.
-*Useful for audits and documentation.*
-
-### 5. **Force Delete Mode**
-**Benefit:** 1 **Difficulty:** *Low*
-Developer-only toggle to bypass FK constraints (with audit logging).
-*Low-value, niche power-user feature for controlled environments.*
+### 4. Force Delete Mode
+Developer-only toggle to bypass FK constraints (with audit logging)
+- Low-value, niche power-user feature for controlled environments
 
 ---
 

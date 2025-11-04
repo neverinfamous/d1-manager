@@ -39,9 +39,12 @@ export interface IndexInfo {
 // Filter types for row-level filtering
 export interface FilterCondition {
   type: 'contains' | 'equals' | 'notEquals' | 'gt' | 'gte' | 'lt' | 'lte' | 
-        'isNull' | 'isNotNull' | 'startsWith' | 'endsWith'
+        'isNull' | 'isNotNull' | 'startsWith' | 'endsWith' | 
+        'between' | 'notBetween' | 'in' | 'notIn'
   value?: string | number
-  value2?: string | number // For range filters (future: between operator)
+  value2?: string | number // For BETWEEN operators
+  values?: (string | number)[] // For IN operators
+  logicOperator?: 'AND' | 'OR' // For combining with next filter
 }
 
 // Foreign key dependency types

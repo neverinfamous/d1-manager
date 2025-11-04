@@ -19,6 +19,14 @@ export function serializeFilters(filters: Record<string, FilterCondition>): URLS
     if (filter.value2 !== undefined && filter.value2 !== null && filter.value2 !== '') {
       params.set(`filterValue2_${columnName}`, String(filter.value2));
     }
+    
+    if (filter.values && filter.values.length > 0) {
+      params.set(`filterValues_${columnName}`, filter.values.join(','));
+    }
+    
+    if (filter.logicOperator) {
+      params.set(`filterLogic_${columnName}`, filter.logicOperator);
+    }
   }
   
   return params;
@@ -35,11 +43,18 @@ export function deserializeFilters(searchParams: URLSearchParams): Record<string
       const columnName = key.substring(7); // Remove 'filter_' prefix
       const filterValue = searchParams.get(`filterValue_${columnName}`);
       const filterValue2 = searchParams.get(`filterValue2_${columnName}`);
+      const filterValues = searchParams.get(`filterValues_${columnName}`);
+      const filterLogic = searchParams.get(`filterLogic_${columnName}`);
       
       filters[columnName] = {
         type: value as FilterCondition['type'],
         value: filterValue || undefined,
-        value2: filterValue2 || undefined
+        value2: filterValue2 || undefined,
+        values: filterValues ? filterValues.split(',').map(v => {
+          const num = Number(v);
+          return isNaN(num) ? v : num;
+        }) : undefined,
+        logicOperator: (filterLogic as 'AND' | 'OR') || undefined
       };
     }
   }
@@ -65,6 +80,10 @@ export function getFilterTypesForColumn(columnType: string): Array<{
       { value: 'gte', label: 'Greater or equal (≥)' },
       { value: 'lt', label: 'Less than (<)' },
       { value: 'lte', label: 'Less or equal (≤)' },
+      { value: 'between', label: 'Between' },
+      { value: 'notBetween', label: 'Not between' },
+      { value: 'in', label: 'In list' },
+      { value: 'notIn', label: 'Not in list' },
       { value: 'isNull', label: 'Is NULL' },
       { value: 'isNotNull', label: 'Is not NULL' }
     ];
@@ -78,6 +97,8 @@ export function getFilterTypesForColumn(columnType: string): Array<{
       { value: 'notEquals', label: 'Not equals' },
       { value: 'startsWith', label: 'Starts with' },
       { value: 'endsWith', label: 'Ends with' },
+      { value: 'in', label: 'In list' },
+      { value: 'notIn', label: 'Not in list' },
       { value: 'isNull', label: 'Is NULL' },
       { value: 'isNotNull', label: 'Is not NULL' }
     ];
@@ -88,6 +109,8 @@ export function getFilterTypesForColumn(columnType: string): Array<{
     { value: 'contains', label: 'Contains' },
     { value: 'equals', label: 'Equals' },
     { value: 'notEquals', label: 'Not equals' },
+    { value: 'in', label: 'In list' },
+    { value: 'notIn', label: 'Not in list' },
     { value: 'isNull', label: 'Is NULL' },
     { value: 'isNotNull', label: 'Is not NULL' }
   ];
@@ -108,13 +131,27 @@ export function formatFilterLabel(columnName: string, filter: FilterCondition): 
     isNull: 'is NULL',
     isNotNull: 'is not NULL',
     startsWith: 'starts with',
-    endsWith: 'ends with'
+    endsWith: 'ends with',
+    between: 'BETWEEN',
+    notBetween: 'NOT BETWEEN',
+    in: 'IN',
+    notIn: 'NOT IN'
   };
   
   const typeLabel = typeLabels[filter.type] || filter.type;
   
   if (filter.type === 'isNull' || filter.type === 'isNotNull') {
     return `${columnName} ${typeLabel}`;
+  }
+  
+  if (filter.type === 'between' || filter.type === 'notBetween') {
+    return `${columnName} ${typeLabel} ${filter.value} AND ${filter.value2}`;
+  }
+  
+  if (filter.type === 'in' || filter.type === 'notIn') {
+    const valueStr = filter.values?.slice(0, 3).map(v => `'${v}'`).join(', ') || '';
+    const extra = filter.values && filter.values.length > 3 ? `, ... +${filter.values.length - 3}` : '';
+    return `${columnName} ${typeLabel} (${valueStr}${extra})`;
   }
   
   return `${columnName} ${typeLabel} "${filter.value}"`;
@@ -128,12 +165,33 @@ export function filterRequiresValue(filterType: FilterCondition['type']): boolea
 }
 
 /**
+ * Check if a filter requires two value inputs (for BETWEEN)
+ */
+export function filterRequiresTwoValues(filterType: FilterCondition['type']): boolean {
+  return filterType === 'between' || filterType === 'notBetween';
+}
+
+/**
+ * Check if a filter requires multiple values (for IN)
+ */
+export function filterRequiresMultipleValues(filterType: FilterCondition['type']): boolean {
+  return filterType === 'in' || filterType === 'notIn';
+}
+
+/**
  * Get count of active filters (non-empty)
  */
 export function getActiveFilterCount(filters: Record<string, FilterCondition>): number {
   return Object.values(filters).filter(filter => {
     if (filter.type === 'isNull' || filter.type === 'isNotNull') {
       return true; // These don't need values
+    }
+    if (filter.type === 'between' || filter.type === 'notBetween') {
+      return filter.value !== undefined && filter.value !== null && filter.value !== '' &&
+             filter.value2 !== undefined && filter.value2 !== null && filter.value2 !== '';
+    }
+    if (filter.type === 'in' || filter.type === 'notIn') {
+      return filter.values && filter.values.length > 0;
     }
     return filter.value !== undefined && filter.value !== null && filter.value !== '';
   }).length;
