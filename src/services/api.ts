@@ -1217,3 +1217,118 @@ export const simulateCascadeImpact = async (
   return data.result
 }
 
+// Foreign key graph data types
+export interface ForeignKeyGraphNode {
+  id: string
+  label: string
+  columns: Array<{name: string; type: string; isPK: boolean}>
+  rowCount: number
+}
+
+export interface ForeignKeyGraphEdge {
+  id: string
+  source: string
+  target: string
+  sourceColumn: string
+  targetColumn: string
+  onDelete: string
+  onUpdate: string
+}
+
+export interface ForeignKeyGraph {
+  nodes: ForeignKeyGraphNode[]
+  edges: ForeignKeyGraphEdge[]
+}
+
+/**
+ * Get all foreign keys for a database
+ */
+export const getAllForeignKeys = async (databaseId: string): Promise<ForeignKeyGraph> => {
+  const response = await fetch(`${WORKER_API}/api/tables/${databaseId}/foreign-keys`, {
+    method: 'GET',
+    credentials: 'include'
+  })
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+    throw new Error(error.error || `Failed to get foreign keys: ${response.status}`)
+  }
+  
+  const data = await response.json() as { result: ForeignKeyGraph, success: boolean }
+  return data.result
+}
+
+/**
+ * Add a foreign key constraint
+ */
+export const addForeignKey = async (
+  databaseId: string,
+  params: {
+    sourceTable: string
+    sourceColumn: string
+    targetTable: string
+    targetColumn: string
+    onDelete: string
+    onUpdate: string
+    constraintName?: string
+  }
+): Promise<void> => {
+  const response = await fetch(`${WORKER_API}/api/tables/${databaseId}/foreign-keys/add`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    credentials: 'include',
+    body: JSON.stringify(params)
+  })
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+    throw new Error(error.error || `Failed to add foreign key: ${response.status}`)
+  }
+}
+
+/**
+ * Modify a foreign key constraint
+ */
+export const modifyForeignKey = async (
+  databaseId: string,
+  constraintName: string,
+  params: {
+    onDelete?: string
+    onUpdate?: string
+  }
+): Promise<void> => {
+  const response = await fetch(`${WORKER_API}/api/tables/${databaseId}/foreign-keys/${encodeURIComponent(constraintName)}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    credentials: 'include',
+    body: JSON.stringify(params)
+  })
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+    throw new Error(error.error || `Failed to modify foreign key: ${response.status}`)
+  }
+}
+
+/**
+ * Delete a foreign key constraint
+ */
+export const deleteForeignKey = async (
+  databaseId: string,
+  constraintName: string
+): Promise<void> => {
+  const response = await fetch(`${WORKER_API}/api/tables/${databaseId}/foreign-keys/${encodeURIComponent(constraintName)}`, {
+    method: 'DELETE',
+    credentials: 'include'
+  })
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+    throw new Error(error.error || `Failed to delete foreign key: ${response.status}`)
+  }
+}
+

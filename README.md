@@ -230,6 +230,14 @@ d1-manager/
 - `POST /api/query/:dbId/batch` - Execute multiple queries in a batch
 - `GET /api/query/:dbId/history` - Get query execution history
 
+### Foreign Keys
+- `GET /api/tables/:dbId/foreign-keys` - Get all foreign keys for a database (returns graph structure with nodes and edges)
+- `POST /api/tables/:dbId/foreign-keys/add` - Add a new foreign key constraint
+  - Body: `{ sourceTable, sourceColumn, targetTable, targetColumn, onDelete, onUpdate, constraintName? }`
+- `PATCH /api/tables/:dbId/foreign-keys/:constraintName` - Modify foreign key ON DELETE/ON UPDATE behavior
+  - Body: `{ onDelete?, onUpdate? }`
+- `DELETE /api/tables/:dbId/foreign-keys/:constraintName` - Remove a foreign key constraint
+
 ---
 
 ## 🎨 Technology Stack
@@ -592,64 +600,71 @@ For more help, see [Cloudflare Workers Troubleshooting](https://developers.cloud
   - **Detailed History Dialog** - View all past operations with timestamps and descriptions
   - **Supported Operations**: Table drops, column drops, row deletes
   - **Smart Restoration** - Detects conflicts and provides clear warnings before restoring
+- **Foreign Key Visualizer/Editor** - Interactive graph-based relationship management
+  - **Dual Layout System** - Switch between hierarchical (dagre) and force-directed layouts
+  - **Interactive Graph** - ReactFlow-powered visualization with pan, zoom, and minimap
+  - **Add Foreign Keys** - Create new foreign key constraints with validation
+  - **Modify Constraints** - Edit ON DELETE and ON UPDATE behaviors
+  - **Delete Constraints** - Remove foreign key relationships
+  - **Type Validation** - Automatic column type compatibility checking
+  - **Orphan Detection** - Prevents adding FKs that would violate referential integrity
+  - **Color-Coded Edges** - Visual distinction between CASCADE, RESTRICT, SET NULL, and NO ACTION
+  - **Table Filtering** - Focus on specific tables and their relationships
+  - **Column Display** - Shows table columns with types and primary key indicators
+  - **Accessible Tab** - Integrated as "Relationships" tab alongside Tables and Query Builder
 
 ## 🔮 Planned Features (Prioritized by Expected Benefit)
 
-### 1. **Foreign Key Visualizer / Editor**
 
-**Benefit:** ⭐⭐⭐⭐½ **Difficulty:** 🔴 *High*
-Interactive graph to view and edit table relationships in real time.
-➡️ *Provides intuitive schema control and clear relational insight.*
-
-### 2. **FTS5 Virtual Table Management**
+### 1. **FTS5 Virtual Table Management**
 
 **Benefit:** ⭐⭐⭐⭐ **Difficulty:** 🔴 *High*
 Create and manage full-text search indexes (FTS5) with tokenizers, ranking (bm25), highlighting, and query performance metrics.
 ➡️ *Adds deep search and analytics capabilities.*
 
-### 3. **Constraint Validator**
+### 2. **Constraint Validator**
 
 **Benefit:** ⭐⭐⭐⭐ **Difficulty:** 🟡 *Medium*
 Detect orphaned records and broken foreign key references before destructive operations.
 ➡️ *Enhances data safety and schema integrity.*
 
-### 4. **Index Analyzer**
+### 3. **Index Analyzer**
 
 **Benefit:** ⭐⭐⭐½ **Difficulty:** 🟡 *Medium*
 Suggest missing or suboptimal indexes based on schema and query patterns.
 ➡️ *Improves database performance and developer awareness.*
 
-### 5. **Relationship Diagram**
+### 4. **Relationship Diagram**
 
 **Benefit:** ⭐⭐⭐½ **Difficulty:** 🟡 *Medium*
 Auto-generate an ER-style diagram showing all table relationships.
 ➡️ *Gives quick visual understanding of complex schemas.*
 
-### 6. **Advanced Row Filters**
+### 5. **Advanced Row Filters**
 
 **Benefit:** ⭐⭐⭐ **Difficulty:** 🟡 *Medium*
 Add OR logic, BETWEEN, IN, and preset filters in the data browser.
 ➡️ *Refines query flexibility and precision.*
 
-### 7. **Quick Navigation Links**
+### 6. **Quick Navigation Links**
 
 **Benefit:** ⭐⭐½ **Difficulty:** 🟢 *Low*
 Add direct navigation between dependent tables with breadcrumbs.
 ➡️ *Smooths workflow and enhances usability.*
 
-### 8. **Circular Dependency Detector**
+### 7. **Circular Dependency Detector**
 
 **Benefit:** ⭐⭐½ **Difficulty:** 🟡 *Medium*
 Detect and warn users about circular foreign key chains.
 ➡️ *Prevents schema design pitfalls.*
 
-### 9. **Dependency Export**
+### 8. **Dependency Export**
 
 **Benefit:** ⭐⭐ **Difficulty:** 🟢 *Low*
 Export schema relationships as JSON or documentation files.
 ➡️ *Useful for audits and documentation.*
 
-### 10. **Force Delete Mode**
+### 9. **Force Delete Mode**
 
 **Benefit:** ⭐ **Difficulty:** 🟢 *Low*
 Developer-only toggle to bypass FK constraints (with audit logging).

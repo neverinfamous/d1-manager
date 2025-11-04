@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Table, RefreshCw, Plus, Search, Loader2, Wand2, Copy, Download, Trash2, Pencil, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Table, RefreshCw, Plus, Search, Loader2, Wand2, Copy, Download, Trash2, Pencil, AlertTriangle, Network } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -27,6 +27,7 @@ import { SchemaDesigner } from './SchemaDesigner';
 import { QueryBuilder } from './QueryBuilder';
 import { TableDependenciesView } from './TableDependenciesView';
 import { CascadeImpactSimulator } from './CascadeImpactSimulator';
+import { ForeignKeyVisualizer } from './ForeignKeyVisualizer';
 
 interface DatabaseViewProps {
   databaseId: string;
@@ -42,7 +43,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSchemaDesigner, setShowSchemaDesigner] = useState(false);
-  const [activeTab, setActiveTab] = useState<'tables' | 'builder'>('tables');
+  const [activeTab, setActiveTab] = useState<'tables' | 'builder' | 'relationships'>('tables');
   
   // Selection state
   const [selectedTables, setSelectedTables] = useState<string[]>([]);
@@ -386,6 +387,14 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
               <Wand2 className="h-4 w-4 mr-2" />
               Query Builder
             </Button>
+            <Button
+              variant={activeTab === 'relationships' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setActiveTab('relationships')}
+            >
+              <Network className="h-4 w-4 mr-2" />
+              Relationships
+            </Button>
           </div>
           {activeTab === 'tables' && (
             <>
@@ -404,6 +413,8 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
       {/* Content based on active tab */}
       {activeTab === 'builder' ? (
         <QueryBuilder databaseId={databaseId} databaseName={databaseName} />
+      ) : activeTab === 'relationships' ? (
+        <ForeignKeyVisualizer databaseId={databaseId} onTableSelect={onSelectTable} />
       ) : (
         <>
           {/* Search Bar */}

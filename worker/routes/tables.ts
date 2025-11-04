@@ -1275,7 +1275,169 @@ export async function handleTableRoutes(
       });
     }
 
-    // Route not found
+    // Get all foreign keys for database
+    if (request.method === 'GET' && url.pathname === `/api/tables/${dbId}/foreign-keys`) {
+      console.log('[Tables] Getting all foreign keys for database:', dbId);
+      
+      // Mock response for local development
+      if (isLocalDev) {
+        return new Response(JSON.stringify({
+          result: {
+            nodes: [
+              { id: 'users', label: 'users', columns: [{ name: 'id', type: 'INTEGER', isPK: true }], rowCount: 50 },
+              { id: 'posts', label: 'posts', columns: [{ name: 'id', type: 'INTEGER', isPK: true }, { name: 'user_id', type: 'INTEGER', isPK: false }], rowCount: 120 },
+              { id: 'comments', label: 'comments', columns: [{ name: 'id', type: 'INTEGER', isPK: true }, { name: 'post_id', type: 'INTEGER', isPK: false }], rowCount: 340 }
+            ],
+            edges: [
+              { id: 'fk_posts_user', source: 'posts', target: 'users', sourceColumn: 'user_id', targetColumn: 'id', onDelete: 'SET NULL', onUpdate: 'CASCADE' },
+              { id: 'fk_comments_post', source: 'comments', target: 'posts', sourceColumn: 'post_id', targetColumn: 'id', onDelete: 'CASCADE', onUpdate: 'CASCADE' }
+            ]
+          },
+          success: true
+        }), {
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        });
+      }
+      
+      // Get all foreign keys for the entire database
+      const fkGraphResult = await getAllForeignKeysForDatabase(dbId, env);
+      
+      return new Response(JSON.stringify({
+        result: fkGraphResult,
+        success: true
+      }), {
+        headers: {
+          'Content-Type': 'application/json',
+          ...corsHeaders
+        }
+      });
+    }
+
+    // Add foreign key constraint
+    if (request.method === 'POST' && url.pathname === `/api/tables/${dbId}/foreign-keys/add`) {
+      console.log('[Tables] Adding foreign key constraint');
+      
+      const body = await request.json() as {
+        sourceTable: string;
+        sourceColumn: string;
+        targetTable: string;
+        targetColumn: string;
+        onDelete: string;
+        onUpdate: string;
+        constraintName?: string;
+      };
+      
+      if (!body.sourceTable || !body.sourceColumn || !body.targetTable || !body.targetColumn) {
+        return new Response(JSON.stringify({ 
+          error: 'sourceTable, sourceColumn, targetTable, and targetColumn are required' 
+        }), { 
+          status: 400,
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        });
+      }
+      
+      // Mock response for local development
+      if (isLocalDev) {
+        return new Response(JSON.stringify({
+          result: { success: true, message: 'Foreign key added successfully (mock)' },
+          success: true
+        }), {
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        });
+      }
+      
+      // Add the foreign key constraint
+      await addForeignKeyConstraint(dbId, body, env);
+      
+      return new Response(JSON.stringify({
+        result: { success: true, message: 'Foreign key constraint added successfully' },
+        success: true
+      }), {
+        headers: {
+          'Content-Type': 'application/json',
+          ...corsHeaders
+        }
+      });
+    }
+
+    // Modify foreign key constraint
+    if (request.method === 'PATCH' && url.pathname.match(/^\/api\/tables\/[^/]+\/foreign-keys\/[^/]+$/)) {
+      const constraintName = decodeURIComponent(pathParts[5]);
+      console.log('[Tables] Modifying foreign key constraint:', constraintName);
+      
+      const body = await request.json() as {
+        onDelete?: string;
+        onUpdate?: string;
+      };
+      
+      // Mock response for local development
+      if (isLocalDev) {
+        return new Response(JSON.stringify({
+          result: { success: true, message: 'Foreign key modified successfully (mock)' },
+          success: true
+        }), {
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        });
+      }
+      
+      // Modify the foreign key constraint
+      await modifyForeignKeyConstraint(dbId, constraintName, body, env);
+      
+      return new Response(JSON.stringify({
+        result: { success: true, message: 'Foreign key constraint modified successfully' },
+        success: true
+      }), {
+        headers: {
+          'Content-Type': 'application/json',
+          ...corsHeaders
+        }
+      });
+    }
+
+    // Delete foreign key constraint
+    if (request.method === 'DELETE' && url.pathname.match(/^\/api\/tables\/[^/]+\/foreign-keys\/[^/]+$/)) {
+      const constraintName = decodeURIComponent(pathParts[5]);
+      console.log('[Tables] Deleting foreign key constraint:', constraintName);
+      
+      // Mock response for local development
+      if (isLocalDev) {
+        return new Response(JSON.stringify({
+          result: { success: true, message: 'Foreign key deleted successfully (mock)' },
+          success: true
+        }), {
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        });
+      }
+      
+      // Delete the foreign key constraint
+      await deleteForeignKeyConstraint(dbId, constraintName, env);
+      
+      return new Response(JSON.stringify({
+        result: { success: true, message: 'Foreign key constraint deleted successfully' },
+        success: true
+      }), {
+        headers: {
+          'Content-Type': 'application/json',
+          ...corsHeaders
+        }
+      });
+    }
+
     return new Response(JSON.stringify({ 
       error: 'Route not found' 
     }), { 
@@ -1690,6 +1852,411 @@ async function simulateCascadeImpact(
       message: `Circular reference detected: ${path}`
     }))
   };
+}
+
+/**
+ * Get all foreign keys for a database and build graph structure
+ */
+async function getAllForeignKeysForDatabase(
+  dbId: string,
+  env: Env
+): Promise<{
+  nodes: Array<{
+    id: string;
+    label: string;
+    columns: Array<{name: string; type: string; isPK: boolean}>;
+    rowCount: number;
+  }>;
+  edges: Array<{
+    id: string;
+    source: string;
+    target: string;
+    sourceColumn: string;
+    targetColumn: string;
+    onDelete: string;
+    onUpdate: string;
+  }>;
+}> {
+  // Get all tables
+  const tableListQuery = "PRAGMA table_list";
+  const tableListResult = await executeQueryViaAPI(dbId, tableListQuery, env);
+  const allTables = (tableListResult.results as Array<{ name: string; type: string }>)
+    .filter(t => !t.name.startsWith('sqlite_') && !t.name.startsWith('_cf_') && t.type === 'table');
+  
+  const nodes: Array<{
+    id: string;
+    label: string;
+    columns: Array<{name: string; type: string; isPK: boolean}>;
+    rowCount: number;
+  }> = [];
+  const edges: Array<{
+    id: string;
+    source: string;
+    target: string;
+    sourceColumn: string;
+    targetColumn: string;
+    onDelete: string;
+    onUpdate: string;
+  }> = [];
+  const processedConstraints = new Set<string>();
+  
+  // Build nodes
+  for (const table of allTables) {
+    const sanitizedTable = sanitizeIdentifier(table.name);
+    
+    // Get schema
+    const schemaQuery = `PRAGMA table_info("${sanitizedTable}")`;
+    const schemaResult = await executeQueryViaAPI(dbId, schemaQuery, env);
+    const columns = schemaResult.results as Array<{
+      cid: number;
+      name: string;
+      type: string;
+      notnull: number;
+      dflt_value: string | null;
+      pk: number;
+    }>;
+    
+    // Get row count
+    const countQuery = `SELECT COUNT(*) as count FROM "${sanitizedTable}"`;
+    const countResult = await executeQueryViaAPI(dbId, countQuery, env);
+    const rowCount = (countResult.results[0] as { count: number })?.count || 0;
+    
+    nodes.push({
+      id: table.name,
+      label: table.name,
+      columns: columns.map(col => ({
+        name: col.name,
+        type: col.type || 'ANY',
+        isPK: col.pk > 0
+      })),
+      rowCount
+    });
+    
+    // Get foreign keys
+    const fkQuery = `PRAGMA foreign_key_list("${sanitizedTable}")`;
+    const fkResult = await executeQueryViaAPI(dbId, fkQuery, env);
+    const fks = fkResult.results as Array<{
+      id: number;
+      seq: number;
+      table: string;
+      from: string;
+      to: string;
+      on_update: string;
+      on_delete: string;
+      match: string;
+    }>;
+    
+    // Process foreign keys
+    for (const fk of fks) {
+      // Generate unique constraint ID
+      const constraintId = `fk_${table.name}_${fk.from}_${fk.table}_${fk.to}`;
+      
+      if (!processedConstraints.has(constraintId)) {
+        edges.push({
+          id: constraintId,
+          source: table.name,
+          target: fk.table,
+          sourceColumn: fk.from,
+          targetColumn: fk.to,
+          onDelete: fk.on_delete || 'NO ACTION',
+          onUpdate: fk.on_update || 'NO ACTION'
+        });
+        processedConstraints.add(constraintId);
+      }
+    }
+  }
+  
+  return { nodes, edges };
+}
+
+/**
+ * Add a foreign key constraint to a table
+ */
+async function addForeignKeyConstraint(
+  dbId: string,
+  params: {
+    sourceTable: string;
+    sourceColumn: string;
+    targetTable: string;
+    targetColumn: string;
+    onDelete: string;
+    onUpdate: string;
+    constraintName?: string;
+  },
+  env: Env
+): Promise<void> {
+  const { sourceTable, sourceColumn, targetTable, targetColumn, onDelete, onUpdate, constraintName } = params;
+  
+  // Validate constraint actions
+  const validActions = ['CASCADE', 'RESTRICT', 'SET NULL', 'SET DEFAULT', 'NO ACTION'];
+  if (!validActions.includes(onDelete.toUpperCase())) {
+    throw new Error(`Invalid ON DELETE action: ${onDelete}`);
+  }
+  if (!validActions.includes(onUpdate.toUpperCase())) {
+    throw new Error(`Invalid ON UPDATE action: ${onUpdate}`);
+  }
+  
+  // Validate column types match
+  const sourceSchema = await executeQueryViaAPI(dbId, `PRAGMA table_info("${sanitizeIdentifier(sourceTable)}")`, env);
+  const targetSchema = await executeQueryViaAPI(dbId, `PRAGMA table_info("${sanitizeIdentifier(targetTable)}")`, env);
+  
+  interface ColumnInfoResult {
+    cid: number;
+    name: string;
+    type: string;
+    notnull: number;
+    dflt_value: string | null;
+    pk: number;
+  }
+  
+  const sourceCol = (sourceSchema.results as ColumnInfoResult[]).find((c) => c.name === sourceColumn);
+  const targetCol = (targetSchema.results as ColumnInfoResult[]).find((c) => c.name === targetColumn);
+  
+  if (!sourceCol) {
+    throw new Error(`Column ${sourceColumn} not found in table ${sourceTable}`);
+  }
+  if (!targetCol) {
+    throw new Error(`Column ${targetColumn} not found in table ${targetTable}`);
+  }
+  
+  // Check if target column is a primary key or has unique constraint
+  if (targetCol.pk === 0) {
+    // Check for unique index
+    const indexQuery = `PRAGMA index_list("${sanitizeIdentifier(targetTable)}")`;
+    const indexResult = await executeQueryViaAPI(dbId, indexQuery, env);
+    const indexes = indexResult.results as Array<{ name: string; unique: number }>;
+    
+    let hasUniqueIndex = false;
+    for (const index of indexes.filter(i => i.unique === 1)) {
+      const indexInfoQuery = `PRAGMA index_info("${sanitizeIdentifier(index.name)}")`;
+      const indexInfoResult = await executeQueryViaAPI(dbId, indexInfoQuery, env);
+      const indexCols = indexInfoResult.results as Array<{ name: string }>;
+      if (indexCols.some(ic => ic.name === targetColumn)) {
+        hasUniqueIndex = true;
+        break;
+      }
+    }
+    
+    if (!hasUniqueIndex) {
+      throw new Error(`Target column ${targetColumn} must have a UNIQUE constraint or be a PRIMARY KEY`);
+    }
+  }
+  
+  // Check for orphaned rows
+  const orphanQuery = `
+    SELECT COUNT(*) as count 
+    FROM "${sanitizeIdentifier(sourceTable)}" 
+    WHERE "${sanitizeIdentifier(sourceColumn)}" IS NOT NULL 
+      AND "${sanitizeIdentifier(sourceColumn)}" NOT IN (
+        SELECT "${sanitizeIdentifier(targetColumn)}" FROM "${sanitizeIdentifier(targetTable)}"
+      )
+  `;
+  const orphanResult = await executeQueryViaAPI(dbId, orphanQuery, env);
+  const orphanCount = (orphanResult.results[0] as { count: number })?.count || 0;
+  
+  if (orphanCount > 0) {
+    throw new Error(`Cannot add foreign key: ${orphanCount} rows in ${sourceTable} reference non-existent rows in ${targetTable}`);
+  }
+  
+  // Recreate table with foreign key constraint
+  await recreateTableWithForeignKey(dbId, sourceTable, {
+    action: 'add',
+    constraint: {
+      columns: [sourceColumn],
+      refTable: targetTable,
+      refColumns: [targetColumn],
+      onDelete,
+      onUpdate,
+      name: constraintName
+    }
+  }, env);
+}
+
+/**
+ * Modify a foreign key constraint
+ */
+async function modifyForeignKeyConstraint(
+  dbId: string,
+  constraintName: string,
+  params: {
+    onDelete?: string;
+    onUpdate?: string;
+  },
+  env: Env
+): Promise<void> {
+  // Parse constraint name to get table and column info
+  const parts = constraintName.split('_');
+  if (parts.length < 5 || parts[0] !== 'fk') {
+    throw new Error('Invalid constraint name format. Expected: fk_sourceTable_sourceColumn_targetTable_targetColumn');
+  }
+  
+  const sourceTable = parts[1];
+  const sourceColumn = parts[2];
+  const targetTable = parts[3];
+  const targetColumn = parts[4];
+  
+  // Get current constraint to preserve values not being changed
+  const fkQuery = `PRAGMA foreign_key_list("${sanitizeIdentifier(sourceTable)}")`;
+  const fkResult = await executeQueryViaAPI(dbId, fkQuery, env);
+  const fks = fkResult.results as Array<{
+    id: number;
+    seq: number;
+    table: string;
+    from: string;
+    to: string;
+    on_update: string;
+    on_delete: string;
+  }>;
+  
+  const currentFk = fks.find(fk => fk.table === targetTable && fk.from === sourceColumn && fk.to === targetColumn);
+  if (!currentFk) {
+    throw new Error(`Foreign key constraint not found`);
+  }
+  
+  const onDelete = params.onDelete?.toUpperCase() || currentFk.on_delete || 'NO ACTION';
+  const onUpdate = params.onUpdate?.toUpperCase() || currentFk.on_update || 'NO ACTION';
+  
+  // Recreate table with modified constraint
+  await recreateTableWithForeignKey(dbId, sourceTable, {
+    action: 'modify',
+    oldConstraint: {
+      columns: [sourceColumn],
+      refTable: targetTable,
+      refColumns: [targetColumn]
+    },
+    constraint: {
+      columns: [sourceColumn],
+      refTable: targetTable,
+      refColumns: [targetColumn],
+      onDelete,
+      onUpdate
+    }
+  }, env);
+}
+
+/**
+ * Delete a foreign key constraint
+ */
+async function deleteForeignKeyConstraint(
+  dbId: string,
+  constraintName: string,
+  env: Env
+): Promise<void> {
+  // Parse constraint name
+  const parts = constraintName.split('_');
+  if (parts.length < 5 || parts[0] !== 'fk') {
+    throw new Error('Invalid constraint name format');
+  }
+  
+  const sourceTable = parts[1];
+  const sourceColumn = parts[2];
+  const targetTable = parts[3];
+  const targetColumn = parts[4];
+  
+  // Recreate table without the constraint
+  await recreateTableWithForeignKey(dbId, sourceTable, {
+    action: 'remove',
+    constraint: {
+      columns: [sourceColumn],
+      refTable: targetTable,
+      refColumns: [targetColumn]
+    }
+  }, env);
+}
+
+/**
+ * Recreate a table with modified foreign key constraints
+ */
+async function recreateTableWithForeignKey(
+  dbId: string,
+  tableName: string,
+  modification: {
+    action: 'add' | 'modify' | 'remove';
+    constraint: {
+      columns: string[];
+      refTable: string;
+      refColumns: string[];
+      onDelete?: string;
+      onUpdate?: string;
+      name?: string;
+    };
+    oldConstraint?: {
+      columns: string[];
+      refTable: string;
+      refColumns: string[];
+    };
+  },
+  env: Env
+): Promise<void> {
+  const sanitizedTable = sanitizeIdentifier(tableName);
+  const tempTableName = `${tableName}_temp_${Date.now()}`;
+  const sanitizedTempTable = sanitizeIdentifier(tempTableName);
+  
+  try {
+    // 1. Get current CREATE TABLE statement
+    const createQuery = `SELECT sql FROM sqlite_master WHERE type='table' AND name='${sanitizedTable}'`;
+    const createResult = await executeQueryViaAPI(dbId, createQuery, env);
+    const createSql = (createResult.results[0] as { sql: string })?.sql;
+    
+    if (!createSql) {
+      throw new Error(`Table ${tableName} not found`);
+    }
+    
+    // 2. Parse and modify the CREATE TABLE statement
+    let newCreateSql = createSql.replace(new RegExp(`CREATE TABLE ${sanitizedTable}`, 'i'), `CREATE TABLE ${sanitizedTempTable}`);
+    
+    // Remove old constraint if modifying or removing
+    if (modification.action === 'modify' || modification.action === 'remove') {
+      const oldConst = modification.oldConstraint || modification.constraint;
+      const fkPattern = new RegExp(
+        `\\s*,?\\s*FOREIGN KEY\\s*\\([^)]*${oldConst.columns[0]}[^)]*\\)\\s*REFERENCES\\s*${oldConst.refTable}\\s*\\([^)]+\\)[^,)]*`,
+        'gi'
+      );
+      newCreateSql = newCreateSql.replace(fkPattern, '');
+    }
+    
+    // Add new constraint if adding or modifying
+    if (modification.action === 'add' || modification.action === 'modify') {
+      const { columns, refTable, refColumns, onDelete, onUpdate, name } = modification.constraint;
+      const constraintName = name || `fk_${tableName}_${columns.join('_')}`;
+      const fkClause = `CONSTRAINT ${constraintName} FOREIGN KEY (${columns.map(c => `"${c}"`).join(', ')}) REFERENCES "${refTable}" (${refColumns.map(c => `"${c}"`).join(', ')})${onDelete ? ` ON DELETE ${onDelete}` : ''}${onUpdate ? ` ON UPDATE ${onUpdate}` : ''}`;
+      
+      // Insert before closing parenthesis
+      newCreateSql = newCreateSql.replace(/\)(\s*;?\s*)$/i, `, ${fkClause})$1`);
+    }
+    
+    // 3. Create temporary table
+    await executeQueryViaAPI(dbId, newCreateSql, env);
+    
+    // 4. Copy data
+    const copyQuery = `INSERT INTO ${sanitizedTempTable} SELECT * FROM ${sanitizedTable}`;
+    await executeQueryViaAPI(dbId, copyQuery, env);
+    
+    // 5. Get indexes
+    const indexQuery = `SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name='${sanitizedTable}' AND sql IS NOT NULL`;
+    const indexResult = await executeQueryViaAPI(dbId, indexQuery, env);
+    const indexes = (indexResult.results as Array<{ sql: string }>).map(r => r.sql);
+    
+    // 6. Drop original table
+    await executeQueryViaAPI(dbId, `DROP TABLE ${sanitizedTable}`, env);
+    
+    // 7. Rename temporary table
+    await executeQueryViaAPI(dbId, `ALTER TABLE ${sanitizedTempTable} RENAME TO ${sanitizedTable}`, env);
+    
+    // 8. Recreate indexes
+    for (const indexSql of indexes) {
+      await executeQueryViaAPI(dbId, indexSql, env);
+    }
+    
+  } catch (err) {
+    // Attempt cleanup if temporary table exists
+    try {
+      await executeQueryViaAPI(dbId, `DROP TABLE IF EXISTS ${sanitizedTempTable}`, env);
+    } catch {
+      // Ignore cleanup errors
+    }
+    throw err;
+  }
 }
 
 /**

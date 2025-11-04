@@ -96,6 +96,7 @@ This Docker image packages the complete D1 Database Manager with:
 - **Row-Level Filtering** - Type-aware filtering with server-side SQL WHERE clauses
 - **Bulk Operations** - Multi-select operations for databases and tables (bulk download, delete, clone, export)
 - **Column Management** - Add, rename, modify, and delete columns with proper migration handling
+- **Foreign Key Visualizer/Editor** - Interactive graph-based relationship management with dual layout system (hierarchical/force-directed), add/modify/delete constraints, type validation, orphan detection, and color-coded edges
 - **Dependency Analysis** - Foreign key relationship viewer before table deletion
 - **Cascade Impact Simulator** - Interactive graph visualization of DELETE operations with multi-format export (CSV/JSON/Text/PDF)
 - **Undo/Rollback System** - Restore dropped tables, columns, or deleted rows with 10-operation history per database
