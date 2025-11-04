@@ -28,6 +28,7 @@ import { QueryBuilder } from './QueryBuilder';
 import { TableDependenciesView } from './TableDependenciesView';
 import { CascadeImpactSimulator } from './CascadeImpactSimulator';
 import { ForeignKeyVisualizer } from './ForeignKeyVisualizer';
+import { ERDiagram } from './ERDiagram';
 import { FTS5Manager } from './FTS5Manager';
 import { ConstraintValidator } from './ConstraintValidator';
 import { IndexAnalyzer } from './IndexAnalyzer';
@@ -47,6 +48,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
   const [searchQuery, setSearchQuery] = useState('');
   const [showSchemaDesigner, setShowSchemaDesigner] = useState(false);
   const [activeTab, setActiveTab] = useState<'tables' | 'builder' | 'relationships' | 'fts5' | 'constraints' | 'performance'>('tables');
+  const [relationshipsView, setRelationshipsView] = useState<'editor' | 'diagram'>('editor');
   
   // Selection state
   const [selectedTables, setSelectedTables] = useState<string[]>([]);
@@ -441,7 +443,34 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
       {activeTab === 'builder' ? (
         <QueryBuilder databaseId={databaseId} databaseName={databaseName} />
       ) : activeTab === 'relationships' ? (
-        <ForeignKeyVisualizer databaseId={databaseId} onTableSelect={onSelectTable} />
+        <>
+          {/* View toggle for Relationships tab */}
+          <div className="mb-4 flex items-center gap-2 border-b pb-3">
+            <span className="text-sm font-medium text-muted-foreground">View:</span>
+            <div className="flex gap-1">
+              <Button
+                variant={relationshipsView === 'editor' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setRelationshipsView('editor')}
+              >
+                Foreign Key Editor
+              </Button>
+              <Button
+                variant={relationshipsView === 'diagram' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setRelationshipsView('diagram')}
+              >
+                ER Diagram
+              </Button>
+            </div>
+          </div>
+          
+          {relationshipsView === 'editor' ? (
+            <ForeignKeyVisualizer databaseId={databaseId} onTableSelect={onSelectTable} />
+          ) : (
+            <ERDiagram databaseId={databaseId} databaseName={databaseName} onTableSelect={onSelectTable} />
+          )}
+        </>
       ) : activeTab === 'fts5' ? (
         <FTS5Manager databaseId={databaseId} databaseName={databaseName} />
       ) : activeTab === 'constraints' ? (

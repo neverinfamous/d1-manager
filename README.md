@@ -647,35 +647,39 @@ For more help, see [Cloudflare Workers Troubleshooting](https://developers.cloud
   - **Existing Index Display** - View all current indexes organized by table
   - **Statistics Dashboard** - Total recommendations, tables without indexes, query efficiency metrics
   - **Performance Tab** - Dedicated index analysis interface in database view
+- **ER Relationship Diagram** - Visual entity-relationship diagram generator
+  - **Dual View Mode** - Toggle between Foreign Key Editor and ER Diagram in Relationships tab
+  - **Visual Schema Display** - Tables with primary keys (🔑) and foreign keys (🔗)
+  - **Interactive Navigation** - Click tables to navigate to data view
+  - **Multiple Layouts** - Hierarchical and force-directed graph layouts
+  - **Multi-Format Export** - Export as PNG image, SVG vector, or JSON data
+  - **Relationship Visualization** - Color-coded edges for CASCADE, RESTRICT, SET NULL
+  - **Read-Only Mode** - Focus on understanding schema without accidental edits
+  - **Zoom & Pan** - ReactFlow controls with minimap for large schemas
   
-## Planned Features (Prioritized by Expected Benefit)
+## Planned Features
 
-### 1. **Relationship Diagram**
-**Benefit:** 3.5 **Difficulty:** *Medium*
-Auto-generate an ER-style diagram showing all table relationships.
-*Gives quick visual understanding of complex schemas.*
-
-### 2. **Advanced Row Filters**
+### 1. **Advanced Row Filters**
 **Benefit:** 3 **Difficulty:** *Medium*
 Add OR logic, BETWEEN, IN, and preset filters in the data browser.
 *Refines query flexibility and precision.*
 
-### 3. **Quick Navigation Links**
+### 2. **Quick Navigation Links**
 **Benefit:** 2.5 **Difficulty:** *Low*
 Add direct navigation between dependent tables with breadcrumbs.
 *Smooths workflow and enhances usability.*
 
-### 4. **Circular Dependency Detector**
+### 3. **Circular Dependency Detector**
 **Benefit:** 2.5 **Difficulty:** *Medium*
 Detect and warn users about circular foreign key chains.
 *Prevents schema design pitfalls.*
 
-### 5. **Dependency Export**
+### 4. **Dependency Export**
 **Benefit:** 2 **Difficulty:** *Low*
 Export schema relationships as JSON or documentation files.
 *Useful for audits and documentation.*
 
-### 6. **Force Delete Mode**
+### 5. **Force Delete Mode**
 **Benefit:** 1 **Difficulty:** *Low*
 Developer-only toggle to bypass FK constraints (with audit logging).
 *Low-value, niche power-user feature for controlled environments.*
