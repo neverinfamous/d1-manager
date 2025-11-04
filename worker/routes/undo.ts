@@ -191,8 +191,8 @@ export async function handleUndoRoutes(
       } catch (restoreErr) {
         console.error('[Undo] Restore failed:', restoreErr);
         return new Response(JSON.stringify({
-          error: 'Restore failed',
-          details: restoreErr instanceof Error ? restoreErr.message : String(restoreErr)
+          error: 'Restore operation failed',
+          message: 'Unable to restore the selected operation. Please try again or contact support if the issue persists.'
         }), {
           status: 500,
           headers: {
@@ -253,7 +253,7 @@ export async function handleUndoRoutes(
     console.error('[Undo] Error:', err);
     return new Response(JSON.stringify({
       error: 'Internal server error',
-      details: err instanceof Error ? err.message : String(err)
+      message: 'An unexpected error occurred while processing your request. Please try again later.'
     }), {
       status: 500,
       headers: {
