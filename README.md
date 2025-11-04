@@ -476,6 +476,8 @@ Migration-based approach with automatic export/import since D1 doesn't natively 
    ```bash
    npx wrangler d1 execute d1-manager-metadata --remote --file=worker/schema.sql
    ```
+   
+   **Note for existing users upgrading:** If you're upgrading from an earlier version, run this command again to add new tables (like `undo_history` for the rollback feature). Existing tables won't be affected.
 
 4. **Set Up Cloudflare Access (Zero Trust):**
    - Navigate to [Cloudflare Zero Trust](https://one.dash.cloudflare.com/)

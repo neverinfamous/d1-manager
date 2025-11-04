@@ -98,6 +98,7 @@ This Docker image packages the complete D1 Database Manager with:
 - **Column Management** - Add, rename, modify, and delete columns with proper migration handling
 - **Dependency Analysis** - Foreign key relationship viewer before table deletion
 - **Cascade Impact Simulator** - Interactive graph visualization of DELETE operations with multi-format export (CSV/JSON/Text/PDF)
+- **Undo/Rollback System** - Restore dropped tables, columns, or deleted rows with 10-operation history per database
 - **Dark/Light Themes** - System-aware theme switching with persistence
 - **Responsive Design** - Works seamlessly on desktop, tablet, and mobile
 
@@ -139,13 +140,35 @@ This Docker image packages the complete D1 Database Manager with:
 
 ## 🔧 Configuration Guide
 
-### 1. Get Your Cloudflare Account ID
+### 1. Set Up Metadata Database
+
+The D1 Manager requires a metadata database to store query history, saved queries, and undo history.
+
+**Create the metadata database:**
+```bash
+npx wrangler login
+npx wrangler d1 create d1-manager-metadata
+```
+
+**Initialize the schema:**
+```bash
+# Clone the repository to get schema.sql
+git clone https://github.com/neverinfamous/d1-manager.git
+cd d1-manager
+
+# Run the schema initialization
+npx wrangler d1 execute d1-manager-metadata --remote --file=worker/schema.sql
+```
+
+**Note for existing users upgrading:** If you're upgrading from an earlier version, run the schema command again to add new tables (like `undo_history` for the rollback feature). Existing tables won't be affected.
+
+### 2. Get Your Cloudflare Account ID
 
 1. Log in to [Cloudflare Dashboard](https://dash.cloudflare.com)
 2. Navigate to any page in your account
 3. Copy the Account ID from the URL: `dash.cloudflare.com/{ACCOUNT_ID}/...`
 
-### 2. Create a Cloudflare API Token
+### 3. Create a Cloudflare API Token
 
 1. Go to [Cloudflare API Tokens](https://dash.cloudflare.com/profile/api-tokens)
 2. Click **Create Token** → **Create Custom Token**
@@ -154,7 +177,7 @@ This Docker image packages the complete D1 Database Manager with:
 4. Click **Continue to summary** → **Create Token**
 5. Copy the token (it won't be shown again)
 
-### 3. Set Up Cloudflare Access (Zero Trust)
+### 4. Set Up Cloudflare Access (Zero Trust)
 
 1. Navigate to [Cloudflare Zero Trust](https://one.dash.cloudflare.com/)
 2. Go to **Settings → Authentication**
@@ -166,7 +189,7 @@ This Docker image packages the complete D1 Database Manager with:
 5. Configure Access Policies (e.g., allow users from your GitHub organization)
 6. Copy the **Application Audience (AUD) tag** from the application settings
 
-### 4. Note Your Team Domain
+### 5. Note Your Team Domain
 
 Your team domain is in the format: `https://yourteam.cloudflareaccess.com`
 
