@@ -1332,3 +1332,212 @@ export const deleteForeignKey = async (
   }
 }
 
+// FTS5 API Methods
+import type {
+  FTS5TableConfig,
+  FTS5TableInfo,
+  FTS5SearchParams,
+  FTS5SearchResponse,
+  FTS5Stats,
+  FTS5CreateFromTableParams,
+} from './fts5-types'
+
+/**
+ * List all FTS5 tables in a database
+ */
+export const listFTS5Tables = async (databaseId: string): Promise<FTS5TableInfo[]> => {
+  const response = await fetch(`${WORKER_API}/api/fts5/${databaseId}/list`, {
+    method: 'GET',
+    credentials: 'include'
+  })
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+    throw new Error(error.error || `Failed to list FTS5 tables: ${response.status}`)
+  }
+  
+  const data = await response.json() as { result: FTS5TableInfo[], success: boolean }
+  return data.result
+}
+
+/**
+ * Create a new FTS5 virtual table
+ */
+export const createFTS5Table = async (
+  databaseId: string,
+  config: FTS5TableConfig
+): Promise<{ tableName: string; created: boolean }> => {
+  const response = await fetch(`${WORKER_API}/api/fts5/${databaseId}/create`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    credentials: 'include',
+    body: JSON.stringify(config)
+  })
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+    throw new Error(error.error || `Failed to create FTS5 table: ${response.status}`)
+  }
+  
+  const data = await response.json() as { result: { tableName: string; created: boolean }, success: boolean }
+  return data.result
+}
+
+/**
+ * Create FTS5 table from existing table
+ */
+export const createFTS5FromTable = async (
+  databaseId: string,
+  params: FTS5CreateFromTableParams
+): Promise<{ ftsTableName: string; created: boolean; triggersCreated: boolean }> => {
+  const response = await fetch(`${WORKER_API}/api/fts5/${databaseId}/create-from-table`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    credentials: 'include',
+    body: JSON.stringify(params)
+  })
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+    throw new Error(error.error || `Failed to create FTS5 from table: ${response.status}`)
+  }
+  
+  const data = await response.json() as { 
+    result: { ftsTableName: string; created: boolean; triggersCreated: boolean }, 
+    success: boolean 
+  }
+  return data.result
+}
+
+/**
+ * Get FTS5 table configuration
+ */
+export const getFTS5Config = async (
+  databaseId: string,
+  tableName: string
+): Promise<Partial<FTS5TableConfig>> => {
+  const response = await fetch(`${WORKER_API}/api/fts5/${databaseId}/${encodeURIComponent(tableName)}/config`, {
+    method: 'GET',
+    credentials: 'include'
+  })
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+    throw new Error(error.error || `Failed to get FTS5 config: ${response.status}`)
+  }
+  
+  const data = await response.json() as { result: Partial<FTS5TableConfig>, success: boolean }
+  return data.result
+}
+
+/**
+ * Delete FTS5 table
+ */
+export const deleteFTS5Table = async (
+  databaseId: string,
+  tableName: string
+): Promise<void> => {
+  const response = await fetch(`${WORKER_API}/api/fts5/${databaseId}/${encodeURIComponent(tableName)}`, {
+    method: 'DELETE',
+    credentials: 'include'
+  })
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+    throw new Error(error.error || `Failed to delete FTS5 table: ${response.status}`)
+  }
+}
+
+/**
+ * Rebuild FTS5 index
+ */
+export const rebuildFTS5Index = async (
+  databaseId: string,
+  tableName: string
+): Promise<{ rebuilt: boolean }> => {
+  const response = await fetch(`${WORKER_API}/api/fts5/${databaseId}/${encodeURIComponent(tableName)}/rebuild`, {
+    method: 'POST',
+    credentials: 'include'
+  })
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+    throw new Error(error.error || `Failed to rebuild FTS5 index: ${response.status}`)
+  }
+  
+  const data = await response.json() as { result: { rebuilt: boolean }, success: boolean }
+  return data.result
+}
+
+/**
+ * Optimize FTS5 index
+ */
+export const optimizeFTS5 = async (
+  databaseId: string,
+  tableName: string
+): Promise<{ optimized: boolean }> => {
+  const response = await fetch(`${WORKER_API}/api/fts5/${databaseId}/${encodeURIComponent(tableName)}/optimize`, {
+    method: 'POST',
+    credentials: 'include'
+  })
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+    throw new Error(error.error || `Failed to optimize FTS5 index: ${response.status}`)
+  }
+  
+  const data = await response.json() as { result: { optimized: boolean }, success: boolean }
+  return data.result
+}
+
+/**
+ * Search FTS5 table
+ */
+export const searchFTS5 = async (
+  databaseId: string,
+  tableName: string,
+  params: FTS5SearchParams
+): Promise<FTS5SearchResponse> => {
+  const response = await fetch(`${WORKER_API}/api/fts5/${databaseId}/${encodeURIComponent(tableName)}/search`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    credentials: 'include',
+    body: JSON.stringify(params)
+  })
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+    throw new Error(error.error || `Failed to search FTS5 table: ${response.status}`)
+  }
+  
+  const data = await response.json() as { result: FTS5SearchResponse, success: boolean }
+  return data.result
+}
+
+/**
+ * Get FTS5 table statistics
+ */
+export const getFTS5Stats = async (
+  databaseId: string,
+  tableName: string
+): Promise<FTS5Stats> => {
+  const response = await fetch(`${WORKER_API}/api/fts5/${databaseId}/${encodeURIComponent(tableName)}/stats`, {
+    method: 'GET',
+    credentials: 'include'
+  })
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+    throw new Error(error.error || `Failed to get FTS5 stats: ${response.status}`)
+  }
+  
+  const data = await response.json() as { result: FTS5Stats, success: boolean }
+  return data.result
+}
+

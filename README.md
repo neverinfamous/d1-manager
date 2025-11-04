@@ -18,6 +18,8 @@ A modern, full-featured web application for managing Cloudflare D1 databases wit
 
 **📰 [Read the v1.0.0 Release Article](https://adamic.tech/articles/2025-11-02-d1-manager-v1-0-0)** - Learn more about features, architecture, and deployment
 
+**📖 [View the Wiki](https://github.com/neverinfamous/d1-manager/wiki)** - Comprehensive documentation and guides
+
 ---
 
 ## 🎯 Features
@@ -325,7 +327,7 @@ When you attempt to delete a table (single or bulk), the system automatically:
 1. Analyzes all foreign key relationships using `PRAGMA foreign_key_list()`
 2. Identifies both inbound and outbound dependencies
 3. Calculates row counts for impact assessment
-4. Displays cascade behavior (CASCADE, RESTRICT, SET NULL, NO ACTION)
+4. Displays cascade behavior (CASCADE, RESTRICT, SET NULL, etc.)
 5. Requires explicit confirmation if dependencies exist
 
 **Dependency Types:**
@@ -615,56 +617,55 @@ For more help, see [Cloudflare Workers Troubleshooting](https://developers.cloud
 
 ## 🔮 Planned Features (Prioritized by Expected Benefit)
 
-
 ### 1. **FTS5 Virtual Table Management**
 
 **Benefit:** ⭐⭐⭐⭐ **Difficulty:** 🔴 *High*
 Create and manage full-text search indexes (FTS5) with tokenizers, ranking (bm25), highlighting, and query performance metrics.
 ➡️ *Adds deep search and analytics capabilities.*
 
-### 2. **Constraint Validator**
+### 1. **Constraint Validator**
 
 **Benefit:** ⭐⭐⭐⭐ **Difficulty:** 🟡 *Medium*
 Detect orphaned records and broken foreign key references before destructive operations.
 ➡️ *Enhances data safety and schema integrity.*
 
-### 3. **Index Analyzer**
+### 2. **Index Analyzer**
 
 **Benefit:** ⭐⭐⭐½ **Difficulty:** 🟡 *Medium*
 Suggest missing or suboptimal indexes based on schema and query patterns.
 ➡️ *Improves database performance and developer awareness.*
 
-### 4. **Relationship Diagram**
+### 3. **Relationship Diagram**
 
 **Benefit:** ⭐⭐⭐½ **Difficulty:** 🟡 *Medium*
 Auto-generate an ER-style diagram showing all table relationships.
 ➡️ *Gives quick visual understanding of complex schemas.*
 
-### 5. **Advanced Row Filters**
+### 4. **Advanced Row Filters**
 
 **Benefit:** ⭐⭐⭐ **Difficulty:** 🟡 *Medium*
 Add OR logic, BETWEEN, IN, and preset filters in the data browser.
 ➡️ *Refines query flexibility and precision.*
 
-### 6. **Quick Navigation Links**
+### 5. **Quick Navigation Links**
 
 **Benefit:** ⭐⭐½ **Difficulty:** 🟢 *Low*
 Add direct navigation between dependent tables with breadcrumbs.
 ➡️ *Smooths workflow and enhances usability.*
 
-### 7. **Circular Dependency Detector**
+### 6. **Circular Dependency Detector**
 
 **Benefit:** ⭐⭐½ **Difficulty:** 🟡 *Medium*
 Detect and warn users about circular foreign key chains.
 ➡️ *Prevents schema design pitfalls.*
 
-### 8. **Dependency Export**
+### 7. **Dependency Export**
 
 **Benefit:** ⭐⭐ **Difficulty:** 🟢 *Low*
 Export schema relationships as JSON or documentation files.
 ➡️ *Useful for audits and documentation.*
 
-### 9. **Force Delete Mode**
+### 8. **Force Delete Mode**
 
 **Benefit:** ⭐ **Difficulty:** 🟢 *Low*
 Developer-only toggle to bypass FK constraints (with audit logging).
@@ -705,6 +706,7 @@ MIT License - see LICENSE file for details
 - [React 19 Documentation](https://react.dev/)
 - [Tailwind CSS Documentation](https://tailwindcss.com/)
 - [shadcn/ui Documentation](https://ui.shadcn.com/)
+- [D1 Manager Wiki](https://github.com/neverinfamous/d1-manager/wiki)
 
 ---
 

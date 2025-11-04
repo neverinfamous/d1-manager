@@ -16,6 +16,8 @@ A fully containerized version of the D1 Database Manager for Cloudflare. This Do
 
 **📰 [Read the v1.0.0 Release Article](https://adamic.tech/articles/2025-11-02-d1-manager-v1-0-0)** - Learn more about features, architecture, and deployment
 
+**📖 [View the Wiki](https://github.com/neverinfamous/d1-manager/wiki)** - Comprehensive documentation and guides
+
 **🚀 Docker Deployment:** Run the development server in a containerized environment for testing and local development.
 
 ---
@@ -100,6 +102,7 @@ This Docker image packages the complete D1 Database Manager with:
 - **Dependency Analysis** - Foreign key relationship viewer before table deletion
 - **Cascade Impact Simulator** - Interactive graph visualization of DELETE operations with multi-format export (CSV/JSON/Text/PDF)
 - **Undo/Rollback System** - Restore dropped tables, columns, or deleted rows with 10-operation history per database
+- **FTS5 Full-Text Search** - Create and manage FTS5 virtual tables with tokenizers (unicode61, porter, trigram, ascii), BM25 ranking, highlighting, search operators, and performance metrics
 - **Dark/Light Themes** - System-aware theme switching with persistence
 - **Responsive Design** - Works seamlessly on desktop, tablet, and mobile
 
@@ -114,7 +117,7 @@ This Docker image packages the complete D1 Database Manager with:
 - Tailwind CSS + shadcn/ui for modern UI
 - ReactFlow for interactive graph visualization
 - Cloudflare Workers runtime for serverless API
-- SQLite-compatible D1 database engine
+- SQLite-compatible D1 database engine with FTS5 support
 
 ---
 
@@ -874,6 +877,8 @@ d1.yourdomain.com {
 - **Cloudflare D1:** [D1 Documentation](https://developers.cloudflare.com/d1/)
 - **Cloudflare Access:** [Zero Trust Documentation](https://developers.cloudflare.com/cloudflare-one/policies/access/)
 - **Docker Documentation:** [Docker Docs](https://docs.docker.com/)
+- **Wiki:** [D1 Manager Wiki](https://github.com/neverinfamous/d1-manager/wiki)
+- **FTS5 Guide:** [Full-Text Search Documentation](https://github.com/neverinfamous/d1-manager/wiki/FTS5-Full-Text-Search)
 
 ### Support
 - 🐛 **Bug Reports:** [GitHub Issues](https://github.com/neverinfamous/d1-manager/issues)

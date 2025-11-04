@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Table, RefreshCw, Plus, Search, Loader2, Wand2, Copy, Download, Trash2, Pencil, AlertTriangle, Network } from 'lucide-react';
+import { ArrowLeft, Table, RefreshCw, Plus, Search, Loader2, Wand2, Copy, Download, Trash2, Pencil, AlertTriangle, Network, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -28,6 +28,7 @@ import { QueryBuilder } from './QueryBuilder';
 import { TableDependenciesView } from './TableDependenciesView';
 import { CascadeImpactSimulator } from './CascadeImpactSimulator';
 import { ForeignKeyVisualizer } from './ForeignKeyVisualizer';
+import { FTS5Manager } from './FTS5Manager';
 
 interface DatabaseViewProps {
   databaseId: string;
@@ -43,7 +44,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSchemaDesigner, setShowSchemaDesigner] = useState(false);
-  const [activeTab, setActiveTab] = useState<'tables' | 'builder' | 'relationships'>('tables');
+  const [activeTab, setActiveTab] = useState<'tables' | 'builder' | 'relationships' | 'fts5'>('tables');
   
   // Selection state
   const [selectedTables, setSelectedTables] = useState<string[]>([]);
@@ -395,6 +396,14 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
               <Network className="h-4 w-4 mr-2" />
               Relationships
             </Button>
+            <Button
+              variant={activeTab === 'fts5' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setActiveTab('fts5')}
+            >
+              <Sparkles className="h-4 w-4 mr-2" />
+              Full-Text Search
+            </Button>
           </div>
           {activeTab === 'tables' && (
             <>
@@ -415,6 +424,8 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
         <QueryBuilder databaseId={databaseId} databaseName={databaseName} />
       ) : activeTab === 'relationships' ? (
         <ForeignKeyVisualizer databaseId={databaseId} onTableSelect={onSelectTable} />
+      ) : activeTab === 'fts5' ? (
+        <FTS5Manager databaseId={databaseId} databaseName={databaseName} />
       ) : (
         <>
           {/* Search Bar */}
