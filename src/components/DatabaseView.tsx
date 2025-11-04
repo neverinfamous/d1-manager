@@ -33,9 +33,10 @@ interface DatabaseViewProps {
   databaseName: string;
   onBack: () => void;
   onSelectTable: (tableName: string) => void;
+  onUndoableOperation?: () => void;
 }
 
-export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable }: DatabaseViewProps) {
+export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, onUndoableOperation }: DatabaseViewProps) {
   const [tables, setTables] = useState<TableInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -340,6 +341,11 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable }
       await loadTables();
       clearSelection();
       setDeleteDialogState(null);
+      
+      // Notify parent of undo able operation
+      if (onUndoableOperation) {
+        onUndoableOperation();
+      }
     } catch (err) {
       setDeleteDialogState(prev => prev ? {
         ...prev,

@@ -83,6 +83,18 @@ export interface QueryHistoryEntry {
   error?: string
 }
 
+// Undo history types
+export interface UndoHistoryEntry {
+  id: number
+  database_id: string
+  operation_type: 'DROP_TABLE' | 'DROP_COLUMN' | 'DELETE_ROW'
+  target_table: string
+  target_column?: string
+  description: string
+  executed_at: string
+  user_email?: string
+}
+
 // Optimize result types
 class APIService {
   /**
@@ -1062,6 +1074,76 @@ export const deleteSavedQuery = async (id: number): Promise<void> => {
     const error = await response.json().catch(() => ({ error: 'Unknown error' }))
     throw new Error(error.error || `Failed to delete query: ${response.status}`)
   }
+}
+
+// Undo/Rollback API
+export const getUndoHistory = async (databaseId: string): Promise<UndoHistoryEntry[]> => {
+  const response = await fetch(`${WORKER_API}/api/undo/${databaseId}/history`, {
+    credentials: 'include'
+  })
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+    throw new Error(error.error || `Failed to get undo history: ${response.status}`)
+  }
+  
+  const data = await response.json() as { history: UndoHistoryEntry[], success: boolean }
+  return data.history
+}
+
+export const restoreUndo = async (databaseId: string, undoId: number): Promise<string> => {
+  const response = await fetch(`${WORKER_API}/api/undo/${databaseId}/restore/${undoId}`, {
+    method: 'POST',
+    credentials: 'include'
+  })
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error', details: '' }))
+    throw new Error(error.details || error.error || `Failed to restore: ${response.status}`)
+  }
+  
+  const data = await response.json() as { message: string, success: boolean }
+  return data.message
+}
+
+export const clearUndoHistory = async (databaseId: string): Promise<number> => {
+  const response = await fetch(`${WORKER_API}/api/undo/${databaseId}/clear`, {
+    method: 'DELETE',
+    credentials: 'include'
+  })
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+    throw new Error(error.error || `Failed to clear undo history: ${response.status}`)
+  }
+  
+  const data = await response.json() as { cleared: number, success: boolean }
+  return data.cleared
+}
+
+// Row delete with undo API
+export const deleteRowsWithUndo = async (
+  databaseId: string,
+  tableName: string,
+  whereClause: string,
+  description?: string
+): Promise<number> => {
+  const response = await fetch(`${WORKER_API}/api/tables/${databaseId}/${encodeURIComponent(tableName)}/rows/delete`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    credentials: 'include',
+    body: JSON.stringify({ whereClause, description })
+  })
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+    throw new Error(error.error || `Failed to delete rows: ${response.status}`)
+  }
+  
+  const data = await response.json() as { rowsDeleted: number, success: boolean }
+  return data.rowsDeleted
 }
 
 // Cascade Impact Simulation Types

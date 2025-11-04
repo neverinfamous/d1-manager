@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
-import { api, type D1Database } from './services/api'
+import { api, type D1Database, getUndoHistory } from './services/api'
 import { auth } from './services/auth'
 import { useTheme } from './hooks/useTheme'
-import { Database, Plus, Moon, Sun, Monitor, Loader2, Code, GitCompare, Upload, Download, Trash2, Pencil, Zap } from 'lucide-react'
+import { Database, Plus, Moon, Sun, Monitor, Loader2, Code, GitCompare, Upload, Download, Trash2, Pencil, Zap, Undo } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
@@ -37,6 +37,7 @@ import { QueryConsole } from './components/QueryConsole'
 import { CrossDatabaseSearch } from './components/CrossDatabaseSearch'
 import { DatabaseComparison } from './components/DatabaseComparison'
 import { MigrationWizard } from './components/MigrationWizard'
+import { UndoHistoryDialog } from './components/UndoHistoryDialog'
 
 type View = 
   | { type: 'list' }
@@ -55,6 +56,10 @@ export default function App() {
   const [showComparison, setShowComparison] = useState(false)
   const [showMigration, setShowMigration] = useState(false)
   const { theme, setTheme } = useTheme()
+  
+  // Undo state
+  const [showUndoHistory, setShowUndoHistory] = useState(false)
+  const [undoCount, setUndoCount] = useState(0)
   
   // Bulk operations state
   const [selectedDatabases, setSelectedDatabases] = useState<string[]>([])
@@ -100,6 +105,31 @@ export default function App() {
   useEffect(() => {
     loadDatabases()
   }, [])
+
+  // Load undo count when viewing a specific database
+  useEffect(() => {
+    if (currentView.type !== 'list' && 'databaseId' in currentView) {
+      loadUndoCount(currentView.databaseId)
+    } else {
+      setUndoCount(0)
+    }
+  }, [currentView])
+
+  const loadUndoCount = async (databaseId: string) => {
+    try {
+      const history = await getUndoHistory(databaseId)
+      setUndoCount(history.length)
+    } catch (err) {
+      console.error('Failed to load undo count:', err)
+      setUndoCount(0)
+    }
+  }
+
+  const refreshUndoCount = () => {
+    if (currentView.type !== 'list' && 'databaseId' in currentView) {
+      loadUndoCount(currentView.databaseId)
+    }
+  }
 
   const loadDatabases = async () => {
     try {
@@ -450,6 +480,22 @@ export default function App() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {currentView.type !== 'list' && 'databaseId' in currentView && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowUndoHistory(true)}
+                title="Undo History"
+                className="relative"
+              >
+                <Undo className="h-5 w-5" />
+                {undoCount > 0 && (
+                  <span className="absolute -top-1 -right-1 h-5 w-5 text-xs flex items-center justify-center bg-primary text-primary-foreground rounded-full">
+                    {undoCount}
+                  </span>
+                )}
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="icon"
@@ -733,6 +779,7 @@ export default function App() {
                 tableName
               })
             }}
+            onUndoableOperation={refreshUndoCount}
           />
         )}
 
@@ -748,6 +795,7 @@ export default function App() {
                 databaseName: currentView.databaseName
               })
             }}
+            onUndoableOperation={refreshUndoCount}
           />
         )}
 
@@ -1208,6 +1256,25 @@ export default function App() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+      )}
+
+      {/* Undo History Dialog */}
+      {currentView.type !== 'list' && 'databaseId' in currentView && (
+        <UndoHistoryDialog
+          open={showUndoHistory}
+          onOpenChange={setShowUndoHistory}
+          databaseId={currentView.databaseId}
+          databaseName={currentView.databaseName}
+          onRestoreSuccess={() => {
+            refreshUndoCount()
+            // Reload current view
+            if (currentView.type === 'database') {
+              // Trigger reload in DatabaseView
+            } else if (currentView.type === 'table') {
+              // Trigger reload in TableView
+            }
+          }}
+        />
       )}
     </div>
   )

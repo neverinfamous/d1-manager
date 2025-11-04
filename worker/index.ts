@@ -5,6 +5,7 @@ import { handleDatabaseRoutes } from './routes/databases';
 import { handleTableRoutes } from './routes/tables';
 import { handleQueryRoutes } from './routes/queries';
 import { handleSavedQueriesRoutes } from './routes/saved-queries';
+import { handleUndoRoutes } from './routes/undo';
 import { trackDatabaseAccess } from './utils/database-tracking';
 
 async function handleApiRequest(request: Request, env: Env): Promise<Response> {
@@ -62,7 +63,7 @@ async function handleApiRequest(request: Request, env: Env): Promise<Response> {
   }
 
   if (url.pathname.startsWith('/api/tables/')) {
-    return await handleTableRoutes(request, env, url, corsHeaders, isLocalDev);
+    return await handleTableRoutes(request, env, url, corsHeaders, isLocalDev, userEmail);
   }
 
   if (url.pathname.startsWith('/api/query/')) {
@@ -77,6 +78,10 @@ async function handleApiRequest(request: Request, env: Env): Promise<Response> {
 
   if (url.pathname.startsWith('/api/saved-queries')) {
     return await handleSavedQueriesRoutes(request, env, url, corsHeaders, isLocalDev, userEmail);
+  }
+
+  if (url.pathname.startsWith('/api/undo/')) {
+    return await handleUndoRoutes(request, env, url, corsHeaders, isLocalDev, userEmail);
   }
 
   // Serve frontend assets

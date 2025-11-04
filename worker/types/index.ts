@@ -115,3 +115,37 @@ export interface SavedQuery {
   updated_at: string;
 }
 
+// Undo history types
+export interface UndoHistoryEntry {
+  id: number;
+  database_id: string;
+  operation_type: 'DROP_TABLE' | 'DROP_COLUMN' | 'DELETE_ROW';
+  target_table: string;
+  target_column?: string;
+  description: string;
+  snapshot_data: string;
+  executed_at: string;
+  user_email?: string;
+}
+
+export interface UndoSnapshot {
+  operation_type: 'DROP_TABLE' | 'DROP_COLUMN' | 'DELETE_ROW';
+  tableSchema?: {
+    createStatement: string;
+    indexes: string[];
+    data: Record<string, unknown>[];
+  };
+  columnData?: {
+    columnName: string;
+    columnType: string;
+    notNull: boolean;
+    defaultValue: string | null;
+    position: number;
+    rowData: Record<string, unknown>[];
+  };
+  rowData?: {
+    whereClause: string;
+    rows: Record<string, unknown>[];
+  };
+}
+

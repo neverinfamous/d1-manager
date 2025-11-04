@@ -48,11 +48,29 @@ CREATE TABLE saved_queries (
 CREATE INDEX idx_saved_queries_user ON saved_queries(user_email);
 CREATE INDEX idx_saved_queries_database ON saved_queries(database_id);
 
+-- Undo history for rollback operations
+DROP TABLE IF EXISTS undo_history;
+CREATE TABLE undo_history (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  database_id TEXT NOT NULL,
+  operation_type TEXT NOT NULL,
+  target_table TEXT NOT NULL,
+  target_column TEXT,
+  description TEXT NOT NULL,
+  snapshot_data TEXT NOT NULL,
+  executed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  user_email TEXT
+);
+
+CREATE INDEX idx_undo_history_database ON undo_history(database_id, executed_at DESC);
+CREATE INDEX idx_undo_history_user ON undo_history(user_email, executed_at DESC);
+
 -- ============================================
 -- NOTES:
 -- ============================================
 -- Query history is limited to last 100 queries per database
 -- Saved queries are per-user
+-- Undo history is limited to last 10 operations per database
 -- All dates stored in UTC
 -- ============================================
 

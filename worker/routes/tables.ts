@@ -1,6 +1,7 @@
 import type { Env, TableInfo } from '../types';
 import { sanitizeIdentifier } from '../utils/helpers';
 import { trackDatabaseAccess } from '../utils/database-tracking';
+import { captureTableSnapshot, captureColumnSnapshot, captureRowSnapshot, saveUndoSnapshot } from '../utils/undo';
 
 /**
  * Note: This route handler requires dynamic D1 database access
@@ -15,7 +16,8 @@ export async function handleTableRoutes(
   env: Env,
   url: URL,
   corsHeaders: HeadersInit,
-  isLocalDev: boolean
+  isLocalDev: boolean,
+  userEmail: string | null
 ): Promise<Response> {
   console.log('[Tables] Handling table operation');
   
@@ -291,6 +293,24 @@ export async function handleTableRoutes(
             ...corsHeaders
           }
         });
+      }
+      
+      // Capture snapshot before drop
+      try {
+        const snapshot = await captureTableSnapshot(dbId, tableName, env);
+        await saveUndoSnapshot(
+          dbId,
+          'DROP_TABLE',
+          tableName,
+          null,
+          `Dropped table "${tableName}"`,
+          snapshot,
+          userEmail,
+          env
+        );
+      } catch (snapshotErr) {
+        console.error('[Tables] Failed to capture snapshot:', snapshotErr);
+        // Continue with drop even if snapshot fails
       }
       
       const sanitizedTable = sanitizeIdentifier(tableName);
@@ -826,6 +846,24 @@ export async function handleTableRoutes(
         });
       }
       
+      // Capture snapshot before drop
+      try {
+        const snapshot = await captureColumnSnapshot(dbId, tableName, columnName, env);
+        await saveUndoSnapshot(
+          dbId,
+          'DROP_COLUMN',
+          tableName,
+          columnName,
+          `Dropped column "${columnName}" from table "${tableName}"`,
+          snapshot,
+          userEmail,
+          env
+        );
+      } catch (snapshotErr) {
+        console.error('[Tables] Failed to capture column snapshot:', snapshotErr);
+        // Continue with drop even if snapshot fails
+      }
+      
       const sanitizedTable = sanitizeIdentifier(tableName);
       const sanitizedColumn = sanitizeIdentifier(columnName);
       
@@ -836,6 +874,77 @@ export async function handleTableRoutes(
       
       return new Response(JSON.stringify({
         success: true
+      }), {
+        headers: {
+          'Content-Type': 'application/json',
+          ...corsHeaders
+        }
+      });
+    }
+
+    // Delete rows with undo snapshot
+    if (request.method === 'POST' && url.pathname.match(/^\/api\/tables\/[^/]+\/[^/]+\/rows\/delete$/)) {
+      const tableName = decodeURIComponent(pathParts[4]);
+      console.log('[Tables] Deleting rows from table:', tableName);
+      
+      const body = await request.json() as { 
+        whereClause: string;
+        description?: string;
+      };
+      
+      if (!body.whereClause) {
+        return new Response(JSON.stringify({ 
+          error: 'WHERE clause required' 
+        }), { 
+          status: 400,
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        });
+      }
+      
+      // Mock response for local development
+      if (isLocalDev) {
+        return new Response(JSON.stringify({
+          success: true,
+          rowsDeleted: 1
+        }), {
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        });
+      }
+      
+      // Capture snapshot before delete
+      try {
+        const snapshot = await captureRowSnapshot(dbId, tableName, body.whereClause, env);
+        const rowCount = snapshot.rowData?.rows.length || 0;
+        
+        await saveUndoSnapshot(
+          dbId,
+          'DELETE_ROW',
+          tableName,
+          null,
+          body.description || `Deleted ${rowCount} row(s) from table "${tableName}"`,
+          snapshot,
+          userEmail,
+          env
+        );
+      } catch (snapshotErr) {
+        console.error('[Tables] Failed to capture row snapshot:', snapshotErr);
+        // Continue with delete even if snapshot fails
+      }
+      
+      // Execute delete
+      const sanitizedTable = sanitizeIdentifier(tableName);
+      const deleteQuery = `DELETE FROM "${sanitizedTable}"${body.whereClause}`;
+      const result = await executeQueryViaAPI(dbId, deleteQuery, env);
+      
+      return new Response(JSON.stringify({
+        success: true,
+        rowsDeleted: result.meta?.changes || 0
       }), {
         headers: {
           'Content-Type': 'application/json',

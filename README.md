@@ -582,70 +582,72 @@ For more help, see [Cloudflare Workers Troubleshooting](https://developers.cloud
 - Full column management (add, rename, modify, delete columns)
 - Table dependencies viewer with foreign key relationship analysis
 - Cascade Impact Simulator - Interactive graph visualization with ReactFlow, multi-format export (CSV/JSON/Text/PDF), and theoretical impact analysis
+- **Undo/Rollback System** - Restore dropped tables, columns, or deleted rows
+  - **10-Operation History** - Keeps last 10 destructive operations per database
+  - **Automatic Snapshots** - Captures full table schemas, indexes, and data before DROP operations
+  - **Per-Database** - Undo history stored in metadata database with proper indexing
+  - **Global Undo Button** - Badge count in header shows available undo operations
+  - **Detailed History Dialog** - View all past operations with timestamps and descriptions
+  - **Supported Operations**: Table drops, column drops, row deletes
+  - **Smart Restoration** - Detects conflicts and provides clear warnings before restoring
 
 ## 🔮 Planned Features (Prioritized by Expected Benefit)
 
-### 1. **Undo / Rollback Last Operation**
-
-**Benefit:** ⭐⭐⭐⭐½ **Difficulty:** 🔴 *High*
-Instantly revert recent schema or data changes for safer experimentation.
-➡️ *Adds IDE-like confidence and protects users from destructive mistakes.*
-
-### 2. **Foreign Key Visualizer / Editor**
+### 1. **Foreign Key Visualizer / Editor**
 
 **Benefit:** ⭐⭐⭐⭐½ **Difficulty:** 🔴 *High*
 Interactive graph to view and edit table relationships in real time.
 ➡️ *Provides intuitive schema control and clear relational insight.*
 
-### 3. **FTS5 Virtual Table Management**
+### 2. **FTS5 Virtual Table Management**
 
 **Benefit:** ⭐⭐⭐⭐ **Difficulty:** 🔴 *High*
 Create and manage full-text search indexes (FTS5) with tokenizers, ranking (bm25), highlighting, and query performance metrics.
 ➡️ *Adds deep search and analytics capabilities.*
 
-### 4. **Constraint Validator**
+### 3. **Constraint Validator**
 
 **Benefit:** ⭐⭐⭐⭐ **Difficulty:** 🟡 *Medium*
 Detect orphaned records and broken foreign key references before destructive operations.
 ➡️ *Enhances data safety and schema integrity.*
 
-### 5. **Index Analyzer**
+### 4. **Index Analyzer**
 
 **Benefit:** ⭐⭐⭐½ **Difficulty:** 🟡 *Medium*
 Suggest missing or suboptimal indexes based on schema and query patterns.
 ➡️ *Improves database performance and developer awareness.*
 
-### 6. **Relationship Diagram**
+### 5. **Relationship Diagram**
 
 **Benefit:** ⭐⭐⭐½ **Difficulty:** 🟡 *Medium*
 Auto-generate an ER-style diagram showing all table relationships.
 ➡️ *Gives quick visual understanding of complex schemas.*
 
-### 7. **Advanced Row Filters**
+### 6. **Advanced Row Filters**
 
 **Benefit:** ⭐⭐⭐ **Difficulty:** 🟡 *Medium*
 Add OR logic, BETWEEN, IN, and preset filters in the data browser.
 ➡️ *Refines query flexibility and precision.*
 
-### 8. **Quick Navigation Links**
+### 7. **Quick Navigation Links**
 
 **Benefit:** ⭐⭐½ **Difficulty:** 🟢 *Low*
 Add direct navigation between dependent tables with breadcrumbs.
 ➡️ *Smooths workflow and enhances usability.*
 
-### 9. **Circular Dependency Detector**
+### 8. **Circular Dependency Detector**
 
 **Benefit:** ⭐⭐½ **Difficulty:** 🟡 *Medium*
 Detect and warn users about circular foreign key chains.
 ➡️ *Prevents schema design pitfalls.*
 
-### 10. **Dependency Export**
+### 9. **Dependency Export**
 
 **Benefit:** ⭐⭐ **Difficulty:** 🟢 *Low*
 Export schema relationships as JSON or documentation files.
 ➡️ *Useful for audits and documentation.*
 
-### 11. **Force Delete Mode**
+### 10. **Force Delete Mode**
 
 **Benefit:** ⭐ **Difficulty:** 🟢 *Low*
 Developer-only toggle to bypass FK constraints (with audit logging).

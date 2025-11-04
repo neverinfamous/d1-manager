@@ -30,9 +30,10 @@ interface TableViewProps {
   databaseName: string;
   tableName: string;
   onBack: () => void;
+  onUndoableOperation?: () => void;
 }
 
-export function TableView({ databaseId, databaseName, tableName, onBack }: TableViewProps) {
+export function TableView({ databaseId, databaseName, tableName, onBack, onUndoableOperation }: TableViewProps) {
   const [schema, setSchema] = useState<ColumnInfo[]>([]);
   const [data, setData] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
@@ -307,6 +308,11 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
       setShowDeleteDialog(false);
       setDeletingRow(null);
       await loadTableData(); // Reload data
+      
+      // Notify parent of undoable operation
+      if (onUndoableOperation) {
+        onUndoableOperation();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete row');
     } finally {
@@ -440,6 +446,11 @@ export function TableView({ databaseId, databaseName, tableName, onBack }: Table
       setShowDeleteColumnDialog(false);
       setDeletingColumn(null);
       await loadTableData(); // Reload data to refresh schema
+      
+      // Notify parent of undoable operation
+      if (onUndoableOperation) {
+        onUndoableOperation();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete column');
     } finally {
