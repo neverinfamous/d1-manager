@@ -1,5 +1,141 @@
 # D1 Database Manager - Release Notes
 
+## Unreleased - Post-1.0.0 Enhancements
+**Status:** In Production (v1.0.0 codebase with continuous improvements)
+
+These features have been implemented and deployed since the initial v1.0.0 release, representing significant enhancements to the platform without requiring a formal version bump.
+
+---
+
+### 🎉 Major New Features
+
+#### Cascade Impact Simulator
+- **Interactive Graph Visualization** - ReactFlow-powered dependency graph with color-coded nodes
+  - 🔴 Red nodes for source tables/rows being deleted
+  - 🟡 Yellow nodes for CASCADE operations (data will be deleted)
+  - 🔵 Blue nodes for SET NULL operations (foreign keys will be nullified)
+  - ⚪ Gray nodes for RESTRICT/NO ACTION (no automatic changes)
+- **Theoretical Simulation** - Non-destructive analysis with recursive traversal and circular dependency detection
+- **Detailed Impact Analysis** - Total affected rows, maximum cascade depth, table-by-table breakdown
+- **Multi-Format Export** - CSV, JSON, Text, and PDF reports with embedded graph visualization
+- **Integrated Access** - Available in delete dialogs for both rows (TableView) and tables (DatabaseView)
+
+#### Undo/Rollback System
+- **10-Operation History** - Keeps last 10 destructive operations per database with automatic cleanup
+- **Automatic Snapshots** - Captures full table schemas, indexes, and data before DROP operations
+- **Per-Database Storage** - Undo history stored in metadata database with proper indexing
+- **Global Undo Button** - Header badge showing available undo operation count across all databases
+- **Detailed History Dialog** - View all past operations with timestamps, descriptions, and affected tables
+- **Supported Operations** - Table drops, column drops, and row deletes with full data restoration
+- **Smart Restoration** - Detects naming conflicts and provides clear warnings before restoring
+- **Automatic Expiration** - Maintains only the most recent 10 operations to prevent unbounded growth
+
+#### Foreign Key Visualizer/Editor
+- **Dual Layout System** - Switch between hierarchical (dagre) and force-directed graph layouts
+- **Interactive Graph** - ReactFlow-powered visualization with pan, zoom, and minimap navigation
+- **Add Foreign Keys** - Create new foreign key constraints with comprehensive validation
+- **Modify Constraints** - Edit ON DELETE and ON UPDATE behaviors for existing relationships
+- **Delete Constraints** - Remove foreign key relationships with impact preview
+- **Type Validation** - Automatic column type compatibility checking before constraint creation
+- **Orphan Detection** - Prevents adding foreign keys that would violate referential integrity
+- **Color-Coded Edges** - Visual distinction between CASCADE, RESTRICT, SET NULL, and NO ACTION behaviors
+- **Table Filtering** - Focus view on specific tables and their immediate relationships
+- **Column Display** - Shows table columns with data types and primary key indicators (🔑)
+- **Dedicated Tab** - Integrated as "Relationships" tab alongside Tables and Query Builder
+
+#### FTS5 Virtual Table Management
+- **Visual Schema Designer** - Create FTS5 full-text search tables with interactive column builder
+- **Table Converter** - Convert existing tables to FTS5 with external content support for syncing
+- **Multiple Tokenizers** - Unicode61, Porter (stemming), Trigram (fuzzy search), and ASCII
+- **Advanced Configuration** - Diacritic handling, custom separators, token characters, case sensitivity
+- **Prefix Indexing** - Enable autocomplete functionality with configurable prefix lengths (2-4 characters)
+- **Dedicated Search Interface** - Advanced search UI with BM25 ranking and result highlighting
+- **Search Operators** - Full support for AND, OR, NOT, NEAR, phrase matching, and column-specific filters
+- **Performance Metrics** - Execution time, search efficiency, rows scanned with optimization recommendations
+- **Index Maintenance** - Rebuild and optimize operations with detailed statistics
+- **Sync Triggers** - Auto-generate INSERT/UPDATE/DELETE triggers for external content tables
+- **Full-Text Search Tab** - Dedicated FTS5 management interface in database view
+
+#### Constraint Validator
+- **Full Database Scans** - Validate all foreign key, NOT NULL, and UNIQUE constraints across database
+- **Automatic Pre-Operation Checks** - Warns before destructive operations that might violate constraints
+- **Orphan Detection** - Find records with broken foreign key references (referencing non-existent rows)
+- **NOT NULL Violations** - Identify NULL values in columns with NOT NULL constraints
+- **UNIQUE Violations** - Detect duplicate values in columns with UNIQUE constraints
+- **Guided Fix Workflow** - Apply constraint fixes with explicit user confirmation and impact preview
+- **Fix Strategies** - Multiple options: delete orphaned rows or set foreign keys to NULL
+- **Dedicated Tab** - Integrated as "Constraints" tab in database view for easy access
+
+#### Index Analyzer
+- **Schema Analysis** - Automatically detects foreign keys, unique constraints, and commonly queried column types
+- **Query Pattern Detection** - Analyzes query history to identify frequently filtered, joined, or sorted columns
+- **Priority Scoring** - High/Medium/Low recommendations based on query frequency and expected impact
+- **Estimated Impact** - Clear explanations of expected performance improvements for each recommendation
+- **One-Click Creation** - Generate and execute CREATE INDEX statements instantly from recommendations
+- **Existing Index Display** - View all current indexes organized by table with usage information
+- **Statistics Dashboard** - Total recommendations, tables without indexes, query efficiency metrics
+- **Performance Tab** - Dedicated index analysis interface in database view
+
+#### ER Relationship Diagram
+- **Dual View Mode** - Toggle between Foreign Key Editor and ER Diagram within Relationships tab
+- **Visual Schema Display** - Tables showing primary keys (🔑) and foreign keys (🔗) with data types
+- **Interactive Navigation** - Click on any table to navigate directly to its data view
+- **Multiple Layouts** - Switch between hierarchical (top-down) and force-directed (organic) layouts
+- **Multi-Format Export** - Export diagrams as PNG images, SVG vectors, or JSON data
+- **Relationship Visualization** - Color-coded edges showing CASCADE, RESTRICT, SET NULL behaviors
+- **Read-Only Mode** - Focus on understanding schema structure without accidental edits
+- **Zoom & Pan Controls** - ReactFlow controls with minimap for navigating large database schemas
+
+#### Advanced Row Filters
+- **OR Logic** - Combine filters with AND or OR operators for complex query conditions
+- **BETWEEN Operator** - Range queries for numeric and date columns (e.g., `age BETWEEN 18 AND 65`)
+- **IN Operator** - Filter by multiple specific values (e.g., `status IN ('active', 'pending', 'suspended')`)
+- **NOT BETWEEN/NOT IN** - Inverse range and list operations for exclusion queries
+- **Filter Presets** - Built-in templates including:
+  - Time-based: last 7 days, last 30 days, this month, this year
+  - Numeric ranges: 0-100, positive values, negative values
+  - Custom: save your own filter combinations
+- **Custom Presets** - Save and manage frequently used filter combinations in localStorage
+- **Multi-Value Input** - Comma-separated list input with 100-value limit for performance
+- **Dynamic UI** - Automatically shows appropriate inputs (two inputs for BETWEEN, textarea for IN)
+- **SQL Injection Protection** - All operators properly escaped and validated before query execution
+- **Visual Indicators** - AND/OR toggle buttons, active filter badges, highlighted inputs
+
+#### Foreign Key Navigation
+- **Clickable FK Values** - Foreign key columns display as interactive links with visual indicators (🔗)
+- **Auto-Filtering** - Automatically applies filters when navigating via foreign key relationships
+- **Breadcrumb Trail** - Shows complete navigation path (Database > Table1 > Table2 > Table3)
+- **Smart Navigation** - Click to jump to referenced tables or use breadcrumbs to navigate back
+- **Keyboard Shortcuts** - Alt+Left for back navigation through table browsing history
+- **Visual Indicators** - FK columns highlighted with link icons and tooltips showing referenced tables
+- **Context Preservation** - Maintains filter state when navigating back through breadcrumb trail
+
+---
+
+### 🔧 API Enhancements
+
+#### New Endpoints
+- `GET /api/tables/:dbId/foreign-keys` - Get all foreign keys with graph structure (nodes and edges)
+- `POST /api/tables/:dbId/foreign-keys/add` - Add new foreign key constraint with validation
+- `PATCH /api/tables/:dbId/foreign-keys/:constraintName` - Modify ON DELETE/ON UPDATE behaviors
+- `DELETE /api/tables/:dbId/foreign-keys/:constraintName` - Remove foreign key constraint
+- `GET /api/indexes/:dbId/analyze` - Analyze database and return index recommendations
+- `POST /api/undo/:dbId/list` - List available undo operations for a database
+- `POST /api/undo/:dbId/restore/:operationId` - Restore a previous operation
+
+---
+
+### 📈 Roadmap Updates
+
+#### Still Planned
+- Circular dependency detector with visual cycle highlighting
+- Dependency export as JSON documentation files
+- Force delete mode with audit logging for power users
+- Time Travel API integration for point-in-time recovery
+- Analytics dashboard with comprehensive usage metrics
+
+---
+
 ## Version 1.0.0 - Production Stable Release
 **Release Date:** November 2, 2025  
 **Status:** Production/Stable  
@@ -376,30 +512,15 @@ npx wrangler deploy
 
 ### Planned for Future Releases
 
-#### Foreign Key Management (v1.1.0)
-- Visual relationship graph and editor
-- Cascade impact simulator with multi-level preview
-- Force delete mode for advanced users
-- Quick navigation links to dependent tables
-- Relationship documentation export
-- Circular dependency detector
+#### Remaining Enhancements
+- **Circular Dependency Detector** - Visual cycle highlighting in foreign key relationships
+- **Dependency Export** - Export schema relationships as JSON documentation files
+- **Force Delete Mode** - Developer toggle to bypass FK constraints with audit logging
+- **Time Travel API Integration** - Point-in-time recovery when Cloudflare releases the feature
+- **Analytics Dashboard** - Comprehensive usage metrics and query performance insights
+- **Cross-Database Search** - Enhanced search across multiple databases simultaneously
 
-#### Full-Text Search (v1.2.0)
-- FTS5 virtual table management
-- Search index creation wizard
-- Tokenizer configuration (porter, unicode61, trigram)
-- Query builder with MATCH syntax
-- Search result highlighting
-- Performance metrics and ranking
-
-#### Other Enhancements (v1.x)
-- Undo/Rollback last operation
-- Index analyzer with suggestions
-- Advanced row filters (OR logic, BETWEEN, IN clause)
-- Filter presets and saved filters
-- Time Travel API integration for backups
-- Analytics dashboard with usage metrics
-- Cross-database search improvements
+> **Note:** Many features originally planned for v1.1.0 and v1.2.0 have been implemented and are documented in the "Unreleased - Post-1.0.0 Enhancements" section above.
 
 ---
 

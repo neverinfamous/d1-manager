@@ -679,15 +679,15 @@ For more help, see [Cloudflare Workers Troubleshooting](https://developers.cloud
   
 ## Planned Features
 
-### 2. Circular Dependency Detector
+### 1. Circular Dependency Detector
 Detect and warn users about circular foreign key chains
 - Prevents schema design pitfalls
 
-### 3. Dependency Export
+### 2. Dependency Export
 Export schema relationships as JSON or documentation files
 - Useful for audits and documentation
 
-### 4. Force Delete Mode
+### 3. Force Delete Mode
 Developer-only toggle to bypass FK constraints (with audit logging)
 - Low-value, niche power-user feature for controlled environments
 
