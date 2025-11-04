@@ -103,6 +103,7 @@ This Docker image packages the complete D1 Database Manager with:
 - **Cascade Impact Simulator** - Interactive graph visualization of DELETE operations with multi-format export (CSV/JSON/Text/PDF)
 - **Undo/Rollback System** - Restore dropped tables, columns, or deleted rows with 10-operation history per database
 - **FTS5 Full-Text Search** - Create and manage FTS5 virtual tables with tokenizers (unicode61, porter, trigram, ascii), BM25 ranking, highlighting, search operators, and performance metrics
+- **Constraint Validator** - Detect orphaned records, broken foreign keys, NOT NULL violations, and UNIQUE constraint violations with guided fix workflow
 - **Dark/Light Themes** - System-aware theme switching with persistence
 - **Responsive Design** - Works seamlessly on desktop, tablet, and mobile
 

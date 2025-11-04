@@ -626,56 +626,59 @@ For more help, see [Cloudflare Workers Troubleshooting](https://developers.cloud
   - **Index Maintenance** - Rebuild and optimize operations with statistics
   - **Sync Triggers** - Auto-generate triggers for external content tables
   - **Full-Text Search Tab** - Dedicated FTS5 management interface in database view
+- **Constraint Validator** - Detect and fix data integrity violations
+  - **Full Database Scans** - Validate all FK, NOT NULL, and UNIQUE constraints
+  - **Automatic Pre-Operation Checks** - Warn before destructive operations
+  - **Orphan Detection** - Find records with broken foreign key references
+  - **NOT NULL Violations** - Identify NULL values in NOT NULL columns
+  - **UNIQUE Violations** - Detect duplicate values in unique columns
+  - **Guided Fix Workflow** - Apply fixes with explicit user confirmation
+  - **Fix Strategies** - Delete orphans or set to NULL with impact preview
+  - **Dedicated Tab** - Integrated as "Constraints" tab in database view
   
-## 🔮 Planned Features (Prioritized by Expected Benefit)
+## Planned Features (Prioritized by Expected Benefit)
 
-### 1. **Constraint Validator**
+### 1. **Index Analyzer**
 
-**Benefit:** ⭐⭐⭐⭐ **Difficulty:** 🟡 *Medium*
-Detect orphaned records and broken foreign key references before destructive operations.
-➡️ *Enhances data safety and schema integrity.*
-
-### 2. **Index Analyzer**
-
-**Benefit:** ⭐⭐⭐½ **Difficulty:** 🟡 *Medium*
+**Benefit:** 3.5 **Difficulty:** *Medium*
 Suggest missing or suboptimal indexes based on schema and query patterns.
-➡️ *Improves database performance and developer awareness.*
+*Improves database performance and developer awareness.*
 
-### 3. **Relationship Diagram**
+### 2. **Relationship Diagram**
 
-**Benefit:** ⭐⭐⭐½ **Difficulty:** 🟡 *Medium*
+**Benefit:** 3.5 **Difficulty:** *Medium*
 Auto-generate an ER-style diagram showing all table relationships.
-➡️ *Gives quick visual understanding of complex schemas.*
+*Gives quick visual understanding of complex schemas.*
 
-### 4. **Advanced Row Filters**
+### 3. **Advanced Row Filters**
 
-**Benefit:** ⭐⭐⭐ **Difficulty:** 🟡 *Medium*
+**Benefit:** 3 **Difficulty:** *Medium*
 Add OR logic, BETWEEN, IN, and preset filters in the data browser.
-➡️ *Refines query flexibility and precision.*
+*Refines query flexibility and precision.*
 
-### 5. **Quick Navigation Links**
+### 4. **Quick Navigation Links**
 
-**Benefit:** ⭐⭐½ **Difficulty:** 🟢 *Low*
+**Benefit:** 2.5 **Difficulty:** *Low*
 Add direct navigation between dependent tables with breadcrumbs.
-➡️ *Smooths workflow and enhances usability.*
+*Smooths workflow and enhances usability.*
 
-### 6. **Circular Dependency Detector**
+### 5. **Circular Dependency Detector**
 
-**Benefit:** ⭐⭐½ **Difficulty:** 🟡 *Medium*
+**Benefit:** 2.5 **Difficulty:** *Medium*
 Detect and warn users about circular foreign key chains.
-➡️ *Prevents schema design pitfalls.*
+*Prevents schema design pitfalls.*
 
-### 7. **Dependency Export**
+### 6. **Dependency Export**
 
-**Benefit:** ⭐⭐ **Difficulty:** 🟢 *Low*
+**Benefit:** 2 **Difficulty:** *Low*
 Export schema relationships as JSON or documentation files.
-➡️ *Useful for audits and documentation.*
+*Useful for audits and documentation.*
 
-### 8. **Force Delete Mode**
+### 7. **Force Delete Mode**
 
-**Benefit:** ⭐ **Difficulty:** 🟢 *Low*
+**Benefit:** 1 **Difficulty:** *Low*
 Developer-only toggle to bypass FK constraints (with audit logging).
-➡️ *Low-value, niche power-user feature for controlled environments.*
+*Low-value, niche power-user feature for controlled environments.*
 
 ---
 

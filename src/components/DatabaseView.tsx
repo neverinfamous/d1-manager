@@ -29,6 +29,7 @@ import { TableDependenciesView } from './TableDependenciesView';
 import { CascadeImpactSimulator } from './CascadeImpactSimulator';
 import { ForeignKeyVisualizer } from './ForeignKeyVisualizer';
 import { FTS5Manager } from './FTS5Manager';
+import { ConstraintValidator } from './ConstraintValidator';
 
 interface DatabaseViewProps {
   databaseId: string;
@@ -44,7 +45,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSchemaDesigner, setShowSchemaDesigner] = useState(false);
-  const [activeTab, setActiveTab] = useState<'tables' | 'builder' | 'relationships' | 'fts5'>('tables');
+  const [activeTab, setActiveTab] = useState<'tables' | 'builder' | 'relationships' | 'fts5' | 'constraints'>('tables');
   
   // Selection state
   const [selectedTables, setSelectedTables] = useState<string[]>([]);
@@ -404,6 +405,14 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
               <Sparkles className="h-4 w-4 mr-2" />
               Full-Text Search
             </Button>
+            <Button
+              variant={activeTab === 'constraints' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setActiveTab('constraints')}
+            >
+              <AlertTriangle className="h-4 w-4 mr-2" />
+              Constraints
+            </Button>
           </div>
           {activeTab === 'tables' && (
             <>
@@ -426,6 +435,8 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
         <ForeignKeyVisualizer databaseId={databaseId} onTableSelect={onSelectTable} />
       ) : activeTab === 'fts5' ? (
         <FTS5Manager databaseId={databaseId} databaseName={databaseName} />
+      ) : activeTab === 'constraints' ? (
+        <ConstraintValidator databaseId={databaseId} databaseName={databaseName} />
       ) : (
         <>
           {/* Search Bar */}

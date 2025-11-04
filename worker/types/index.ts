@@ -149,3 +149,42 @@ export interface UndoSnapshot {
   };
 }
 
+// Constraint validation types
+export interface ConstraintViolation {
+  id: string;
+  type: 'foreign_key' | 'not_null' | 'unique';
+  severity: 'critical' | 'warning' | 'info';
+  table: string;
+  column?: string;
+  affectedRows: number;
+  details: string;
+  fixable: boolean;
+  fixStrategies?: Array<'delete' | 'set_null' | 'manual'>;
+  metadata?: {
+    parentTable?: string;
+    parentColumn?: string;
+    fkId?: number;
+    duplicateValue?: string;
+  };
+}
+
+export interface ValidationReport {
+  database: string;
+  timestamp: string;
+  totalViolations: number;
+  violationsByType: {
+    foreign_key: number;
+    not_null: number;
+    unique: number;
+  };
+  violations: ConstraintViolation[];
+  isHealthy: boolean;
+}
+
+export interface FixResult {
+  violationId: string;
+  success: boolean;
+  rowsAffected: number;
+  error?: string;
+}
+

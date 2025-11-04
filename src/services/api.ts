@@ -1541,3 +1541,111 @@ export const getFTS5Stats = async (
   return data.result
 }
 
+// Constraint validation types
+export interface ConstraintViolation {
+  id: string
+  type: 'foreign_key' | 'not_null' | 'unique'
+  severity: 'critical' | 'warning' | 'info'
+  table: string
+  column?: string
+  affectedRows: number
+  details: string
+  fixable: boolean
+  fixStrategies?: Array<'delete' | 'set_null' | 'manual'>
+  metadata?: {
+    parentTable?: string
+    parentColumn?: string
+    fkId?: number
+    duplicateValue?: string
+  }
+}
+
+export interface ValidationReport {
+  database: string
+  timestamp: string
+  totalViolations: number
+  violationsByType: {
+    foreign_key: number
+    not_null: number
+    unique: number
+  }
+  violations: ConstraintViolation[]
+  isHealthy: boolean
+}
+
+export interface FixResult {
+  violationId: string
+  success: boolean
+  rowsAffected: number
+  error?: string
+}
+
+/**
+ * Validate all constraints in a database
+ */
+export const validateConstraints = async (databaseId: string): Promise<ValidationReport> => {
+  const response = await fetch(`${WORKER_API}/api/constraints/${databaseId}/validate`, {
+    method: 'POST',
+    credentials: 'include'
+  })
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+    throw new Error(error.error || `Failed to validate constraints: ${response.status}`)
+  }
+  
+  const data = await response.json() as { result: ValidationReport, success: boolean }
+  return data.result
+}
+
+/**
+ * Validate constraints for a specific table
+ */
+export const validateTableConstraints = async (
+  databaseId: string,
+  tableName: string
+): Promise<ValidationReport> => {
+  const response = await fetch(`${WORKER_API}/api/constraints/${databaseId}/validate-table`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    credentials: 'include',
+    body: JSON.stringify({ tableName })
+  })
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+    throw new Error(error.error || `Failed to validate table constraints: ${response.status}`)
+  }
+  
+  const data = await response.json() as { result: ValidationReport, success: boolean }
+  return data.result
+}
+
+/**
+ * Apply fixes to constraint violations
+ */
+export const fixViolations = async (
+  databaseId: string,
+  violations: string[],
+  fixStrategy: 'delete' | 'set_null'
+): Promise<FixResult[]> => {
+  const response = await fetch(`${WORKER_API}/api/constraints/${databaseId}/fix`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    credentials: 'include',
+    body: JSON.stringify({ violations, fixStrategy })
+  })
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+    throw new Error(error.error || `Failed to fix violations: ${response.status}`)
+  }
+  
+  const data = await response.json() as { result: FixResult[], success: boolean }
+  return data.result
+}
+
