@@ -1,5 +1,6 @@
 import type { Env } from '../types';
 import { sanitizeIdentifier } from '../utils/helpers';
+import { isProtectedDatabase, createProtectedDatabaseResponse, getDatabaseInfo } from '../utils/database-protection';
 
 const CF_API = 'https://api.cloudflare.com/client/v4';
 
@@ -72,6 +73,15 @@ export async function handleConstraintRoutes(
         ...corsHeaders
       }
     });
+  }
+
+  // Check if accessing a protected database
+  if (!isLocalDev) {
+    const dbInfo = await getDatabaseInfo(dbId, env);
+    if (dbInfo && isProtectedDatabase(dbInfo.name)) {
+      console.warn('[Constraints] Attempted to access protected database:', dbInfo.name);
+      return createProtectedDatabaseResponse(corsHeaders);
+    }
   }
 
   try {

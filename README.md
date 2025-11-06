@@ -299,17 +299,21 @@ Click the theme toggle button in the header to cycle through modes. Your prefere
 
 ## 📝 Development Notes
 
-### Protected System Database
+### Protected System Databases
 
-The `d1-manager-metadata` database is automatically hidden from the UI and protected from all operations (view, delete, rename, export). This internal database stores query history and saved queries for the application. Protection ensures:
+D1 Manager automatically hides and protects system metadata databases from all operations to prevent accidental corruption of dependent applications:
 
-- **Hidden from List** - Does not appear in the database list
-- **Delete Protection** - Returns 403 Forbidden if deletion is attempted
-- **Rename Protection** - Returns 403 Forbidden if rename is attempted  
-- **Export Protection** - Silently skipped in bulk export operations
-- **Info Protection** - Returns 404 Not Found if info is requested
+- **Pattern-based Protection** - Any database ending with `-metadata` or `-metadata-dev` is automatically protected
+- **Protected Databases** - Includes `d1-manager-metadata` (query history, saved queries, undo history), `kv-manager-metadata` (KV Manager tags and audit logs), and similar system databases
+- **What's Blocked** - Database list visibility, info requests, delete, rename, export, table operations, and query execution
+- **Error Response** - Returns 403 Forbidden with clear message: "This database is used by system applications and cannot be accessed"
+- **Cross-Application Safety** - Prevents users from breaking KV Manager, D1 Manager, and other applications in the Cloudflare ecosystem
 
-This safeguards the demo site and production deployments from accidental or malicious deletion of critical application data.
+**Benefits:**
+- Safeguards the demo site where multiple applications coexist
+- Prevents accidental corruption of critical application data
+- Future-proof protection for new system databases
+- Users protected from self-inflicted damage across all installations
 
 ### Mock Data in Local Development
 

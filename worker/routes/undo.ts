@@ -1,5 +1,6 @@
 import type { Env, UndoHistoryEntry, UndoSnapshot } from '../types';
 import { sanitizeIdentifier } from '../utils/helpers';
+import { isProtectedDatabase, createProtectedDatabaseResponse, getDatabaseInfo } from '../utils/database-protection';
 
 const CF_API = 'https://api.cloudflare.com/client/v4';
 
@@ -65,6 +66,15 @@ export async function handleUndoRoutes(
         ...corsHeaders
       }
     });
+  }
+
+  // Check if accessing a protected database
+  if (!isLocalDev) {
+    const dbInfo = await getDatabaseInfo(dbId, env);
+    if (dbInfo && isProtectedDatabase(dbInfo.name)) {
+      console.warn('[Undo] Attempted to access protected database:', dbInfo.name);
+      return createProtectedDatabaseResponse(corsHeaders);
+    }
   }
 
   try {

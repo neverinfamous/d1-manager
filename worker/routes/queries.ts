@@ -1,5 +1,6 @@
 import type { Env, QueryHistoryEntry } from '../types';
 import { validateQuery, parseD1Error } from '../utils/helpers';
+import { isProtectedDatabase, createProtectedDatabaseResponse, getDatabaseInfo } from '../utils/database-protection';
 
 export async function handleQueryRoutes(
   request: Request,
@@ -25,6 +26,15 @@ export async function handleQueryRoutes(
         ...corsHeaders
       }
     });
+  }
+
+  // Check if accessing a protected database
+  if (!isLocalDev) {
+    const dbInfo = await getDatabaseInfo(dbId, env);
+    if (dbInfo && isProtectedDatabase(dbInfo.name)) {
+      console.warn('[Queries] Attempted to query protected database:', dbInfo.name);
+      return createProtectedDatabaseResponse(corsHeaders);
+    }
   }
 
   try {

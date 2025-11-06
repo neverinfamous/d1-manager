@@ -25,6 +25,7 @@ import {
   sanitizeFTS5Query,
 } from '../utils/fts5-helpers';
 import { sanitizeIdentifier } from '../utils/helpers';
+import { isProtectedDatabase, createProtectedDatabaseResponse, getDatabaseInfo } from '../utils/database-protection';
 
 export async function handleFTS5Routes(
   request: Request,
@@ -50,7 +51,16 @@ export async function handleFTS5Routes(
       }
     });
   }
-
+  
+  // Check if accessing a protected database
+  if (!isLocalDev) {
+    const dbInfo = await getDatabaseInfo(dbId, env);
+    if (dbInfo && isProtectedDatabase(dbInfo.name)) {
+      console.warn('[FTS5] Attempted to access protected database:', dbInfo.name);
+      return createProtectedDatabaseResponse(corsHeaders);
+    }
+  }
+  
   try {
     // List FTS5 tables in database
     if (request.method === 'GET' && url.pathname === `/api/fts5/${dbId}/list`) {

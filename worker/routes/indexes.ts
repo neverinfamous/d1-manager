@@ -1,5 +1,6 @@
 import type { Env } from '../types';
 import { analyzeIndexes } from '../utils/index-analyzer';
+import { isProtectedDatabase, createProtectedDatabaseResponse, getDatabaseInfo } from '../utils/database-protection';
 
 /**
  * Handle Index Analyzer routes
@@ -27,6 +28,15 @@ export async function handleIndexRoutes(
         ...corsHeaders
       }
     });
+  }
+
+  // Check if accessing a protected database
+  if (!isLocalDev) {
+    const dbInfo = await getDatabaseInfo(dbId, env);
+    if (dbInfo && isProtectedDatabase(dbInfo.name)) {
+      console.warn('[Indexes] Attempted to access protected database:', dbInfo.name);
+      return createProtectedDatabaseResponse(corsHeaders);
+    }
   }
 
   try {

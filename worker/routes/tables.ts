@@ -2,6 +2,7 @@ import type { Env, TableInfo } from '../types';
 import { sanitizeIdentifier } from '../utils/helpers';
 import { trackDatabaseAccess } from '../utils/database-tracking';
 import { captureTableSnapshot, captureColumnSnapshot, captureRowSnapshot, saveUndoSnapshot } from '../utils/undo';
+import { isProtectedDatabase, createProtectedDatabaseResponse, getDatabaseInfo } from '../utils/database-protection';
 
 /**
  * Note: This route handler requires dynamic D1 database access
@@ -35,6 +36,15 @@ export async function handleTableRoutes(
         ...corsHeaders
       }
     });
+  }
+
+  // Check if accessing a protected database
+  if (!isLocalDev) {
+    const dbInfo = await getDatabaseInfo(dbId, env);
+    if (dbInfo && isProtectedDatabase(dbInfo.name)) {
+      console.warn('[Tables] Attempted to access protected database:', dbInfo.name);
+      return createProtectedDatabaseResponse(corsHeaders);
+    }
   }
 
   // Track database access (non-blocking)
