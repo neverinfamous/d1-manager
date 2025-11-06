@@ -26,11 +26,15 @@ A fully containerized version of the D1 Database Manager for Cloudflare. This Do
 
 ### Pull and Run
 
-```bash
-# Pull the latest image
-docker pull writenotenow/d1-manager:latest
+1. **Pull the latest image:**
 
-# Run with environment variables
+```bash
+docker pull writenotenow/d1-manager:latest
+```
+
+2. **Run with environment variables:**
+
+```bash
 docker run -d \
   -p 8080:8080 \
   -e ACCOUNT_ID=your_cloudflare_account_id \
@@ -41,11 +45,13 @@ docker run -d \
   writenotenow/d1-manager:latest
 ```
 
-Access the application at `http://localhost:8080`
+3. **Access the application:**
+
+Open `http://localhost:8080` in your browser
 
 ### Using Docker Compose
 
-Create a `docker-compose.yml` file:
+1. **Create a `docker-compose.yml` file:**
 
 ```yaml
 version: '3.8'
@@ -70,7 +76,7 @@ services:
       start_period: 40s
 ```
 
-Create a `.env` file:
+2. **Create a `.env` file:**
 
 ```env
 ACCOUNT_ID=your_cloudflare_account_id
@@ -79,7 +85,7 @@ TEAM_DOMAIN=https://yourteam.cloudflareaccess.com
 POLICY_AUD=your_cloudflare_access_aud_tag
 ```
 
-Run with Docker Compose:
+3. **Run with Docker Compose:**
 
 ```bash
 docker-compose up -d
@@ -152,19 +158,31 @@ This Docker image packages the complete D1 Database Manager with:
 
 The D1 Manager requires a metadata database to store query history, saved queries, and undo history.
 
-**Create the metadata database:**
+**Authenticate with Cloudflare:**
+
 ```bash
 npx wrangler login
+```
+
+**Create the metadata database:**
+
+```bash
 npx wrangler d1 create d1-manager-metadata
 ```
 
-**Initialize the schema:**
-```bash
-# Clone the repository to get schema.sql
-git clone https://github.com/neverinfamous/d1-manager.git
-cd d1-manager
+**Clone the repository to get schema.sql:**
 
-# Run the schema initialization
+```bash
+git clone https://github.com/neverinfamous/d1-manager.git
+```
+
+```bash
+cd d1-manager
+```
+
+**Initialize the schema:**
+
+```bash
 npx wrangler d1 execute d1-manager-metadata --remote --file=worker/schema.sql
 ```
 
@@ -454,14 +472,27 @@ Use this endpoint for:
 
 ### 1. Use Docker Secrets (Docker Swarm)
 
-```bash
-# Create secrets
-echo "your_account_id" | docker secret create d1_account_id -
-echo "your_api_token" | docker secret create d1_api_key -
-echo "https://yourteam.cloudflareaccess.com" | docker secret create d1_team_domain -
-echo "your_aud_tag" | docker secret create d1_policy_aud -
+**Create secrets:**
 
-# Deploy with secrets
+```bash
+echo "your_account_id" | docker secret create d1_account_id -
+```
+
+```bash
+echo "your_api_token" | docker secret create d1_api_key -
+```
+
+```bash
+echo "https://yourteam.cloudflareaccess.com" | docker secret create d1_team_domain -
+```
+
+```bash
+echo "your_aud_tag" | docker secret create d1_policy_aud -
+```
+
+**Deploy with secrets:**
+
+```bash
 docker service create \
   --name d1-manager \
   --publish 8080:8080 \
@@ -474,8 +505,9 @@ docker service create \
 
 ### 2. Use Kubernetes Secrets
 
+**Create secret:**
+
 ```bash
-# Create secret
 kubectl create secret generic d1-manager-secrets \
   --from-literal=account-id='your_account_id' \
   --from-literal=api-key='your_api_token' \
@@ -485,8 +517,9 @@ kubectl create secret generic d1-manager-secrets \
 
 ### 3. Restrict Network Access
 
+**Docker Compose with network isolation:**
+
 ```yaml
-# Docker Compose with network isolation
 version: '3.8'
 
 services:
@@ -537,6 +570,7 @@ docker run -d \
 ### Container Won't Start
 
 **Check logs:**
+
 ```bash
 docker logs d1-manager
 ```
@@ -546,16 +580,25 @@ docker logs d1-manager
 - Invalid API token or Account ID
 - Port already in use
 
-**Solution:**
+**Verify environment variables:**
+
 ```bash
-# Verify environment variables
 docker inspect d1-manager | grep -A 10 Env
+```
 
-# Check if port is available
+**Check if port is available:**
+
+```bash
 netstat -tuln | grep 8080
+```
 
-# Restart with correct variables
+**Restart with correct variables:**
+
+```bash
 docker rm -f d1-manager
+```
+
+```bash
 docker run -d [correct options] yourusername/d1-manager:latest
 ```
 
@@ -572,7 +615,8 @@ docker run -d [correct options] yourusername/d1-manager:latest
 3. Ensure your user is allowed in Access policies
 4. Check if API token has **D1 Edit** permissions
 
-**Logs to check:**
+**Check authentication logs:**
+
 ```bash
 docker logs d1-manager | grep -i "auth\|jwt\|access"
 ```
@@ -591,6 +635,7 @@ docker logs d1-manager | grep -i "auth\|jwt\|access"
 4. Verify D1 databases exist in your account
 
 **Test API token:**
+
 ```bash
 curl -X GET "https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/d1/database" \
   -H "Authorization: Bearer ${API_KEY}" \
@@ -600,11 +645,13 @@ curl -X GET "https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/d1/data
 ### High Memory Usage
 
 **Check container stats:**
+
 ```bash
 docker stats d1-manager
 ```
 
 **Set memory limits:**
+
 ```bash
 docker run -d \
   --memory="512m" \
@@ -616,26 +663,42 @@ docker run -d \
 ### Networking Issues
 
 **Cannot access from host:**
+
+Check if container is running:
+
 ```bash
-# Check if container is running
 docker ps | grep d1-manager
+```
 
-# Check port mapping
+Check port mapping:
+
+```bash
 docker port d1-manager
+```
 
-# Test connectivity
+Test connectivity:
+
+```bash
 curl http://localhost:8080/health
 ```
 
 **Cannot access from other containers:**
+
+Ensure containers are on the same network:
+
 ```bash
-# Ensure containers are on the same network
 docker network inspect bridge
+```
 
-# Create custom network
+Create custom network:
+
+```bash
 docker network create d1-network
+```
 
-# Run with custom network
+Run with custom network:
+
+```bash
 docker run --network d1-network [other options] yourusername/d1-manager:latest
 ```
 
@@ -645,21 +708,28 @@ docker run --network d1-network [other options] yourusername/d1-manager:latest
 
 ### Docker Logs
 
-**View logs:**
+**Follow logs in real-time:**
+
 ```bash
-# Follow logs in real-time
 docker logs -f d1-manager
+```
 
-# View last 100 lines
+**View last 100 lines:**
+
+```bash
 docker logs --tail 100 d1-manager
+```
 
-# View logs since 1 hour ago
+**View logs since 1 hour ago:**
+
+```bash
 docker logs --since 1h d1-manager
 ```
 
 ### Log Aggregation
 
 **Using Docker logging driver:**
+
 ```yaml
 version: '3.8'
 
@@ -674,6 +744,7 @@ services:
 ```
 
 **Forward to syslog:**
+
 ```yaml
 version: '3.8'
 
@@ -689,13 +760,15 @@ services:
 
 ### Container Stats
 
-Monitor container resource usage:
+**View real-time stats:**
 
 ```bash
-# View real-time stats
 docker stats d1-manager
+```
 
-# View stats for all containers
+**View stats for all containers:**
+
+```bash
 docker stats
 ```
 
@@ -705,37 +778,54 @@ docker stats
 
 ### Updating to Latest Version
 
+**Pull latest image:**
+
 ```bash
-# Pull latest image
 docker pull writenotenow/d1-manager:latest
+```
 
-# Stop and remove old container
+**Stop old container:**
+
+```bash
 docker stop d1-manager
-docker rm d1-manager
+```
 
-# Start new container with same configuration
+**Remove old container:**
+
+```bash
+docker rm d1-manager
+```
+
+**Start new container with same configuration:**
+
+```bash
 docker run -d [same options as before] writenotenow/d1-manager:latest
 ```
 
 ### Using Docker Compose
 
-```bash
-# Pull latest images
-docker-compose pull
+**Pull latest images:**
 
-# Restart services
+```bash
+docker-compose pull
+```
+
+**Restart services:**
+
+```bash
 docker-compose up -d
 ```
 
 ### Version Pinning (Recommended for Production)
+
+**Pin to specific version:**
 
 ```yaml
 version: '3.8'
 
 services:
   d1-manager:
-    image: writenotenow/d1-manager:1.0.0  # Pin to specific version
-    # ... rest of configuration
+    image: writenotenow/d1-manager:1.0.0
 ```
 
 ### Automated Updates with Watchtower
@@ -763,18 +853,29 @@ If you want to build the Docker image yourself:
 
 ### Clone the Repository
 
+**Clone the repository:**
+
 ```bash
 git clone https://github.com/neverinfamous/d1-manager.git
+```
+
+**Navigate to directory:**
+
+```bash
 cd d1-manager
 ```
 
 ### Build the Image
 
-```bash
-# Build for your platform
-docker build -t d1-manager:local .
+**Build for your platform:**
 
-# Build for multiple platforms
+```bash
+docker build -t d1-manager:local .
+```
+
+**Build for multiple platforms:**
+
+```bash
 docker buildx build --platform linux/amd64,linux/arm64 -t d1-manager:local .
 ```
 

@@ -111,38 +111,52 @@ A modern, full-featured web application for managing Cloudflare D1 databases wit
 
 ### Local Development
 
-1. **Clone and install:**
+1. **Clone the repository:**
+
    ```bash
    git clone https://github.com/yourusername/d1-manager.git
+   ```
+
+2. **Navigate to the project directory:**
+
+   ```bash
    cd d1-manager
+   ```
+
+3. **Install dependencies:**
+
+   ```bash
    npm install
    ```
 
-2. **Set up environment:**
+4. **Set up environment:**
+
    ```bash
    cp .env.example .env
    ```
+
    The defaults work for local development. Edit if needed.
 
-3. **Run development servers (requires 2 terminal windows):**
+5. **Run development servers (requires 2 terminal windows):**
    
    **Terminal 1 - Frontend (Vite):**
+   
    ```bash
    npm run dev
    ```
-   - Runs on: `http://localhost:5173`
-   - Hot Module Replacement enabled
-   - Watches for file changes automatically
+   
+   Runs on: `http://localhost:5173`
 
    **Terminal 2 - Worker API (Wrangler):**
+   
    ```bash
    npx wrangler dev --config wrangler.dev.toml --local
    ```
-   - Runs on: `http://localhost:8787`
-   - Uses mock data (no Cloudflare credentials required)
-   - Automatically reloads on code changes
+   
+   Runs on: `http://localhost:8787`
 
-4. **Access the app:**
+6. **Access the app:**
+
    Open `http://localhost:5173` in your browser
 
 ### Local Development Features
@@ -473,36 +487,46 @@ Migration-based approach with automatic export/import since D1 doesn't natively 
 ### Setup Steps
 
 1. **Configure Wrangler:**
+
    ```bash
    cp wrangler.toml.example wrangler.toml
    ```
+
    Edit `wrangler.toml` with your settings:
    - Update `name` to your Worker name
    - Set `routes` for custom domains (or remove for workers.dev)
    - Configure D1 database binding
 
-2. **Create D1 Database for Metadata:**
+2. **Authenticate with Cloudflare:**
+
    ```bash
    npx wrangler login
+   ```
+
+3. **Create D1 Database for Metadata:**
+
+   ```bash
    npx wrangler d1 create d1-manager-metadata
    ```
+
    Copy the `database_id` into `wrangler.toml` under `[[d1_databases]]`
 
-3. **Initialize Database Schema:**
+4. **Initialize Database Schema:**
+
    ```bash
    npx wrangler d1 execute d1-manager-metadata --remote --file=worker/schema.sql
    ```
-   
+
    **Note for existing users upgrading:** If you're upgrading from an earlier version, run this command again to add new tables (like `undo_history` for the rollback feature). Existing tables won't be affected.
 
-4. **Set Up Cloudflare Access (Zero Trust):**
+5. **Set Up Cloudflare Access (Zero Trust):**
    - Navigate to [Cloudflare Zero Trust](https://one.dash.cloudflare.com/)
    - Set up GitHub OAuth under **Settings → Authentication**
    - Create a new Access Application for your domain(s)
    - Configure policies (e.g., allow GitHub users from your org)
    - Copy the **Application Audience (AUD) tag**
 
-5. **Create API Token:**
+6. **Create API Token:**
    - Go to [Cloudflare API Tokens](https://dash.cloudflare.com/profile/api-tokens)
    - Click **Create Token** → **Create Custom Token**
    - Name it: `D1-Manager-Token`
@@ -511,35 +535,47 @@ Migration-based approach with automatic export/import since D1 doesn't natively 
    - Click **Continue to summary** → **Create Token**
    - Copy the token immediately (it won't be shown again)
 
-6. **Set Worker Secrets:**
+7. **Set Worker Secrets:**
+
+   Set your Cloudflare Account ID:
+   
    ```bash
-   # Your Cloudflare Account ID (from dashboard URL)
    npx wrangler secret put ACCOUNT_ID
+   ```
 
-   # API Token with D1 Edit permissions (from step 5)
+   Set your API Token (from step 6):
+   
+   ```bash
    npx wrangler secret put API_KEY
+   ```
 
-   # Cloudflare Access team domain (e.g., https://yourteam.cloudflareaccess.com)
+   Set your Cloudflare Access team domain:
+   
+   ```bash
    npx wrangler secret put TEAM_DOMAIN
+   ```
 
-   # Application Audience tag from Cloudflare Access (from step 4)
+   Set your Application Audience tag (from step 5):
+   
+   ```bash
    npx wrangler secret put POLICY_AUD
    ```
 
-7. **Update Environment for Production:**
+8. **Update Environment for Production:**
    
-   Edit `.env` to comment out the local development API:
-   ```env
-   # VITE_WORKER_API=http://localhost:8787
-   # Uncomment the line above for local development only
-   # For production, leave it commented so it uses window.location.origin
-   ```
+   Edit `.env` to comment out the local development API. For production, leave `VITE_WORKER_API` commented so it uses `window.location.origin`.
 
-8. **Build and Deploy:**
+9. **Build the frontend:**
+
    ```bash
    npm run build
-   npx wrangler deploy
    ```
+
+10. **Deploy to Cloudflare:**
+
+    ```bash
+    npx wrangler deploy
+    ```
 
 ### Deployment Domains
 
@@ -556,7 +592,13 @@ After deployment, your D1 Manager will be available at:
 ### Troubleshooting
 
 **"Failed to list databases" Error:**
-- Verify all secrets are set correctly: `npx wrangler secret list`
+
+- Verify all secrets are set correctly:
+
+  ```bash
+  npx wrangler secret list
+  ```
+
 - Ensure API token has **D1 Edit** permissions (not just Read)
 - Check that `ACCOUNT_ID` matches your Cloudflare account
 - Use **API Token** (not Global API Key) for authentication
@@ -567,8 +609,17 @@ After deployment, your D1 Manager will be available at:
 - Ensure your GitHub account is allowed in Access policies
 
 **Mock Data in Production:**
+
 - Check that `.env` does NOT have `VITE_WORKER_API=http://localhost:8787`
-- Rebuild frontend: `npm run build && npx wrangler deploy`
+- Rebuild and redeploy:
+
+  ```bash
+  npm run build
+  ```
+
+  ```bash
+  npx wrangler deploy
+  ```
 
 **Migration Wizard Notes:**
 - DEFAULT values (e.g., `datetime('now')`) are not preserved during migration
