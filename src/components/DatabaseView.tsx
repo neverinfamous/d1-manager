@@ -32,6 +32,7 @@ import { ERDiagram } from './ERDiagram';
 import { FTS5Manager } from './FTS5Manager';
 import { ConstraintValidator } from './ConstraintValidator';
 import { IndexAnalyzer } from './IndexAnalyzer';
+import { CircularDependencyDetector } from './CircularDependencyDetector';
 
 interface DatabaseViewProps {
   databaseId: string;
@@ -47,7 +48,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSchemaDesigner, setShowSchemaDesigner] = useState(false);
-  const [activeTab, setActiveTab] = useState<'tables' | 'builder' | 'relationships' | 'fts5' | 'constraints' | 'performance'>('tables');
+  const [activeTab, setActiveTab] = useState<'tables' | 'builder' | 'relationships' | 'circular' | 'fts5' | 'constraints' | 'performance'>('tables');
   const [relationshipsView, setRelationshipsView] = useState<'editor' | 'diagram'>('editor');
   
   // Selection state
@@ -401,6 +402,14 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
               Relationships
             </Button>
             <Button
+              variant={activeTab === 'circular' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setActiveTab('circular')}
+            >
+              <AlertTriangle className="h-4 w-4 mr-2" />
+              Circular Dependencies
+            </Button>
+            <Button
               variant={activeTab === 'fts5' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setActiveTab('fts5')}
@@ -471,6 +480,11 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
             <ERDiagram databaseId={databaseId} databaseName={databaseName} onTableSelect={onSelectTable} />
           )}
         </>
+      ) : activeTab === 'circular' ? (
+        <CircularDependencyDetector 
+          databaseId={databaseId}
+          onNavigateToRelationships={() => setActiveTab('relationships')}
+        />
       ) : activeTab === 'fts5' ? (
         <FTS5Manager databaseId={databaseId} databaseName={databaseName} />
       ) : activeTab === 'constraints' ? (

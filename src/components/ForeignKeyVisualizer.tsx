@@ -13,7 +13,7 @@ import ReactFlow, {
   MarkerType
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { Loader2, Plus, RefreshCw, Maximize2, LayoutGrid, Network as NetworkIcon, Trash2, Edit, Info } from 'lucide-react';
+import { Loader2, Plus, RefreshCw, Maximize2, LayoutGrid, Network as NetworkIcon, Trash2, Edit, Info, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -31,7 +31,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { getAllForeignKeys, addForeignKey, modifyForeignKey, deleteForeignKey, type ForeignKeyGraph, type ForeignKeyGraphEdge } from '@/services/api';
+import { getAllForeignKeys, addForeignKey, modifyForeignKey, deleteForeignKey, getCircularDependencies, type ForeignKeyGraph, type ForeignKeyGraphEdge, type CircularDependencyCycle } from '@/services/api';
 import { applyLayout, type LayoutType, type GraphData } from '@/services/graphLayout';
 import { ForeignKeyEditor } from './ForeignKeyEditor';
 
@@ -94,6 +94,8 @@ function ForeignKeyVisualizerContent({ databaseId, focusTable, onTableSelect }: 
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showLegend, setShowLegend] = useState(true);
   const [filterTable, setFilterTable] = useState<string>('all');
+  const [highlightCycles, setHighlightCycles] = useState(false);
+  const [cycles, setCycles] = useState<CircularDependencyCycle[]>([]);
   
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -108,6 +110,10 @@ function ForeignKeyVisualizerContent({ databaseId, focusTable, onTableSelect }: 
     try {
       const data = await getAllForeignKeys(databaseId);
       setGraphData(data);
+      
+      // Load circular dependencies
+      const detectedCycles = await getCircularDependencies(databaseId);
+      setCycles(detectedCycles);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load foreign keys');
     } finally {
@@ -151,14 +157,57 @@ function ForeignKeyVisualizerContent({ databaseId, focusTable, onTableSelect }: 
     
     const { nodes: layoutedNodes, edges: layoutedEdges } = applyLayout(layoutData, layoutType);
     
-    setNodes(layoutedNodes);
-    setEdges(layoutedEdges);
+    // Apply cycle highlighting if enabled
+    if (highlightCycles && cycles.length > 0) {
+      // Get all tables and edges in cycles
+      const tablesInCycles = new Set<string>();
+      const edgesInCycles = new Set<string>();
+      
+      cycles.forEach(cycle => {
+        cycle.tables.forEach(table => tablesInCycles.add(table));
+        cycle.constraintNames.forEach(name => edgesInCycles.add(name));
+      });
+      
+      // Update nodes with cycle highlighting
+      const highlightedNodes = layoutedNodes.map(node => ({
+        ...node,
+        style: tablesInCycles.has(node.id) ? {
+          ...node.style,
+          border: '3px solid #ef4444',
+          animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
+        } : {
+          ...node.style,
+          opacity: 0.3
+        }
+      }));
+      
+      // Update edges with cycle highlighting
+      const highlightedEdges = layoutedEdges.map(edge => {
+        const isInCycle = edgesInCycles.has(edge.id);
+        return {
+          ...edge,
+          animated: isInCycle,
+          style: {
+            ...edge.style,
+            stroke: isInCycle ? '#ef4444' : (edge.style?.stroke || '#999'),
+            strokeWidth: isInCycle ? 3 : 2,
+            opacity: isInCycle ? 1 : 0.3
+          }
+        };
+      });
+      
+      setNodes(highlightedNodes);
+      setEdges(highlightedEdges);
+    } else {
+      setNodes(layoutedNodes);
+      setEdges(layoutedEdges);
+    }
     
     // Fit view after layout
     setTimeout(() => {
       fitView({ padding: 0.1, duration: 300 });
     }, 50);
-  }, [graphData, layoutType, filterTable, setNodes, setEdges, fitView]);
+  }, [graphData, layoutType, filterTable, highlightCycles, cycles, setNodes, setEdges, fitView]);
   
   // Focus on specific table if provided
   useEffect(() => {
@@ -301,6 +350,16 @@ function ForeignKeyVisualizerContent({ databaseId, focusTable, onTableSelect }: 
             <Button size="sm" variant="outline" onClick={() => setShowAddDialog(true)}>
               <Plus className="h-4 w-4 mr-2" />
               Add FK
+            </Button>
+            <Button 
+              size="sm" 
+              variant={highlightCycles ? "default" : "outline"}
+              onClick={() => setHighlightCycles(!highlightCycles)}
+              disabled={cycles.length === 0}
+              title={cycles.length > 0 ? `Highlight ${cycles.length} circular ${cycles.length === 1 ? 'dependency' : 'dependencies'}` : 'No circular dependencies detected'}
+            >
+              <AlertTriangle className="h-4 w-4 mr-2" />
+              {cycles.length > 0 && <span className="text-xs">{cycles.length}</span>}
             </Button>
             <Button size="sm" variant="outline" onClick={loadForeignKeys}>
               <RefreshCw className="h-4 w-4" />

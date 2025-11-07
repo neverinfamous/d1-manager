@@ -1431,6 +1431,101 @@ export async function handleTableRoutes(
       });
     }
 
+    // Get circular dependencies in database
+    if (request.method === 'GET' && url.pathname === `/api/tables/${dbId}/circular-dependencies`) {
+      console.log('[Tables] Detecting circular dependencies for database:', dbId);
+      
+      // Mock response for local development
+      if (isLocalDev) {
+        return new Response(JSON.stringify({
+          result: [
+            {
+              tables: ['users', 'profiles', 'users'],
+              path: 'users → profiles → users',
+              severity: 'medium',
+              cascadeRisk: false,
+              restrictPresent: true,
+              constraintNames: ['fk_profiles_user', 'fk_users_profile'],
+              message: 'Circular dependency detected: users → profiles → users (contains RESTRICT constraints)'
+            }
+          ],
+          success: true
+        }), {
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        });
+      }
+      
+      // Get FK graph and detect cycles
+      const { detectCircularDependencies } = await import('../utils/circular-dependency-detector');
+      const fkGraphResult = await getAllForeignKeysForDatabase(dbId, env);
+      const cycles = detectCircularDependencies(fkGraphResult);
+      
+      return new Response(JSON.stringify({
+        result: cycles,
+        success: true
+      }), {
+        headers: {
+          'Content-Type': 'application/json',
+          ...corsHeaders
+        }
+      });
+    }
+
+    // Simulate adding a foreign key (check for cycles)
+    if (request.method === 'POST' && url.pathname === `/api/tables/${dbId}/foreign-keys/simulate`) {
+      console.log('[Tables] Simulating foreign key addition');
+      
+      const body = await request.json() as {
+        sourceTable: string;
+        targetTable: string;
+      };
+      
+      if (!body.sourceTable || !body.targetTable) {
+        return new Response(JSON.stringify({ 
+          error: 'sourceTable and targetTable are required' 
+        }), { 
+          status: 400,
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        });
+      }
+      
+      // Mock response for local development
+      if (isLocalDev) {
+        return new Response(JSON.stringify({
+          result: {
+            wouldCreateCycle: false
+          },
+          success: true
+        }), {
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        });
+      }
+      
+      // Get FK graph and simulate addition
+      const { wouldCreateCycle } = await import('../utils/circular-dependency-detector');
+      const fkGraphResult = await getAllForeignKeysForDatabase(dbId, env);
+      const simulation = wouldCreateCycle(fkGraphResult, body.sourceTable, body.targetTable);
+      
+      return new Response(JSON.stringify({
+        result: simulation,
+        success: true
+      }), {
+        headers: {
+          'Content-Type': 'application/json',
+          ...corsHeaders
+        }
+      });
+    }
+
     // Add foreign key constraint
     if (request.method === 'POST' && url.pathname === `/api/tables/${dbId}/foreign-keys/add`) {
       console.log('[Tables] Adding foreign key constraint');

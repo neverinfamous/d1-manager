@@ -744,18 +744,23 @@ For more help, see [Cloudflare Workers Troubleshooting](https://developers.cloud
   - **Smart Navigation** - Click to jump to referenced tables or use breadcrumbs to go back
   - **Keyboard Shortcuts** - Alt+Left for back navigation through table history
   - **Visual Indicators** - FK columns highlighted with link icons and tooltips showing references
+- **Circular Dependency Detector** - Proactive schema analysis and cycle detection
+  - **DFS Algorithm** - Depth-first search with path tracking for cycle detection
+  - **Severity Classification** - Low/Medium/High based on cycle length and CASCADE presence
+  - **Interactive Visualization** - ReactFlow graph showing only circular dependency chains
+  - **Pre-Add Validation** - Warns before adding FKs that would create cycles
+  - **Breaking Suggestions** - Recommends which constraints to modify
+  - **Dedicated Tab** - "Circular Dependencies" tab in database view with cycle count
+  - **Visual Indicators** - Highlight cycles button in Foreign Key Visualizer with pulsing animation
+  - **Acknowledgment Required** - Checkbox to proceed with FK creation despite cycle warning
   
 ## Planned Features
 
-### 1. Circular Dependency Detector
-Detect and warn users about circular foreign key chains
-- Prevents schema design pitfalls
-
-### 2. Dependency Export
+### 1. Dependency Export
 Export schema relationships as JSON or documentation files
 - Useful for audits and documentation
 
-### 3. Force Delete Mode
+### 2. Force Delete Mode
 Developer-only toggle to bypass FK constraints (with audit logging)
 - Low-value, niche power-user feature for controlled environments
 

@@ -1276,6 +1276,27 @@ export interface ForeignKeyGraph {
 }
 
 /**
+ * Circular dependency cycle information
+ */
+export interface CircularDependencyCycle {
+  tables: string[]
+  path: string
+  severity: 'low' | 'medium' | 'high'
+  cascadeRisk: boolean
+  restrictPresent: boolean
+  constraintNames: string[]
+  message: string
+}
+
+/**
+ * Result of simulating a foreign key addition
+ */
+export interface SimulateForeignKeyResult {
+  wouldCreateCycle: boolean
+  cycle?: CircularDependencyCycle
+}
+
+/**
  * Get all foreign keys for a database
  */
 export const getAllForeignKeys = async (databaseId: string): Promise<ForeignKeyGraph> => {
@@ -1290,6 +1311,50 @@ export const getAllForeignKeys = async (databaseId: string): Promise<ForeignKeyG
   }
   
   const data = await response.json() as { result: ForeignKeyGraph, success: boolean }
+  return data.result
+}
+
+/**
+ * Get circular dependencies in a database
+ */
+export const getCircularDependencies = async (databaseId: string): Promise<CircularDependencyCycle[]> => {
+  const response = await fetch(`${WORKER_API}/api/tables/${databaseId}/circular-dependencies`, {
+    method: 'GET',
+    credentials: 'include'
+  })
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+    throw new Error(error.error || `Failed to get circular dependencies: ${response.status}`)
+  }
+  
+  const data = await response.json() as { result: CircularDependencyCycle[], success: boolean }
+  return data.result
+}
+
+/**
+ * Simulate adding a foreign key to check if it would create a circular dependency
+ */
+export const simulateAddForeignKey = async (
+  databaseId: string,
+  sourceTable: string,
+  targetTable: string
+): Promise<SimulateForeignKeyResult> => {
+  const response = await fetch(`${WORKER_API}/api/tables/${databaseId}/foreign-keys/simulate`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    credentials: 'include',
+    body: JSON.stringify({ sourceTable, targetTable })
+  })
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+    throw new Error(error.error || `Failed to simulate foreign key: ${response.status}`)
+  }
+  
+  const data = await response.json() as { result: SimulateForeignKeyResult, success: boolean }
   return data.result
 }
 

@@ -18,7 +18,8 @@ import {
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { getTableSchema, type ColumnInfo, type ForeignKeyGraphNode } from '@/services/api';
+import { getTableSchema, simulateAddForeignKey, type ColumnInfo, type ForeignKeyGraphNode, type CircularDependencyCycle } from '@/services/api';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface ForeignKeyEditorProps {
   open: boolean;
@@ -73,6 +74,9 @@ export function ForeignKeyEditor({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
+  const [cycleWarning, setCycleWarning] = useState<CircularDependencyCycle | null>(null);
+  const [checkingCycle, setCheckingCycle] = useState(false);
+  const [acknowledgedCycle, setAcknowledgedCycle] = useState(false);
   
   // Initialize from existing constraint if in edit mode
   useEffect(() => {
@@ -140,6 +144,37 @@ export function ForeignKeyEditor({
     
     loadTargetColumns();
   }, [databaseId, targetTable]);
+  
+  // Check for circular dependencies when both tables are selected (only in add mode)
+  useEffect(() => {
+    if (mode !== 'add' || !sourceTable || !targetTable) {
+      setCycleWarning(null);
+      setAcknowledgedCycle(false);
+      return;
+    }
+    
+    const checkForCycles = async () => {
+      setCheckingCycle(true);
+      try {
+        const result = await simulateAddForeignKey(databaseId, sourceTable, targetTable);
+        if (result.wouldCreateCycle && result.cycle) {
+          setCycleWarning(result.cycle);
+          setAcknowledgedCycle(false);
+        } else {
+          setCycleWarning(null);
+          setAcknowledgedCycle(false);
+        }
+      } catch (err) {
+        console.error('Failed to check for cycles:', err);
+        // Don't block FK creation if check fails
+        setCycleWarning(null);
+      } finally {
+        setCheckingCycle(false);
+      }
+    };
+    
+    checkForCycles();
+  }, [databaseId, sourceTable, targetTable, mode]);
   
   // Validate column type compatibility
   useEffect(() => {
@@ -408,6 +443,50 @@ export function ForeignKeyEditor({
             </div>
           )}
           
+          {/* Circular Dependency Warning */}
+          {checkingCycle && (
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-900 rounded-lg p-4">
+              <div className="flex items-center gap-2 text-sm text-blue-800 dark:text-blue-300">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Checking for circular dependencies...</span>
+              </div>
+            </div>
+          )}
+          
+          {cycleWarning && (
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900 rounded-lg p-4 space-y-3">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <p className="text-sm font-semibold text-red-800 dark:text-red-300">
+                    Circular Dependency Detected
+                  </p>
+                  <p className="text-sm text-red-700 dark:text-red-400">
+                    {cycleWarning.message}
+                  </p>
+                  <div className="bg-red-100 dark:bg-red-900/30 px-3 py-2 rounded text-xs font-mono text-red-900 dark:text-red-200">
+                    {cycleWarning.path}
+                  </div>
+                  <p className="text-xs text-red-600 dark:text-red-400">
+                    Severity: <span className="font-semibold uppercase">{cycleWarning.severity}</span>
+                    {cycleWarning.cascadeRisk && ' • Contains CASCADE operations'}
+                  </p>
+                </div>
+              </div>
+              
+              <div className="flex items-start gap-2 pt-2 border-t border-red-200 dark:border-red-800">
+                <Checkbox 
+                  id="acknowledge-cycle" 
+                  checked={acknowledgedCycle}
+                  onCheckedChange={(checked) => setAcknowledgedCycle(checked === true)}
+                />
+                <Label htmlFor="acknowledge-cycle" className="text-sm text-red-800 dark:text-red-300 cursor-pointer">
+                  I understand this will create a circular dependency and accept the risks
+                </Label>
+              </div>
+            </div>
+          )}
+          
           {/* Error */}
           {error && (
             <div className="bg-destructive/10 border border-destructive text-destructive px-3 py-2 rounded-lg text-sm">
@@ -433,7 +512,8 @@ export function ForeignKeyEditor({
               !targetTable ||
               !targetColumn ||
               loadingSourceCols ||
-              loadingTargetCols
+              loadingTargetCols ||
+              (cycleWarning !== null && !acknowledgedCycle)
             }
           >
             {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
