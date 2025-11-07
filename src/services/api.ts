@@ -374,7 +374,9 @@ class APIService {
       
       if (!response.ok) {
         const error = await response.json().catch(() => ({ error: 'Unknown error' }))
-        throw new Error(error.error || error.message || `Rename failed: ${response.statusText}`)
+        // Use details field if available (e.g., for FTS5 errors), otherwise use error field
+        const errorMessage = error.details || error.error || error.message || `Rename failed: ${response.statusText}`
+        throw new Error(errorMessage)
       }
       
       onProgress?.('completed', 100)

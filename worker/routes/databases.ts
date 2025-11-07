@@ -2,6 +2,62 @@ import type { Env, D1DatabaseInfo } from '../types';
 import { CF_API } from '../types';
 import { isProtectedDatabase, createProtectedDatabaseResponse } from '../utils/database-protection';
 
+/**
+ * Check if a database contains FTS5 virtual tables
+ * FTS5 tables cannot be exported via D1's export API
+ */
+async function hasFTS5Tables(
+  databaseId: string,
+  cfHeaders: Record<string, string>,
+  env: Env
+): Promise<{ hasFTS5: boolean; fts5Tables: string[] }> {
+  try {
+    console.log('[FTS5 Check] Checking for FTS5 tables in database:', databaseId);
+    
+    const response = await fetch(
+      `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database/${databaseId}/query`,
+      {
+        method: 'POST',
+        headers: cfHeaders,
+        body: JSON.stringify({
+          sql: "SELECT name FROM sqlite_master WHERE type='table' AND sql LIKE '%USING fts5%' ORDER BY name"
+        })
+      }
+    );
+    
+    if (!response.ok) {
+      console.error('[FTS5 Check] Failed to query for FTS5 tables:', await response.text());
+      // If we can't check, assume no FTS5 tables to avoid blocking unnecessarily
+      return { hasFTS5: false, fts5Tables: [] };
+    }
+    
+    const data = await response.json() as {
+      result: Array<{ results: Array<{ name: string }> }>;
+      success: boolean;
+    };
+    
+    if (!data.success || !data.result?.[0]?.results) {
+      console.warn('[FTS5 Check] Invalid response structure');
+      return { hasFTS5: false, fts5Tables: [] };
+    }
+    
+    const fts5Tables = data.result[0].results.map((r: { name: string }) => r.name);
+    const hasFTS5 = fts5Tables.length > 0;
+    
+    if (hasFTS5) {
+      console.log('[FTS5 Check] Found FTS5 tables:', fts5Tables);
+    } else {
+      console.log('[FTS5 Check] No FTS5 tables found');
+    }
+    
+    return { hasFTS5, fts5Tables };
+  } catch (err) {
+    console.error('[FTS5 Check] Error checking for FTS5 tables:', err);
+    // If error occurs, assume no FTS5 tables to avoid blocking unnecessarily
+    return { hasFTS5: false, fts5Tables: [] };
+  }
+}
+
 export async function handleDatabaseRoutes(
   request: Request,
   env: Env,
@@ -563,6 +619,24 @@ export async function handleDatabaseRoutes(
           console.warn('[Databases] Attempted to rename protected database:', dbInfo.result.name);
           return createProtectedDatabaseResponse(corsHeaders);
         }
+      }
+      
+      // Check for FTS5 tables - D1 export API cannot export databases with FTS5 tables
+      const fts5Check = await hasFTS5Tables(dbId, cfHeaders, env);
+      if (fts5Check.hasFTS5) {
+        console.warn('[Databases] Cannot rename database with FTS5 tables:', fts5Check.fts5Tables);
+        return new Response(JSON.stringify({
+          error: 'Cannot rename database with FTS5 tables',
+          details: `This database contains FTS5 (Full-Text Search) virtual tables (${fts5Check.fts5Tables.join(', ')}), which cannot be exported using D1's export API. Database rename requires export/import functionality.`,
+          fts5Tables: fts5Check.fts5Tables,
+          success: false
+        }), {
+          status: 400,
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        });
       }
       
       let newDbId: string | null = null;
