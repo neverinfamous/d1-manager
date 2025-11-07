@@ -105,6 +105,7 @@ This Docker image packages the complete D1 Database Manager with:
 - **Bulk Operations** - Multi-select operations for databases and tables (bulk download, delete, clone, export)
 - **Column Management** - Add, rename, modify, and delete columns with proper migration handling
 - **Foreign Key Visualizer/Editor** - Interactive graph-based relationship management with dual layout system (hierarchical/force-directed), add/modify/delete constraints, type validation, orphan detection, and color-coded edges
+- **Circular Dependency Detector** - Proactive schema analysis to identify circular foreign key chains with DFS algorithm, severity classification (Low/Medium/High), interactive visualization, pre-add validation, breaking suggestions, dedicated tab, and FK Visualizer integration with highlight button
 - **ER Relationship Diagram** - Visual entity-relationship diagram with dual view mode (toggle between FK Editor and ER Diagram), interactive navigation, hierarchical/force-directed layouts, and multi-format export (PNG/SVG/JSON)
 - **Foreign Key Navigation** - Click foreign key values to navigate between related tables with breadcrumb trail, auto-filtering, visual FK indicators with link icons and tooltips, and keyboard shortcuts (Alt+Left for back navigation)
 - **Dependency Analysis** - Foreign key relationship viewer before table deletion

@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] - 2025-11-07
 
 ### Added
+- **Circular Dependency Detector** - Proactive schema analysis to identify and warn about circular foreign key chains
+  - DFS-based cycle detection algorithm with path tracking and deduplication
+  - Severity classification (Low/Medium/High) based on cycle length and CASCADE operations
+  - Interactive ReactFlow graph visualization showing only tables in cycles
+  - Pre-add validation warns before creating foreign keys that would complete a cycle
+  - Breaking suggestions recommend which constraints to modify or remove
+  - Dedicated "Circular Dependencies" tab in database view with automatic scanning
+  - FK Visualizer integration with highlight cycles button and badge count
+  - Pulsing red animation on nodes/edges involved in cycles
+  - Mandatory acknowledgment checkbox to proceed despite cycle warnings
+  - Backend API endpoints: GET /api/tables/:dbId/circular-dependencies and POST /api/tables/:dbId/foreign-keys/simulate
+  - Comprehensive wiki documentation with algorithm explanation and best practices
 - **Database Rename Verification** - Comprehensive integrity verification before deleting original database during rename operations
   - Validates table counts match between source and target databases
   - Verifies row counts for all tables

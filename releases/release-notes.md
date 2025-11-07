@@ -76,6 +76,17 @@ These features have been implemented and deployed since the initial v1.0.0 relea
 - **Statistics Dashboard** - Total recommendations, tables without indexes, query efficiency metrics
 - **Performance Tab** - Dedicated index analysis interface in database view
 
+#### Circular Dependency Detector
+- **DFS Algorithm** - Depth-first search with path tracking for comprehensive cycle detection
+- **Severity Classification** - Categorizes cycles as Low/Medium/High based on length and CASCADE presence
+- **Interactive Visualization** - ReactFlow graph showing only tables involved in circular dependencies
+- **Pre-Add Validation** - Warns before adding foreign keys that would create circular dependencies
+- **Breaking Suggestions** - Recommends which constraints to modify or remove to break cycles
+- **Dedicated Tab** - "Circular Dependencies" tab in database view with automatic cycle scanning
+- **FK Visualizer Integration** - Highlight cycles button with badge count and pulsing animation
+- **Acknowledgment Required** - Mandatory checkbox to proceed with FK creation despite cycle warning
+- **Cycle Details** - Shows dependency path, risk indicators, and CASCADE/RESTRICT presence
+
 #### ER Relationship Diagram
 - **Dual View Mode** - Toggle between Foreign Key Editor and ER Diagram within Relationships tab
 - **Visual Schema Display** - Tables showing primary keys (🔑) and foreign keys (🔗) with data types
