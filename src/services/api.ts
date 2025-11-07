@@ -357,7 +357,10 @@ class APIService {
   async renameDatabase(
     databaseId: string,
     newName: string,
-    onProgress?: (step: string, progress: number) => void
+    onProgress?: (
+      step: 'validating' | 'creating' | 'exporting' | 'importing' | 'verifying' | 'deleting' | 'completed',
+      progress: number
+    ) => void
   ): Promise<D1Database> {
     try {
       onProgress?.('validating', 10)

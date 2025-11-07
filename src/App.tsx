@@ -1246,6 +1246,7 @@ export default function App() {
                       {renameDialogState.currentStep === 'creating' && 'Creating new database...'}
                       {renameDialogState.currentStep === 'exporting' && 'Exporting data...'}
                       {renameDialogState.currentStep === 'importing' && 'Importing data...'}
+                      {renameDialogState.currentStep === 'verifying' && 'Verifying data integrity...'}
                       {renameDialogState.currentStep === 'deleting' && 'Cleaning up...'}
                       {renameDialogState.currentStep === 'completed' && 'Rename complete!'}
                       {!renameDialogState.currentStep && 'Processing...'}
@@ -1263,7 +1264,8 @@ export default function App() {
               {/* Error Message */}
               {renameDialogState.error && (
                 <div className="bg-destructive/10 border border-destructive text-destructive px-3 py-2 rounded-lg text-sm">
-                  {renameDialogState.error}
+                  <div className="font-semibold mb-1">Error</div>
+                  <div className="whitespace-pre-line">{renameDialogState.error}</div>
                 </div>
               )}
             </div>
