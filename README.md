@@ -462,16 +462,29 @@ Comprehensive schema modification from the table view with always-visible action
 
 Migration-based approach with automatic export/import since D1 doesn't natively support renaming.
 
-**Process:** Validates name → Creates new database → Exports data → Imports → Verifies → Deletes original
+**Process:** Validates name → Creates new database → Exports data → Imports → **Verifies integrity** → Deletes original
 
 **Safety Features:**
+- **FTS5 Detection** - Automatically blocks rename for databases with FTS5 tables (D1 export API limitation)
+- **Integrity Verification** - Validates table count, row counts, and schema structure before deleting original
+- **Automatic Rollback** - Deletes new database and preserves original if verification fails
 - Backup warning with one-click download button
 - Mandatory confirmation checkbox
-- Real-time progress tracking
-- Automatic rollback on failure
+- Real-time progress tracking with verification step
 - Name validation (3-63 chars, lowercase a-z, 0-9, hyphens, no leading/trailing hyphens)
 
-**Note:** Temporary duplication during migration counts toward quota. Always backup first.
+**Limitations:**
+- **Cannot rename databases with FTS5 tables** - Cloudflare D1's export API does not support virtual tables (FTS5)
+- Temporary duplication during migration counts toward quota
+- Always backup first before attempting rename
+
+**Verification Process:**
+The system automatically verifies data integrity after import by comparing:
+- Table counts between source and target
+- Row counts for each table
+- Schema structure (column counts)
+
+If any verification fails, the new database is automatically deleted and the original remains untouched.
 
 ### Authentication & Development
 
