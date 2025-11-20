@@ -26,7 +26,8 @@ RUN cd /tmp && \
     rm -rf /usr/local/lib/node_modules/npm/node_modules/node-gyp/node_modules/glob && \
     tar -xzf glob-11.1.0.tgz && \
     cp -r package /usr/local/lib/node_modules/npm/node_modules/glob && \
-    cp -r package /usr/local/lib/node_modules/npm/node_modules/node-gyp/node_modules/glob && \
+    (mkdir -p /usr/local/lib/node_modules/npm/node_modules/node-gyp/node_modules && \
+     cp -r package /usr/local/lib/node_modules/npm/node_modules/node-gyp/node_modules/glob || true) && \
     tar -xzf tar-7.5.2.tgz && \
     mv package /usr/local/lib/node_modules/npm/node_modules/tar && \
     rm -rf /tmp/*
@@ -70,7 +71,8 @@ RUN cd /tmp && \
     rm -rf /usr/local/lib/node_modules/npm/node_modules/node-gyp/node_modules/glob && \
     tar -xzf glob-11.1.0.tgz && \
     cp -r package /usr/local/lib/node_modules/npm/node_modules/glob && \
-    cp -r package /usr/local/lib/node_modules/npm/node_modules/node-gyp/node_modules/glob && \
+    (mkdir -p /usr/local/lib/node_modules/npm/node_modules/node-gyp/node_modules && \
+     cp -r package /usr/local/lib/node_modules/npm/node_modules/node-gyp/node_modules/glob || true) && \
     tar -xzf tar-7.5.2.tgz && \
     mv package /usr/local/lib/node_modules/npm/node_modules/tar && \
     rm -rf /tmp/*
