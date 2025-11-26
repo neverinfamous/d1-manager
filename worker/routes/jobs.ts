@@ -416,7 +416,7 @@ export async function handleJobRoutes(
       }
       
       return new Response(
-        JSON.stringify({ success: false, error: 'Failed to list jobs', details: errorMessage }),
+        JSON.stringify({ success: false, error: 'Failed to list jobs' }),
         { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
       );
     }
@@ -485,7 +485,7 @@ export async function handleJobRoutes(
       }
       
       return new Response(
-        JSON.stringify({ success: false, error: 'Failed to get job status', details: errorMessage }),
+        JSON.stringify({ success: false, error: 'Failed to get job status' }),
         { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
       );
     }
@@ -581,7 +581,7 @@ export async function handleJobRoutes(
       }
       
       return new Response(
-        JSON.stringify({ success: false, error: 'Failed to get job events', details: errorMessage }),
+        JSON.stringify({ success: false, error: 'Failed to get job events' }),
         { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
       );
     }
