@@ -193,7 +193,7 @@ async function getTableIndexes(dbId: string, tableName: string, env: Env, isLoca
 /**
  * Get columns in an index
  */
-async function getIndexColumns(dbId: string, tableName: string, indexName: string, env: Env, isLocalDev: boolean): Promise<string[]> {
+async function getIndexColumns(dbId: string, _tableName: string, indexName: string, env: Env, isLocalDev: boolean): Promise<string[]> {
   if (isLocalDev) {
     return ['email'];
   }
@@ -369,7 +369,7 @@ async function getQueryPatterns(dbId: string, env: Env, isLocalDev: boolean): Pr
       'SELECT query FROM query_history WHERE database_id = ? AND error IS NULL ORDER BY executed_at DESC LIMIT 100'
     ).bind(dbId).all();
 
-    const queries = (result.results as QueryHistoryEntry[]).map(entry => ({
+    const queries = (result.results as unknown as QueryHistoryEntry[]).map(entry => ({
       query: entry.query,
     }));
 
@@ -383,7 +383,7 @@ async function getQueryPatterns(dbId: string, env: Env, isLocalDev: boolean): Pr
 /**
  * Calculate average query efficiency from history
  */
-async function calculateAverageQueryEfficiency(dbId: string, env: Env, isLocalDev: boolean): Promise<number | undefined> {
+async function calculateAverageQueryEfficiency(_dbId: string, _env: Env, isLocalDev: boolean): Promise<number | undefined> {
   if (isLocalDev) {
     return 0.65;
   }

@@ -9,6 +9,16 @@ These features have been implemented and deployed since the initial v1.0.0 relea
 
 ### 🎉 Major New Features
 
+#### Job History
+- **Operation Tracking** - Comprehensive tracking of bulk operations (export, import, delete, rename, optimize)
+- **Job List View** - View all jobs with status badges, progress, error counts, and timestamps
+- **Advanced Filtering** - Filter by status, operation type, database, date range, job ID, and minimum errors
+- **Sorting Options** - Sort by started time, completed time, total items, or error count
+- **Event Timeline** - Detailed event timeline for each job showing progress milestones and errors
+- **Job Details Dialog** - Click any job to view full event history with timestamps and contextual details
+- **Database Schema** - New `bulk_jobs` and `job_audit_events` tables for persistent storage
+- **Migration Support** - Migration file for existing installations
+
 #### Cascade Impact Simulator
 - **Interactive Graph Visualization** - ReactFlow-powered dependency graph with color-coded nodes
   - 🔴 Red nodes for source tables/rows being deleted
@@ -126,6 +136,9 @@ These features have been implemented and deployed since the initial v1.0.0 relea
 ### 🔧 API Enhancements
 
 #### New Endpoints
+- `GET /api/jobs` - List jobs with filtering (status, operation, database, date range, errors)
+- `GET /api/jobs/:jobId` - Get single job status and details
+- `GET /api/jobs/:jobId/events` - Get job event timeline
 - `GET /api/tables/:dbId/foreign-keys` - Get all foreign keys with graph structure (nodes and edges)
 - `POST /api/tables/:dbId/foreign-keys/add` - Add new foreign key constraint with validation
 - `PATCH /api/tables/:dbId/foreign-keys/:constraintName` - Modify ON DELETE/ON UPDATE behaviors
@@ -139,7 +152,6 @@ These features have been implemented and deployed since the initial v1.0.0 relea
 ### 📈 Roadmap Updates
 
 #### Still Planned
-- Circular dependency detector with visual cycle highlighting
 - Dependency export as JSON documentation files
 - Force delete mode with audit logging for power users
 - Time Travel API integration for point-in-time recovery

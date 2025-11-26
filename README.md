@@ -9,7 +9,7 @@
 [![CodeQL](https://img.shields.io/badge/CodeQL-Passing-brightgreen.svg)](https://github.com/neverinfamous/d1-manager/security/code-scanning)
 [![Type Safety](https://img.shields.io/badge/TypeScript-Strict-blue.svg)](https://github.com/neverinfamous/d1-manager)
 
-**Last Updated:** November 7, 2025 | **Version:** 1.0.0
+**Last Updated:** November 26, 2025 | **Version:** 1.0.0
 **Tech Stack:** React 19.2.0 | Vite 7.1.12 | TypeScript 5.9.3 | Tailwind CSS | shadcn/ui | Cloudflare Workers + Zero Trust
 
 A modern, full-featured web application for managing Cloudflare D1 databases with enterprise-grade authentication via Cloudflare Access (Zero Trust). Similar in design and functionality to the R2 Bucket Manager, providing capabilities beyond the standard Cloudflare dashboard.
@@ -645,6 +645,28 @@ After deployment, your D1 Manager will be available at:
 
 For more help, see [Cloudflare Workers Troubleshooting](https://developers.cloudflare.com/workers/troubleshooting/).
 
+### Upgrading from Previous Versions
+
+If you're upgrading an existing installation, run the following commands to add new features:
+
+**1. Update the schema (adds Job History tables):**
+
+```bash
+npx wrangler d1 execute d1-manager-metadata --remote --file=worker/schema.sql
+```
+
+**2. Rebuild and redeploy:**
+
+```bash
+npm run build
+```
+
+```bash
+npx wrangler deploy
+```
+
+> **Note:** The schema file uses `CREATE TABLE IF NOT EXISTS`, so running it multiple times is safe and won't affect existing data.
+
 ---
 
 ## 📋 Roadmap
@@ -753,6 +775,12 @@ For more help, see [Cloudflare Workers Troubleshooting](https://developers.cloud
   - **Dedicated Tab** - "Circular Dependencies" tab in database view with cycle count
   - **Visual Indicators** - Highlight cycles button in Foreign Key Visualizer with pulsing animation
   - **Acknowledgment Required** - Checkbox to proceed with FK creation despite cycle warning
+- **Job History** - Track and monitor bulk operations
+  - **Operation Tracking** - View all bulk operations (export, import, delete, rename, optimize)
+  - **Status Badges** - Color-coded status (queued, running, completed, failed, cancelled)
+  - **Advanced Filtering** - Filter by status, operation type, database, date range, job ID, errors
+  - **Event Timeline** - Detailed progress milestones and error details for each job
+  - **Job Details Dialog** - Click any job to view full event history with timestamps
   
 ## Planned Features
 

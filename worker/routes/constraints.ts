@@ -54,8 +54,7 @@ export async function handleConstraintRoutes(
   url: URL,
   corsHeaders: HeadersInit,
   isLocalDev: boolean,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  userEmail: string | null
+  _userEmail: string | null
 ): Promise<Response> {
   console.log('[Constraints] Handling constraint operation');
   

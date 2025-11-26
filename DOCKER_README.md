@@ -7,7 +7,7 @@
 ![Status](https://img.shields.io/badge/status-Production%2FStable-brightgreen)
 [![Security](https://img.shields.io/badge/Security-Enhanced-green.svg)](https://github.com/neverinfamous/d1-manager/blob/main/SECURITY.md)
 
-**Version:** 1.0.0 | **Last Updated:** November 7, 2025 
+**Version:** 1.0.0 | **Last Updated:** November 26, 2025 
 **Base Image:** Node.js 18-alpine | **Architecture:** linux/amd64, linux/arm64
 
 A fully containerized version of the D1 Database Manager for Cloudflare. This Docker image provides a modern, full-featured web application for managing Cloudflare D1 databases with enterprise-grade authentication via Cloudflare Access (Zero Trust).
@@ -103,6 +103,7 @@ This Docker image packages the complete D1 Database Manager with:
 - **SQL Query Console** - Execute queries with syntax highlighting, history, and CSV export
 - **Row-Level Filtering** - Type-aware filtering with OR logic, BETWEEN, IN operators, and preset templates
 - **Bulk Operations** - Multi-select operations for databases and tables (bulk download, delete, clone, export)
+- **Job History** - Track and monitor bulk operations with status badges, progress tracking, and detailed event timelines
 - **Column Management** - Add, rename, modify, and delete columns with proper migration handling
 - **Foreign Key Visualizer/Editor** - Interactive graph-based relationship management with dual layout system (hierarchical/force-directed), add/modify/delete constraints, type validation, orphan detection, and color-coded edges
 - **Circular Dependency Detector** - Proactive schema analysis to identify circular foreign key chains with DFS algorithm, severity classification (Low/Medium/High), interactive visualization, pre-add validation, breaking suggestions, dedicated tab, and FK Visualizer integration with highlight button
@@ -779,29 +780,33 @@ docker stats
 
 ### Updating to Latest Version
 
-**Pull latest image:**
+**1. Pull latest image:**
 
 ```bash
 docker pull writenotenow/d1-manager:latest
 ```
 
-**Stop old container:**
+**2. Stop and remove old container:**
 
 ```bash
-docker stop d1-manager
+docker stop d1-manager && docker rm d1-manager
 ```
 
-**Remove old container:**
-
-```bash
-docker rm d1-manager
-```
-
-**Start new container with same configuration:**
+**3. Start new container with same configuration:**
 
 ```bash
 docker run -d [same options as before] writenotenow/d1-manager:latest
 ```
+
+**4. Update the metadata database schema (for new features like Job History):**
+
+If you're using Cloudflare Workers deployment with a D1 metadata database, run:
+
+```bash
+npx wrangler d1 execute d1-manager-metadata --remote --file=worker/schema.sql
+```
+
+> **Note:** This command is safe to run multiple times. It uses `CREATE TABLE IF NOT EXISTS` to add new tables without affecting existing data.
 
 ### Using Docker Compose
 

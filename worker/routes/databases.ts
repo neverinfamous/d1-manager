@@ -1,6 +1,7 @@
 import type { Env, D1DatabaseInfo } from '../types';
 import { CF_API } from '../types';
 import { isProtectedDatabase, createProtectedDatabaseResponse } from '../utils/database-protection';
+import { createJob, completeJob, generateJobId } from './jobs';
 
 /**
  * Check if a database contains FTS5 virtual tables
@@ -322,7 +323,8 @@ export async function handleDatabaseRoutes(
   env: Env,
   url: URL,
   corsHeaders: HeadersInit,
-  isLocalDev: boolean
+  isLocalDev: boolean,
+  userEmail: string = 'unknown'
 ): Promise<Response> {
   console.log('[Databases] Handling database operation');
   
@@ -620,6 +622,25 @@ export async function handleDatabaseRoutes(
       const body = await request.json() as { databaseIds: string[] };
       console.log('[Databases] Exporting databases:', body.databaseIds);
       
+      // Create job for tracking (if metadata DB is available)
+      const jobId = generateJobId('database_export');
+      const db = env.METADATA;
+      
+      if (db && !isLocalDev) {
+        try {
+          await createJob(db, {
+            jobId,
+            databaseId: body.databaseIds[0] || 'multiple',
+            operationType: 'database_export',
+            totalItems: body.databaseIds.length,
+            userEmail,
+            metadata: { databaseIds: body.databaseIds }
+          });
+        } catch (err) {
+          console.error('[Databases] Failed to create job record:', err);
+        }
+      }
+      
       // Mock response for local development
       if (isLocalDev) {
         console.log('[Databases] Simulating database export for local development');
@@ -642,25 +663,48 @@ export async function handleDatabaseRoutes(
       
       // Export each database using D1's export API
       const exports: { [key: string]: string } = {};
+      const skipped: Array<{ databaseId: string; name: string; reason: string; details?: string[] }> = [];
+      let errorCount = 0;
       
       for (const dbId of body.databaseIds) {
         try {
+          console.log(`[Databases] Starting export for database: ${dbId}`);
+          
           // Check if this is a protected system database
           const dbInfoResponse = await fetch(
             `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database/${dbId}`,
             { headers: cfHeaders }
           );
           
+          let dbName = dbId;
           if (dbInfoResponse.ok) {
             const dbInfo = await dbInfoResponse.json() as { result: D1DatabaseInfo };
+            dbName = dbInfo.result.name;
             if (isProtectedDatabase(dbInfo.result.name)) {
               console.warn(`[Databases] Skipping export of protected database: ${dbId} (${dbInfo.result.name})`);
+              skipped.push({ databaseId: dbId, name: dbName, reason: 'protected', details: ['System database'] });
               continue; // Skip this database
             }
+          } else {
+            console.error(`[Databases] Failed to get database info for ${dbId}:`, await dbInfoResponse.text());
           }
           
+          // Check for FTS5 tables - D1 export doesn't support virtual tables
+          const fts5Check = await hasFTS5Tables(dbId, cfHeaders, env);
+          if (fts5Check.hasFTS5) {
+            console.error(`[Databases] Cannot export database ${dbName} (${dbId}): contains FTS5 tables: ${fts5Check.fts5Tables.join(', ')}`);
+            skipped.push({ 
+              databaseId: dbId, 
+              name: dbName, 
+              reason: 'fts5', 
+              details: fts5Check.fts5Tables 
+            });
+            errorCount++;
+            continue;
+          }
 
           // Start export with polling
+          console.log(`[Databases] Initiating D1 export API for ${dbName}`);
           const startResponse = await fetch(
             `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database/${dbId}/export`,
             {
@@ -671,57 +715,128 @@ export async function handleDatabaseRoutes(
           );
           
           if (!startResponse.ok) {
-            console.error(`[Databases] Export start failed for ${dbId}:`, await startResponse.text());
+            const errorText = await startResponse.text();
+            console.error(`[Databases] Export start failed for ${dbName} (${dbId}): ${startResponse.status} - ${errorText}`);
+            errorCount++;
             continue;
           }
           
-          const startData = await startResponse.json() as { result: { at_bookmark: string } };
-          const bookmark = startData.result.at_bookmark;
+          const startData = await startResponse.json() as { 
+            result: { 
+              at_bookmark?: string; 
+              error?: string;
+              status?: string;
+              result?: { signed_url?: string };
+            };
+            success: boolean;
+          };
+          console.log(`[Databases] Export API response for ${dbName}:`, JSON.stringify(startData));
           
-          // Poll for completion
           let signedUrl: string | null = null;
-          let attempts = 0;
-          const maxAttempts = 30;
           
-          while (!signedUrl && attempts < maxAttempts) {
-            await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+          // Check if export is already complete (small databases complete immediately)
+          if (startData.result?.status === 'complete' && startData.result?.result?.signed_url) {
+            console.log(`[Databases] Export already complete for ${dbName}`);
+            signedUrl = startData.result.result.signed_url;
+          } else if (startData.result?.at_bookmark) {
+            // Need to poll for completion
+            const bookmark = startData.result.at_bookmark;
+            console.log(`[Databases] Got bookmark for ${dbName}: ${bookmark}, polling for completion...`);
             
-            const pollResponse = await fetch(
-              `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database/${dbId}/export`,
-              {
-                method: 'POST',
-                headers: cfHeaders,
-                body: JSON.stringify({ current_bookmark: bookmark })
-              }
-            );
+            let attempts = 0;
+            const maxAttempts = 60; // 2 minutes max
             
-            if (pollResponse.ok) {
-              const pollData = await pollResponse.json() as { result: { signed_url?: string } };
-              if (pollData.result.signed_url) {
-                signedUrl = pollData.result.signed_url;
+            while (!signedUrl && attempts < maxAttempts) {
+              await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+              
+              const pollResponse = await fetch(
+                `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database/${dbId}/export`,
+                {
+                  method: 'POST',
+                  headers: cfHeaders,
+                  body: JSON.stringify({ 
+                    output_format: 'polling',
+                    current_bookmark: bookmark 
+                  })
+                }
+              );
+              
+              if (pollResponse.ok) {
+                const pollData = await pollResponse.json() as { 
+                  result: { 
+                    signed_url?: string; 
+                    status?: string; 
+                    error?: string;
+                    result?: { signed_url?: string };
+                  } 
+                };
+                
+                // Check both possible locations for signed_url
+                const url = pollData.result?.signed_url || pollData.result?.result?.signed_url;
+                if (url) {
+                  console.log(`[Databases] Export ready for ${dbName} after ${attempts + 1} polls`);
+                  signedUrl = url;
+                } else if (pollData.result?.error) {
+                  console.error(`[Databases] Export poll error for ${dbName}:`, pollData.result.error);
+                  break;
+                } else if (attempts % 10 === 0) {
+                  console.log(`[Databases] Still waiting for ${dbName}... (attempt ${attempts + 1}/${maxAttempts})`);
+                }
+              } else {
+                const errorText = await pollResponse.text();
+                console.error(`[Databases] Poll request failed for ${dbName}: ${pollResponse.status} - ${errorText}`);
               }
+              
+              attempts++;
             }
             
-            attempts++;
+            if (!signedUrl) {
+              console.error(`[Databases] Export timeout for ${dbName} (${dbId}) after ${attempts} attempts`);
+            }
+          } else {
+            console.error(`[Databases] Export API did not return expected response for ${dbName}:`, JSON.stringify(startData));
           }
           
           if (!signedUrl) {
-            console.error(`[Databases] Export timeout for ${dbId}`);
+            errorCount++;
             continue;
           }
           
           // Download the SQL file
+          console.log(`[Databases] Downloading export for ${dbName}...`);
           const downloadResponse = await fetch(signedUrl);
           if (downloadResponse.ok) {
-            exports[dbId] = await downloadResponse.text();
+            const sqlContent = await downloadResponse.text();
+            console.log(`[Databases] Successfully exported ${dbName}: ${sqlContent.length} bytes`);
+            exports[dbId] = sqlContent;
+          } else {
+            console.error(`[Databases] Failed to download export for ${dbName}: ${downloadResponse.status}`);
+            errorCount++;
           }
         } catch (err) {
           console.error(`[Databases] Export error for ${dbId}:`, err);
+          errorCount++;
+        }
+      }
+      
+      // Complete the job
+      if (db) {
+        try {
+          await completeJob(db, {
+            jobId,
+            status: errorCount > 0 && Object.keys(exports).length === 0 ? 'failed' : 'completed',
+            processedItems: Object.keys(exports).length,
+            errorCount,
+            userEmail
+          });
+        } catch (err) {
+          console.error('[Databases] Failed to complete job record:', err);
         }
       }
       
       return new Response(JSON.stringify({
         result: exports,
+        skipped: skipped.length > 0 ? skipped : undefined,
         success: true
       }), {
         headers: {
@@ -745,6 +860,28 @@ export async function handleDatabaseRoutes(
         databaseName: body.databaseName,
         targetDatabaseId: body.targetDatabaseId
       });
+      
+      // Create job for tracking
+      const jobId = generateJobId('database_import');
+      const db = env.METADATA;
+      
+      if (db && !isLocalDev) {
+        try {
+          await createJob(db, {
+            jobId,
+            databaseId: body.targetDatabaseId || 'new',
+            operationType: 'database_import',
+            totalItems: 1,
+            userEmail,
+            metadata: { 
+              createNew: body.createNew, 
+              databaseName: body.databaseName 
+            }
+          });
+        } catch (err) {
+          console.error('[Databases] Failed to create job record:', err);
+        }
+      }
       
       // Mock response for local development
       if (isLocalDev) {
@@ -779,62 +916,96 @@ export async function handleDatabaseRoutes(
       
       let targetDbId = body.targetDatabaseId;
       
-      // Create new database if requested
-      if (body.createNew && body.databaseName) {
-        const createResponse = await fetch(
-          `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database`,
+      try {
+        // Create new database if requested
+        if (body.createNew && body.databaseName) {
+          const createResponse = await fetch(
+            `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database`,
+            {
+              method: 'POST',
+              headers: cfHeaders,
+              body: JSON.stringify({ name: body.databaseName })
+            }
+          );
+          
+          if (!createResponse.ok) {
+            const errorText = await createResponse.text();
+            console.error('[Databases] Create error during import:', errorText);
+            throw new Error(`Failed to create database: ${createResponse.status}`);
+          }
+          
+          const createData = await createResponse.json() as { result: { uuid: string } };
+          targetDbId = createData.result.uuid;
+        }
+        
+        if (!targetDbId) {
+          throw new Error('No target database specified');
+        }
+        
+        // Import SQL content using D1's import API
+        const importResponse = await fetch(
+          `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database/${targetDbId}/import`,
           {
             method: 'POST',
             headers: cfHeaders,
-            body: JSON.stringify({ name: body.databaseName })
+            body: JSON.stringify({
+              action: 'init',
+              // Split SQL content into manageable chunks if needed
+              sql: body.sqlContent
+            })
           }
         );
         
-        if (!createResponse.ok) {
-          const errorText = await createResponse.text();
-          console.error('[Databases] Create error during import:', errorText);
-          throw new Error(`Failed to create database: ${createResponse.status}`);
+        if (!importResponse.ok) {
+          const errorText = await importResponse.text();
+          console.error('[Databases] Import error:', errorText);
+          throw new Error(`Failed to import database: ${importResponse.status}`);
         }
         
-        const createData = await createResponse.json() as { result: { uuid: string } };
-        targetDbId = createData.result.uuid;
-      }
-      
-      if (!targetDbId) {
-        throw new Error('No target database specified');
-      }
-      
-      // Import SQL content using D1's import API
-      const importResponse = await fetch(
-        `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database/${targetDbId}/import`,
-        {
-          method: 'POST',
-          headers: cfHeaders,
-          body: JSON.stringify({
-            action: 'init',
-            // Split SQL content into manageable chunks if needed
-            sql: body.sqlContent
-          })
+        const importData = await importResponse.json() as { result: unknown };
+        
+        // Complete the job successfully
+        if (db) {
+          try {
+            await completeJob(db, {
+              jobId,
+              status: 'completed',
+              processedItems: 1,
+              errorCount: 0,
+              userEmail
+            });
+          } catch (err) {
+            console.error('[Databases] Failed to complete job record:', err);
+          }
         }
-      );
-      
-      if (!importResponse.ok) {
-        const errorText = await importResponse.text();
-        console.error('[Databases] Import error:', errorText);
-        throw new Error(`Failed to import database: ${importResponse.status}`);
-      }
-      
-      const importData = await importResponse.json();
-      
-      return new Response(JSON.stringify({
-        result: importData.result,
-        success: true
-      }), {
-        headers: {
-          'Content-Type': 'application/json',
-          ...corsHeaders
+        
+        return new Response(JSON.stringify({
+          result: importData.result,
+          success: true
+        }), {
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        });
+      } catch (err) {
+        // Complete the job as failed
+        if (db) {
+          try {
+            await completeJob(db, {
+              jobId,
+              status: 'failed',
+              processedItems: 0,
+              errorCount: 1,
+              userEmail,
+              errorMessage: err instanceof Error ? err.message : 'Unknown error'
+            });
+          } catch (jobErr) {
+            console.error('[Databases] Failed to complete job record:', jobErr);
+          }
         }
-      });
+        throw err;
+      }
     }
 
     // Rename database (migration-based approach)

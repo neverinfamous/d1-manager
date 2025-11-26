@@ -9,6 +9,7 @@ import { handleUndoRoutes } from './routes/undo';
 import { handleFTS5Routes } from './routes/fts5';
 import { handleConstraintRoutes } from './routes/constraints';
 import { handleIndexRoutes } from './routes/indexes';
+import { handleJobRoutes } from './routes/jobs';
 import { trackDatabaseAccess } from './utils/database-tracking';
 
 async function handleApiRequest(request: Request, env: Env): Promise<Response> {
@@ -62,7 +63,7 @@ async function handleApiRequest(request: Request, env: Env): Promise<Response> {
 
   // Route API requests
   if (url.pathname.startsWith('/api/databases')) {
-    return await handleDatabaseRoutes(request, env, url, corsHeaders, isLocalDev);
+    return await handleDatabaseRoutes(request, env, url, corsHeaders, isLocalDev, userEmail);
   }
 
   if (url.pathname.startsWith('/api/tables/')) {
@@ -97,6 +98,13 @@ async function handleApiRequest(request: Request, env: Env): Promise<Response> {
 
   if (url.pathname.startsWith('/api/indexes/')) {
     return await handleIndexRoutes(request, env, url, corsHeaders, isLocalDev);
+  }
+
+  if (url.pathname.startsWith('/api/jobs')) {
+    const jobResponse = await handleJobRoutes(request, env, url, corsHeaders, isLocalDev, userEmail);
+    if (jobResponse) {
+      return jobResponse;
+    }
   }
 
   // Serve frontend assets

@@ -232,7 +232,7 @@ class APIService {
   async exportDatabases(
     databases: Array<{ uuid: string, name: string }>,
     onProgress?: (progress: number) => void
-  ): Promise<void> {
+  ): Promise<{ skipped?: Array<{ databaseId: string; name: string; reason: string; details?: string[] }> }> {
     try {
       onProgress?.(10)
       
@@ -254,7 +254,11 @@ class APIService {
       
       onProgress?.(50)
       
-      const data = await response.json() as { result: { [key: string]: string }, success: boolean }
+      const data = await response.json() as { 
+        result: { [key: string]: string }
+        skipped?: Array<{ databaseId: string; name: string; reason: string; details?: string[] }>
+        success: boolean 
+      }
       
       if (!data.success) {
         throw new Error('Export operation failed')
@@ -268,29 +272,36 @@ class APIService {
       
       // Add each database's SQL export to the ZIP
       const exports = data.result
+      let fileCount = 0
       for (const db of databases) {
         if (exports[db.uuid]) {
           zip.file(`${db.name}.sql`, exports[db.uuid])
+          fileCount++
         }
       }
       
       onProgress?.(90)
       
-      // Generate the ZIP file
-      const blob = await zip.generateAsync({ type: 'blob' })
-      
-      // Download the ZIP file
-      const url = window.URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)
-      link.download = `d1-databases-${timestamp}.zip`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      window.URL.revokeObjectURL(url)
+      // Only generate ZIP if we have files
+      if (fileCount > 0) {
+        // Generate the ZIP file
+        const blob = await zip.generateAsync({ type: 'blob' })
+        
+        // Download the ZIP file
+        const url = window.URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)
+        link.download = `d1-databases-${timestamp}.zip`
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        window.URL.revokeObjectURL(url)
+      }
       
       onProgress?.(100)
+      
+      return { skipped: data.skipped }
     } catch (error) {
       console.error('Database export failed:', error)
       throw new Error(error instanceof Error ? error.message : 'Failed to export databases')
@@ -1817,5 +1828,142 @@ export const createIndex = async (databaseId: string, sql: string): Promise<void
     const error = await response.json().catch(() => ({ error: 'Unknown error' }))
     throw new Error(error.error || `Failed to create index: ${response.status}`)
   }
+}
+
+// Job History Types
+export interface JobListItem {
+  job_id: string
+  database_id: string
+  operation_type: string
+  status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled'
+  total_items: number | null
+  processed_items: number | null
+  error_count: number | null
+  percentage: number
+  started_at: string
+  completed_at: string | null
+  user_email: string
+  metadata?: string | null
+}
+
+export interface JobListResponse {
+  jobs: JobListItem[]
+  total: number
+  limit: number
+  offset: number
+}
+
+export interface JobEvent {
+  id: number
+  job_id: string
+  event_type: 'started' | 'progress' | 'completed' | 'failed' | 'cancelled'
+  user_email: string
+  timestamp: string
+  details: string | null
+}
+
+export interface JobEventDetails {
+  total?: number
+  processed?: number
+  errors?: number
+  percentage?: number
+  error_message?: string
+  [key: string]: unknown
+}
+
+export interface JobEventsResponse {
+  job_id: string
+  events: JobEvent[]
+}
+
+/**
+ * Get list of jobs with optional filters
+ */
+export const getJobList = async (options?: {
+  limit?: number
+  offset?: number
+  status?: string
+  operation_type?: string
+  database_id?: string
+  start_date?: string
+  end_date?: string
+  job_id?: string
+  min_errors?: number
+  sort_by?: string
+  sort_order?: 'asc' | 'desc'
+}): Promise<JobListResponse> => {
+  const params = new URLSearchParams()
+  if (options?.limit) params.set('limit', options.limit.toString())
+  if (options?.offset) params.set('offset', options.offset.toString())
+  if (options?.status) params.set('status', options.status)
+  if (options?.operation_type) params.set('operation_type', options.operation_type)
+  if (options?.database_id) params.set('database_id', options.database_id)
+  if (options?.start_date) params.set('start_date', options.start_date)
+  if (options?.end_date) params.set('end_date', options.end_date)
+  if (options?.job_id) params.set('job_id', options.job_id)
+  if (options?.min_errors !== undefined) params.set('min_errors', options.min_errors.toString())
+  if (options?.sort_by) params.set('sort_by', options.sort_by)
+  if (options?.sort_order) params.set('sort_order', options.sort_order)
+
+  const response = await fetch(
+    `${WORKER_API}/api/jobs?${params.toString()}`,
+    {
+      method: 'GET',
+      credentials: 'include',
+      cache: 'no-store'
+    }
+  )
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+    throw new Error(error.error || `Failed to get job list: ${response.status}`)
+  }
+  
+  const data = await response.json() as { result: JobListResponse, success: boolean }
+  return data.result
+}
+
+/**
+ * Get job events (event timeline) for a specific job
+ */
+export const getJobEvents = async (jobId: string): Promise<JobEventsResponse> => {
+  const response = await fetch(
+    `${WORKER_API}/api/jobs/${jobId}/events`,
+    {
+      method: 'GET',
+      credentials: 'include',
+      cache: 'no-store'
+    }
+  )
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+    throw new Error(error.error || `Failed to get job events: ${response.status}`)
+  }
+  
+  const data = await response.json() as { result: JobEventsResponse, success: boolean }
+  return data.result
+}
+
+/**
+ * Get job status
+ */
+export const getJobStatus = async (jobId: string): Promise<JobListItem> => {
+  const response = await fetch(
+    `${WORKER_API}/api/jobs/${jobId}`,
+    {
+      method: 'GET',
+      credentials: 'include',
+      cache: 'no-store'
+    }
+  )
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+    throw new Error(error.error || `Failed to get job status: ${response.status}`)
+  }
+  
+  const data = await response.json() as { result: JobListItem, success: boolean }
+  return data.result
 }
 

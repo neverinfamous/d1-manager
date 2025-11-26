@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { api, type D1Database, getUndoHistory } from './services/api'
 import { auth } from './services/auth'
 import { useTheme } from './hooks/useTheme'
-import { Database, Plus, Moon, Sun, Monitor, Loader2, Code, GitCompare, Upload, Download, Trash2, Pencil, Zap, Undo } from 'lucide-react'
+import { Database, Plus, Moon, Sun, Monitor, Loader2, Code, GitCompare, Upload, Download, Trash2, Pencil, Zap, Undo, History, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
@@ -38,12 +38,14 @@ import { CrossDatabaseSearch } from './components/CrossDatabaseSearch'
 import { DatabaseComparison } from './components/DatabaseComparison'
 import { MigrationWizard } from './components/MigrationWizard'
 import { UndoHistoryDialog } from './components/UndoHistoryDialog'
+import { JobHistory } from './components/JobHistory'
 
 type View = 
   | { type: 'list' }
   | { type: 'database'; databaseId: string; databaseName: string }
   | { type: 'table'; databaseId: string; databaseName: string; tableName: string; navigationHistory?: Array<{ tableName: string; fkFilter?: string }>; fkFilter?: string }
   | { type: 'query'; databaseId: string; databaseName: string }
+  | { type: 'job-history' }
 
 export default function App() {
   const [databases, setDatabases] = useState<D1Database[]>([])
@@ -68,6 +70,12 @@ export default function App() {
     status: 'preparing' | 'downloading' | 'complete' | 'error'
     error?: string
   } | null>(null)
+  const [skippedExports, setSkippedExports] = useState<Array<{
+    databaseId: string
+    name: string
+    reason: string
+    details?: string[]
+  }> | null>(null)
   const [showUploadDialog, setShowUploadDialog] = useState(false)
   const [uploadFile, setUploadFile] = useState<File | null>(null)
   const [uploadMode, setUploadMode] = useState<'create' | 'import'>('create')
@@ -232,17 +240,23 @@ export default function App() {
     if (selectedDatabases.length === 0) return
     
     setError('')
+    setSkippedExports(null)
     setBulkDownloadProgress({ progress: 0, status: 'preparing' })
     
     try {
       const selectedDbData = databases.filter(db => selectedDatabases.includes(db.uuid))
       
-      await api.exportDatabases(selectedDbData, (progress) => {
+      const result = await api.exportDatabases(selectedDbData, (progress) => {
         setBulkDownloadProgress({
           progress,
           status: progress < 100 ? 'downloading' : 'complete'
         })
       })
+      
+      // Show skipped databases notice if any
+      if (result.skipped && result.skipped.length > 0) {
+        setSkippedExports(result.skipped)
+      }
       
       // Clear selection after successful download
       setSelectedDatabases([])
@@ -480,7 +494,7 @@ export default function App() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {currentView.type !== 'list' && 'databaseId' in currentView && (
+            {currentView.type !== 'list' && currentView.type !== 'job-history' && 'databaseId' in currentView && (
               <Button
                 variant="ghost"
                 size="icon"
@@ -509,6 +523,25 @@ export default function App() {
             </Button>
           </div>
         </div>
+        {/* Navigation Tabs */}
+        {(currentView.type === 'list' || currentView.type === 'job-history') && (
+          <div className="container mx-auto px-4 pb-4 flex gap-2">
+            <Button
+              variant={currentView.type === 'list' ? 'default' : 'ghost'}
+              onClick={() => setCurrentView({ type: 'list' })}
+            >
+              <Database className="h-4 w-4 mr-2" />
+              Databases
+            </Button>
+            <Button
+              variant={currentView.type === 'job-history' ? 'default' : 'ghost'}
+              onClick={() => setCurrentView({ type: 'job-history' })}
+            >
+              <History className="h-4 w-4 mr-2" />
+              Job History
+            </Button>
+          </div>
+        )}
       </header>
 
       {/* Main Content */}
@@ -846,6 +879,10 @@ export default function App() {
               databaseName={currentView.databaseName}
             />
           </div>
+        )}
+
+        {currentView.type === 'job-history' && (
+          <JobHistory databases={databases} />
         )}
       </main>
 
@@ -1295,7 +1332,7 @@ export default function App() {
       )}
 
       {/* Undo History Dialog */}
-      {currentView.type !== 'list' && 'databaseId' in currentView && (
+      {currentView.type !== 'list' && currentView.type !== 'job-history' && 'databaseId' in currentView && (
         <UndoHistoryDialog
           open={showUndoHistory}
           onOpenChange={setShowUndoHistory}
@@ -1312,6 +1349,53 @@ export default function App() {
           }}
         />
       )}
+
+      {/* Skipped Exports Notice Dialog */}
+      <Dialog open={skippedExports !== null} onOpenChange={() => setSkippedExports(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-600">
+              <AlertCircle className="h-5 w-5" />
+              Some Databases Were Not Exported
+            </DialogTitle>
+            <DialogDescription>
+              The following databases could not be exported due to limitations in the D1 export API.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-4">
+            {skippedExports?.map((item) => (
+              <div key={item.databaseId} className="rounded-lg border p-3 bg-amber-50 dark:bg-amber-950/20">
+                <div className="font-medium">{item.name}</div>
+                <div className="text-sm text-muted-foreground mt-1">
+                  {item.reason === 'fts5' ? (
+                    <>
+                      <span className="text-amber-600 dark:text-amber-400">Contains FTS5 virtual tables</span>
+                      {item.details && item.details.length > 0 && (
+                        <span className="text-xs block mt-1">
+                          Tables: {item.details.join(', ')}
+                        </span>
+                      )}
+                      <p className="text-xs mt-2 text-muted-foreground">
+                        D1's export API does not support databases with FTS5 full-text search tables. 
+                        To export this database, first drop the FTS5 tables, export, then recreate them.
+                      </p>
+                    </>
+                  ) : item.reason === 'protected' ? (
+                    <span className="text-amber-600 dark:text-amber-400">Protected system database</span>
+                  ) : (
+                    <span className="text-amber-600 dark:text-amber-400">{item.reason}</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setSkippedExports(null)}>
+              OK
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

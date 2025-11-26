@@ -5,9 +5,18 @@ All notable changes to the D1 Database Manager project will be documented in thi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 2025-11-07
+## [Unreleased]
 
 ### Added
+- **Job History** - Track and monitor bulk operations with comprehensive job history and event timelines
+  - View all bulk operations (export, import, delete, rename, optimize) in a dedicated Job History page
+  - Filter jobs by status, operation type, database, date range, job ID, and minimum errors
+  - Sort jobs by started time, completed time, total items, or error count
+  - View detailed event timeline for each job with progress milestones
+  - Job events include timestamps, processed items, errors, and contextual details
+  - Automatic tracking of database export/import operations
+  - Database schema with `bulk_jobs` and `job_audit_events` tables
+  - Migration file for existing installations (`worker/migrations/001_add_job_history.sql`)
 - **Circular Dependency Detector** - Proactive schema analysis to identify and warn about circular foreign key chains
   - DFS-based cycle detection algorithm with path tracking and deduplication
   - Severity classification (Low/Medium/High) based on cycle length and CASCADE operations
@@ -32,7 +41,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **FTS5 Detection** - Added immediate detection and blocking of rename attempts for databases containing FTS5 virtual tables
 
 ### Fixed
-- **FTS5 Export Limitation** - Database rename now properly detects and blocks databases with FTS5 (Full-Text Search) tables
+- **Database Export Timeout** - Fixed bulk database export hanging indefinitely when D1 export API returns immediately
+  - Export now correctly detects when `signed_url` is already available in the initial response
+  - Small databases export instantly instead of unnecessary polling
+  - Added proper `output_format: 'polling'` parameter for cases that require polling
+- **FTS5 Export Limitation** - Database export now properly detects and blocks databases with FTS5 (Full-Text Search) tables
+  - Previously caused confusing timeout errors or empty ZIP downloads
+  - Now provides clear UI dialog explaining which databases were skipped and why
+  - Lists specific FTS5 table names that prevent export
+  - Non-FTS5 databases in the same batch export normally
+- **FTS5 Export Limitation (Rename)** - Database rename now properly detects and blocks databases with FTS5 tables
   - Previously caused confusing 2-minute timeout errors
   - Now provides immediate, clear error message explaining D1's export API limitation
   - Lists specific FTS5 tables that prevent export
