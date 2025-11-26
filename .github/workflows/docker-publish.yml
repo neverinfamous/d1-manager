@@ -163,7 +163,7 @@ jobs:
         password: ${{ secrets.DOCKER_PASSWORD }}
         repository: ${{ env.IMAGE_NAME }}
         readme-filepath: ./DOCKER_README.md
-        short-description: "Manage Cloudflare D1 databases — SQL console, table designer, bulk operations, GitHub SSO"
+        short-description: "Manage Cloudflare D1 databases — Bulk Operations, GitHub SSO, SQL Console, Table Designer"
     
     - name: Deployment Summary
       if: success() && github.event_name == 'push' && github.ref == 'refs/heads/master'

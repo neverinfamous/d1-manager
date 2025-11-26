@@ -85,7 +85,10 @@ export function detectCircularDependencies(graph: ForeignKeyGraph): CircularDepe
     for (const { target, edge } of neighbors) {
       if (!visited.has(target)) {
         // Add edge to path before recursing
-        currentPath[currentPath.length - 1].edge = edge;
+        const lastPathNode = currentPath[currentPath.length - 1];
+        if (lastPathNode) {
+          lastPathNode.edge = edge;
+        }
         dfs(target);
       } else if (recursionStack.has(target)) {
         // Found a cycle - extract it from currentPath
@@ -133,6 +136,7 @@ function buildCycleMetadata(cyclePath: Array<{table: string; edge?: FKGraphEdge}
   // Extract tables and analyze edges
   for (let i = 0; i < cyclePath.length - 1; i++) {
     const pathNode = cyclePath[i];
+    if (!pathNode) continue;
     tables.push(pathNode.table);
     
     if (pathNode.edge) {
@@ -161,7 +165,8 @@ function buildCycleMetadata(cyclePath: Array<{table: string; edge?: FKGraphEdge}
   }
 
   // Build path string
-  const pathString = tables.join(' → ') + ' → ' + tables[0];
+  const firstTable = tables[0] ?? '';
+  const pathString = tables.join(' → ') + ' → ' + firstTable;
 
   // Build message
   let message = `Circular dependency detected: ${pathString}`;
@@ -189,10 +194,14 @@ function buildCycleMetadata(cyclePath: Array<{table: string; edge?: FKGraphEdge}
  * e.g., [A, B, C] and [B, C, A] and [C, A, B] are the same cycle
  */
 function getCycleKey(tables: string[]): string {
+  if (tables.length === 0) return '';
+  
   // Find the lexicographically smallest table
   let minIndex = 0;
   for (let i = 1; i < tables.length; i++) {
-    if (tables[i] < tables[minIndex]) {
+    const currentTable = tables[i];
+    const minTable = tables[minIndex];
+    if (currentTable && minTable && currentTable < minTable) {
       minIndex = i;
     }
   }

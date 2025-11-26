@@ -109,11 +109,14 @@ export async function analyzeIndexes(
   }
 
   // Calculate statistics
-  const statistics = {
+  const avgQueryEfficiency = await calculateAverageQueryEfficiency(dbId, env, isLocalDev);
+  const statistics: IndexAnalysisResult['statistics'] = {
     totalRecommendations: recommendations.length,
     tablesWithoutIndexes,
-    averageQueryEfficiency: await calculateAverageQueryEfficiency(dbId, env, isLocalDev),
   };
+  if (avgQueryEfficiency !== undefined) {
+    statistics.averageQueryEfficiency = avgQueryEfficiency;
+  }
 
   return {
     recommendations: sortRecommendationsByPriority(recommendations),
@@ -452,10 +455,11 @@ async function executeQueryViaAPI(
     result: Array<{ results: unknown[]; meta?: Record<string, unknown> }>;
   };
 
-  if (!data.success || !data.result || data.result.length === 0) {
+  const firstResult = data.result?.[0];
+  if (!data.success || !firstResult) {
     throw new Error('Invalid D1 API response');
   }
 
-  return data.result[0];
+  return firstResult;
 }
 

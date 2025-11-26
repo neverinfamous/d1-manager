@@ -604,9 +604,10 @@ async function checkUniqueViolations(
         name: string;
       }>;
       
-      if (indexColumns.length === 1) {
+      const firstIndexColumn = indexColumns[0];
+      if (indexColumns.length === 1 && firstIndexColumn) {
         // Single column unique constraint
-        const columnName = indexColumns[0].name;
+        const columnName = firstIndexColumn.name;
         const sanitizedColumn = sanitizeIdentifier(columnName);
         
         // Find duplicates
@@ -661,9 +662,9 @@ async function applyFixes(
       // Parse violation ID format: fk-tableName-columnName-fkId
       const parts = violationId.split('-');
       
-      if (parts[0] === 'fk' && parts.length >= 4) {
-        const tableName = parts[1];
-        const columnName = parts[2];
+      const tableName = parts[1];
+      const columnName = parts[2];
+      if (parts[0] === 'fk' && parts.length >= 4 && tableName && columnName) {
         const sanitizedTable = sanitizeIdentifier(tableName);
         const sanitizedColumn = sanitizeIdentifier(columnName);
         
@@ -767,6 +768,10 @@ async function executeQueryViaAPI(
   }
   
   const data = await response.json() as { result: Array<{ results: unknown[]; meta?: Record<string, unknown>; success: boolean }> };
-  return data.result[0];
+  const firstResult = data.result[0];
+  if (!firstResult) {
+    throw new Error('Empty result from D1 API');
+  }
+  return firstResult;
 }
 

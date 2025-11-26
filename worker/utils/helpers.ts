@@ -97,7 +97,9 @@ export function buildWhereClause(
   const filterEntries = Object.entries(filters);
   
   for (let i = 0; i < filterEntries.length; i++) {
-    const [columnName, filter] = filterEntries[i];
+    const entry = filterEntries[i];
+    if (!entry) continue;
+    const [columnName, filter] = entry;
     
     // Validate column exists in schema
     if (!columnMap.has(columnName)) {
@@ -148,7 +150,7 @@ export function buildWhereClause(
       // Limit to 100 values for performance
       const limitedValues = filter.values.slice(0, 100);
       
-      const escapedValues = limitedValues.map(val => {
+      const escapedValues = limitedValues.map((val: string | number) => {
         if (typeof val === 'string') {
           return `'${val.replace(/'/g, "''")}'`;
         }
@@ -264,13 +266,16 @@ export function buildWhereClause(
     let currentGroup: string[] = [];
     
     for (let i = 0; i < filterEntries.length; i++) {
-      const [, filter] = filterEntries[i];
+      const filterEntry = filterEntries[i];
+      if (!filterEntry) continue;
+      const [, filter] = filterEntry;
       
       // Find corresponding condition
       if (conditions.length > groups.length + currentGroup.length) {
         const conditionIndex = groups.length + currentGroup.length;
-        if (conditionIndex < conditions.length) {
-          currentGroup.push(conditions[conditionIndex]);
+        const condition = conditions[conditionIndex];
+        if (conditionIndex < conditions.length && condition) {
+          currentGroup.push(condition);
           
           // Check if next filter should be joined with OR
           if (filter.logicOperator === 'OR' && i < filterEntries.length - 1) {
@@ -281,7 +286,8 @@ export function buildWhereClause(
               if (currentGroup.length > 1) {
                 groups.push(`(${currentGroup.join(' OR ')})`);
               } else {
-                groups.push(currentGroup[0]);
+                const firstCondition = currentGroup[0];
+                if (firstCondition) groups.push(firstCondition);
               }
               currentGroup = [];
             }
@@ -295,7 +301,8 @@ export function buildWhereClause(
       if (currentGroup.length > 1) {
         groups.push(`(${currentGroup.join(' OR ')})`);
       } else {
-        groups.push(currentGroup[0]);
+        const firstCondition = currentGroup[0];
+        if (firstCondition) groups.push(firstCondition);
       }
     }
     

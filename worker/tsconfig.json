@@ -9,8 +9,10 @@
     "noEmit": true,
     "isolatedModules": true,
 
-    /* Strict Type-Checking Options (matching frontend tsconfig.app.json) */
+    /* Strict Type-Checking Options */
     "strict": true,
+    "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": true,
 
     /* Additional Checks */
     "noUnusedLocals": true,

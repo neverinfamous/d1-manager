@@ -93,7 +93,7 @@ function extractWhereColumns(sql: string): string[] {
   
   // Find WHERE clause
   const whereMatch = sql.match(/\bWHERE\s+(.*?)(?:\bGROUP\s+BY|\bORDER\s+BY|\bLIMIT|\bOFFSET|$)/is);
-  if (!whereMatch) return columns;
+  if (!whereMatch?.[1]) return columns;
 
   const whereClause = whereMatch[1];
 
@@ -105,8 +105,8 @@ function extractWhereColumns(sql: string): string[] {
     const tableName = match[1] ? match[1].replace('.', '') : null;
     const columnName = match[2];
     
-    // Skip SQL keywords
-    if (isSQLKeyword(columnName)) continue;
+    // Skip SQL keywords or undefined columns
+    if (!columnName || isSQLKeyword(columnName)) continue;
     
     if (tableName) {
       columns.push(`${tableName}.${columnName}`);
@@ -129,13 +129,17 @@ function extractJoinColumns(sql: string): string[] {
   
   for (const match of joinMatches) {
     const onClause = match[1];
+    if (!onClause) continue;
     
     // Extract columns from ON condition: table1.col1 = table2.col2
     const columnMatches = onClause.matchAll(/\b([a-zA-Z_][a-zA-Z0-9_]*\.)([a-zA-Z_][a-zA-Z0-9_]*)/g);
     
     for (const colMatch of columnMatches) {
-      const tableName = colMatch[1].replace('.', '');
+      const tablePrefix = colMatch[1];
       const columnName = colMatch[2];
+      
+      if (!tablePrefix || !columnName) continue;
+      const tableName = tablePrefix.replace('.', '');
       
       if (!isSQLKeyword(columnName)) {
         columns.push(`${tableName}.${columnName}`);
@@ -154,7 +158,7 @@ function extractOrderByColumns(sql: string): string[] {
   
   // Find ORDER BY clause
   const orderByMatch = sql.match(/\bORDER\s+BY\s+(.*?)(?:\bLIMIT|\bOFFSET|$)/is);
-  if (!orderByMatch) return columns;
+  if (!orderByMatch?.[1]) return columns;
 
   const orderByClause = orderByMatch[1];
 
@@ -165,7 +169,8 @@ function extractOrderByColumns(sql: string): string[] {
     const tableName = match[1] ? match[1].replace('.', '') : null;
     const columnName = match[2];
     
-    // Skip ASC/DESC keywords
+    // Skip undefined, ASC/DESC keywords
+    if (!columnName) continue;
     if (columnName.toUpperCase() === 'ASC' || columnName.toUpperCase() === 'DESC') continue;
     if (isSQLKeyword(columnName)) continue;
     
@@ -187,7 +192,7 @@ function extractGroupByColumns(sql: string): string[] {
   
   // Find GROUP BY clause
   const groupByMatch = sql.match(/\bGROUP\s+BY\s+(.*?)(?:\bHAVING|\bORDER\s+BY|\bLIMIT|\bOFFSET|$)/is);
-  if (!groupByMatch) return columns;
+  if (!groupByMatch?.[1]) return columns;
 
   const groupByClause = groupByMatch[1];
 
@@ -198,7 +203,7 @@ function extractGroupByColumns(sql: string): string[] {
     const tableName = match[1] ? match[1].replace('.', '') : null;
     const columnName = match[2];
     
-    if (isSQLKeyword(columnName)) continue;
+    if (!columnName || isSQLKeyword(columnName)) continue;
     
     if (tableName) {
       columns.push(`${tableName}.${columnName}`);
@@ -306,7 +311,9 @@ export function analyzeQueryPatterns(queries: { query: string; table?: string }[
 function parseColumnReference(colRef: string, defaultTable: string): { table: string; column: string } {
   if (colRef.includes('.')) {
     const parts = colRef.split('.');
-    return { table: parts[0], column: parts[1] };
+    const table = parts[0] ?? defaultTable;
+    const column = parts[1] ?? colRef;
+    return { table, column };
   }
   return { table: defaultTable, column: colRef };
 }

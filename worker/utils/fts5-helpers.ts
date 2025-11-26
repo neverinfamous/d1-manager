@@ -110,20 +110,20 @@ export function extractFTS5Config(createSql: string): Partial<FTS5TableConfig> |
   
   // Extract table name
   const tableNameMatch = createSql.match(/CREATE\s+VIRTUAL\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?["']?(\w+)["']?/i);
-  if (tableNameMatch) {
+  if (tableNameMatch?.[1]) {
     config.tableName = tableNameMatch[1];
   }
   
   // Extract tokenizer
   const tokenizerMatch = createSql.match(/tokenize\s*=\s*'([^']+)'/i);
-  if (tokenizerMatch) {
+  if (tokenizerMatch?.[1]) {
     const tokenizerStr = tokenizerMatch[1];
     config.tokenizer = parseTokenizerString(tokenizerStr);
   }
   
   // Extract prefix index
   const prefixMatch = createSql.match(/prefix\s*=\s*'([^']+)'/i);
-  if (prefixMatch) {
+  if (prefixMatch?.[1]) {
     const lengths = prefixMatch[1].split(/\s+/).map(l => parseInt(l, 10)).filter(l => !isNaN(l));
     config.prefixIndex = {
       enabled: true,
@@ -133,19 +133,19 @@ export function extractFTS5Config(createSql: string): Partial<FTS5TableConfig> |
   
   // Extract content table
   const contentMatch = createSql.match(/content\s*=\s*'([^']+)'/i);
-  if (contentMatch) {
+  if (contentMatch?.[1]) {
     config.contentTable = contentMatch[1];
   }
   
   // Extract content rowid
   const contentRowIdMatch = createSql.match(/content_rowid\s*=\s*'([^']+)'/i);
-  if (contentRowIdMatch) {
+  if (contentRowIdMatch?.[1]) {
     config.contentRowId = contentRowIdMatch[1];
   }
   
   // Extract columns (this is complex due to UNINDEXED modifiers)
   const columnsMatch = createSql.match(/USING\s+fts5\s*\(([^)]+)\)/i);
-  if (columnsMatch) {
+  if (columnsMatch?.[1]) {
     const columnsPart = columnsMatch[1];
     const columns: string[] = [];
     const unindexed: string[] = [];
@@ -159,14 +159,14 @@ export function extractFTS5Config(createSql: string): Partial<FTS5TableConfig> |
       
       // Check for UNINDEXED modifier
       const unindexedMatch = part.match(/(\w+)\s+UNINDEXED/i);
-      if (unindexedMatch) {
+      if (unindexedMatch?.[1]) {
         const colName = unindexedMatch[1];
         columns.push(colName);
         unindexed.push(colName);
       } else {
         // Regular column
         const colMatch = part.match(/(\w+)/);
-        if (colMatch) {
+        if (colMatch?.[1]) {
           columns.push(colMatch[1]);
         }
       }
@@ -186,7 +186,7 @@ export function extractFTS5Config(createSql: string): Partial<FTS5TableConfig> |
  */
 function parseTokenizerString(tokenizerStr: string): TokenizerConfig {
   const parts = tokenizerStr.trim().split(/\s+/);
-  const type = parts[0] as 'unicode61' | 'porter' | 'trigram' | 'ascii';
+  const type = (parts[0] ?? 'unicode61') as 'unicode61' | 'porter' | 'trigram' | 'ascii';
   
   if (parts.length === 1) {
     return { type };
@@ -197,21 +197,22 @@ function parseTokenizerString(tokenizerStr: string): TokenizerConfig {
   
   for (let i = 1; i < parts.length; i++) {
     const param = parts[i];
+    const nextParam = parts[i + 1];
     
-    if (param === 'remove_diacritics' && i + 1 < parts.length) {
-      parameters.remove_diacritics = parseInt(parts[i + 1], 10);
+    if (param === 'remove_diacritics' && nextParam !== undefined) {
+      parameters.remove_diacritics = parseInt(nextParam, 10);
       i++;
-    } else if (param === 'case_sensitive' && i + 1 < parts.length) {
-      parameters.case_sensitive = parseInt(parts[i + 1], 10);
+    } else if (param === 'case_sensitive' && nextParam !== undefined) {
+      parameters.case_sensitive = parseInt(nextParam, 10);
       i++;
-    } else if (param === 'categories' && i + 1 < parts.length) {
-      parameters.categories = parts[i + 1].replace(/['"]/g, '');
+    } else if (param === 'categories' && nextParam !== undefined) {
+      parameters.categories = nextParam.replace(/['"]/g, '');
       i++;
-    } else if (param === 'tokenchars' && i + 1 < parts.length) {
-      parameters.tokenchars = parts[i + 1].replace(/['"]/g, '');
+    } else if (param === 'tokenchars' && nextParam !== undefined) {
+      parameters.tokenchars = nextParam.replace(/['"]/g, '');
       i++;
-    } else if (param === 'separators' && i + 1 < parts.length) {
-      parameters.separators = parts[i + 1].replace(/['"]/g, '');
+    } else if (param === 'separators' && nextParam !== undefined) {
+      parameters.separators = nextParam.replace(/['"]/g, '');
       i++;
     }
   }

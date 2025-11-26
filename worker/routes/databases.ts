@@ -100,13 +100,14 @@ async function verifyDatabaseIntegrity(
       success: boolean;
     };
     
-    if (!sourceTablesData.success || !sourceTablesData.result || sourceTablesData.result.length === 0) {
+    const sourceResult = sourceTablesData.result?.[0];
+    if (!sourceTablesData.success || !sourceResult) {
       console.error('[Verification] Invalid source tables response:', JSON.stringify(sourceTablesData));
       issues.push('Invalid response when querying source database tables');
       return { success: false, issues };
     }
     
-    const sourceTables = sourceTablesData.result[0].results.map((r: { name: string }) => r.name);
+    const sourceTables = sourceResult.results.map((r: { name: string }) => r.name);
     console.log('[Verification] Source tables:', sourceTables);
     
     // Get list of tables from target
@@ -133,13 +134,14 @@ async function verifyDatabaseIntegrity(
       success: boolean;
     };
     
-    if (!targetTablesData.success || !targetTablesData.result || targetTablesData.result.length === 0) {
+    const targetResult = targetTablesData.result?.[0];
+    if (!targetTablesData.success || !targetResult) {
       console.error('[Verification] Invalid target tables response:', JSON.stringify(targetTablesData));
       issues.push('Invalid response when querying target database tables');
       return { success: false, issues };
     }
     
-    const targetTables = targetTablesData.result[0].results.map((r: { name: string }) => r.name);
+    const targetTables = targetResult.results.map((r: { name: string }) => r.name);
     console.log('[Verification] Target tables:', targetTables);
     
     // Verify table count matches
@@ -1010,7 +1012,7 @@ export async function handleDatabaseRoutes(
 
     // Rename database (migration-based approach)
     if (request.method === 'POST' && url.pathname.match(/^\/api\/databases\/[^/]+\/rename$/)) {
-      const dbId = url.pathname.split('/')[3];
+      const dbId = url.pathname.split('/')[3] ?? '';
       const body = await request.json() as { newName: string };
       
       console.log('[Databases] Renaming database:', dbId, 'to', body.newName);

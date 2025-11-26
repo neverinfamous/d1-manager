@@ -36,7 +36,11 @@ async function executeQueryViaAPI(
   }
 
   const data = await response.json() as { result: Array<{ results: unknown[]; meta?: Record<string, unknown>; success: boolean }> };
-  return data.result[0];
+  const firstResult = data.result[0];
+  if (!firstResult) {
+    throw new Error('Empty result from D1 API');
+  }
+  return firstResult;
 }
 
 /**
@@ -155,7 +159,7 @@ export async function handleUndoRoutes(
 
     // POST /api/undo/:dbId/restore/:undoId - Restore from undo snapshot
     if (request.method === 'POST' && url.pathname.match(/^\/api\/undo\/[^/]+\/restore\/\d+$/)) {
-      const undoId = parseInt(pathParts[5], 10);
+      const undoId = parseInt(pathParts[5] ?? '', 10);
       console.log('[Undo] Restoring from undo ID:', undoId);
 
       // Mock response for local development
@@ -368,17 +372,18 @@ async function restoreDroppedTable(
   }
 
   // 3. Re-insert data
-  if (data && data.length > 0) {
+  const firstDataRow = data?.[0];
+  if (data && data.length > 0 && firstDataRow) {
     // Extract table name from CREATE statement
     const tableNameMatch = createStatement.match(/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?["']?(\w+)["']?/i);
-    if (!tableNameMatch) {
+    if (!tableNameMatch?.[1]) {
       throw new Error('Could not extract table name from CREATE statement');
     }
     const tableName = tableNameMatch[1];
     const sanitizedTable = sanitizeIdentifier(tableName);
 
     // Get columns from first row
-    const columns = Object.keys(data[0]);
+    const columns = Object.keys(firstDataRow);
     const columnsList = columns.map(col => `"${sanitizeIdentifier(col)}"`).join(', ');
 
     // Insert data in batches of 50 rows
@@ -483,15 +488,16 @@ async function restoreDeletedRows(
   }
 
   const { rows } = snapshot.rowData;
+  const firstRow = rows[0];
 
-  if (rows.length === 0) {
+  if (rows.length === 0 || !firstRow) {
     return; // Nothing to restore
   }
 
   const sanitizedTable = sanitizeIdentifier(tableName);
 
   // Get columns from first row
-  const columns = Object.keys(rows[0]);
+  const columns = Object.keys(firstRow);
   const columnsList = columns.map(col => `"${sanitizeIdentifier(col)}"`).join(', ');
 
   // Insert rows back into table in batches

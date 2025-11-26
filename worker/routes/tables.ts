@@ -98,7 +98,7 @@ export async function handleTableRoutes(
 
     // Get table schema
     if (request.method === 'GET' && url.pathname.match(/^\/api\/tables\/[^/]+\/schema\/[^/]+$/)) {
-      const tableName = decodeURIComponent(pathParts[5]);
+      const tableName = decodeURIComponent(pathParts[5] ?? '');
       console.log('[Tables] Getting schema for table:', tableName);
       
       // Mock response for local development
@@ -136,7 +136,7 @@ export async function handleTableRoutes(
 
     // Get table data (paginated)
     if (request.method === 'GET' && url.pathname.match(/^\/api\/tables\/[^/]+\/data\/[^/]+$/)) {
-      const tableName = decodeURIComponent(pathParts[5]);
+      const tableName = decodeURIComponent(pathParts[5] ?? '');
       const limit = parseInt(url.searchParams.get('limit') || '100');
       const offset = parseInt(url.searchParams.get('offset') || '0');
       
@@ -150,16 +150,21 @@ export async function handleTableRoutes(
           const filterValues = url.searchParams.get(`filterValues_${columnName}`);
           const filterLogic = url.searchParams.get(`filterLogic_${columnName}`);
           
-          filters[columnName] = {
+          const filterObj: { type: string; value?: string; value2?: string; values?: (string | number)[]; logicOperator?: 'AND' | 'OR' } = {
             type: value,
-            value: filterValue || undefined,
-            value2: filterValue2 || undefined,
-            values: filterValues ? filterValues.split(',').map(v => {
+          };
+          if (filterValue) filterObj.value = filterValue;
+          if (filterValue2) filterObj.value2 = filterValue2;
+          if (filterValues) {
+            filterObj.values = filterValues.split(',').map(v => {
               const num = Number(v);
               return isNaN(num) ? v : num;
-            }).slice(0, 100) : undefined, // Limit to 100 values
-            logicOperator: (filterLogic as 'AND' | 'OR') || undefined
-          };
+            }).slice(0, 100); // Limit to 100 values
+          }
+          if (filterLogic === 'AND' || filterLogic === 'OR') {
+            filterObj.logicOperator = filterLogic;
+          }
+          filters[columnName] = filterObj;
         }
       }
       
@@ -252,13 +257,14 @@ export async function handleTableRoutes(
         // Convert filters to FilterCondition format
         const filterConditions: Record<string, import('../utils/helpers').FilterCondition> = {};
         for (const [columnName, filter] of Object.entries(filters)) {
-          filterConditions[columnName] = {
+          const condition: import('../utils/helpers').FilterCondition = {
             type: filter.type as import('../utils/helpers').FilterCondition['type'],
-            value: filter.value,
-            value2: filter.value2,
-            values: filter.values,
-            logicOperator: filter.logicOperator
           };
+          if (filter.value !== undefined) condition.value = filter.value;
+          if (filter.value2 !== undefined) condition.value2 = filter.value2;
+          if (filter.values !== undefined) condition.values = filter.values;
+          if (filter.logicOperator !== undefined) condition.logicOperator = filter.logicOperator;
+          filterConditions[columnName] = condition;
         }
         
         const { whereClause: clause } = buildWhereClause(filterConditions, schema);
@@ -282,7 +288,7 @@ export async function handleTableRoutes(
 
     // Get table indexes
     if (request.method === 'GET' && url.pathname.match(/^\/api\/tables\/[^/]+\/indexes\/[^/]+$/)) {
-      const tableName = decodeURIComponent(pathParts[5]);
+      const tableName = decodeURIComponent(pathParts[5] ?? '');
       console.log('[Tables] Getting indexes for table:', tableName);
       
       // Mock response for local development
@@ -317,7 +323,7 @@ export async function handleTableRoutes(
 
     // Get foreign keys for a specific table
     if (request.method === 'GET' && url.pathname.match(/^\/api\/tables\/[^/]+\/foreign-keys\/[^/]+$/)) {
-      const tableName = decodeURIComponent(pathParts[5]);
+      const tableName = decodeURIComponent(pathParts[5] ?? '');
       console.log('[Tables] Getting foreign keys for table:', tableName);
       
       // Mock response for local development
@@ -395,7 +401,7 @@ export async function handleTableRoutes(
 
     // Delete table
     if (request.method === 'DELETE' && url.pathname.match(/^\/api\/tables\/[^/]+\/[^/]+$/)) {
-      const tableName = decodeURIComponent(pathParts[4]);
+      const tableName = decodeURIComponent(pathParts[4] ?? '');
       console.log('[Tables] Deleting table:', tableName);
       
       // Mock response for local development
@@ -444,7 +450,7 @@ export async function handleTableRoutes(
 
     // Rename table
     if (request.method === 'PATCH' && url.pathname.match(/^\/api\/tables\/[^/]+\/[^/]+\/rename$/)) {
-      const tableName = decodeURIComponent(pathParts[4]);
+      const tableName = decodeURIComponent(pathParts[4] ?? '');
       console.log('[Tables] Renaming table:', tableName);
       
       const body = await request.json() as { newName: string };
@@ -499,7 +505,7 @@ export async function handleTableRoutes(
 
     // Clone table
     if (request.method === 'POST' && url.pathname.match(/^\/api\/tables\/[^/]+\/[^/]+\/clone$/)) {
-      const tableName = decodeURIComponent(pathParts[4]);
+      const tableName = decodeURIComponent(pathParts[4] ?? '');
       console.log('[Tables] Cloning table:', tableName);
       
       const body = await request.json() as { newName: string };
@@ -603,7 +609,7 @@ export async function handleTableRoutes(
 
     // Export table
     if (request.method === 'GET' && url.pathname.match(/^\/api\/tables\/[^/]+\/[^/]+\/export$/)) {
-      const tableName = decodeURIComponent(pathParts[4]);
+      const tableName = decodeURIComponent(pathParts[4] ?? '');
       const format = url.searchParams.get('format') || 'sql';
       console.log('[Tables] Exporting table:', tableName, 'format:', format);
       
@@ -634,7 +640,8 @@ export async function handleTableRoutes(
         const dataResult = await executeQueryViaAPI(dbId, `SELECT * FROM "${sanitizedTable}"`, env);
         const rows = dataResult.results as Record<string, unknown>[];
         
-        if (rows.length === 0) {
+        const firstRow = rows[0];
+        if (rows.length === 0 || !firstRow) {
           return new Response(JSON.stringify({
             result: {
               content: '',
@@ -650,7 +657,7 @@ export async function handleTableRoutes(
         }
         
         // Get column names from first row
-        const columns = Object.keys(rows[0]);
+        const columns = Object.keys(firstRow);
         
         // Create CSV content
         const csvRows: string[] = [];
@@ -767,7 +774,7 @@ export async function handleTableRoutes(
 
     // Add column to table
     if (request.method === 'POST' && url.pathname.match(/^\/api\/tables\/[^/]+\/[^/]+\/columns\/add$/)) {
-      const tableName = decodeURIComponent(pathParts[4]);
+      const tableName = decodeURIComponent(pathParts[4] ?? '');
       console.log('[Tables] Adding column to table:', tableName);
       
       const body = await request.json() as {
@@ -845,8 +852,8 @@ export async function handleTableRoutes(
 
     // Rename column
     if (request.method === 'PATCH' && url.pathname.match(/^\/api\/tables\/[^/]+\/[^/]+\/columns\/[^/]+\/rename$/)) {
-      const tableName = decodeURIComponent(pathParts[4]);
-      const columnName = decodeURIComponent(pathParts[6]);
+      const tableName = decodeURIComponent(pathParts[4] ?? '');
+      const columnName = decodeURIComponent(pathParts[6] ?? '');
       console.log('[Tables] Renaming column:', columnName, 'in table:', tableName);
       
       const body = await request.json() as { newName: string };
@@ -895,8 +902,8 @@ export async function handleTableRoutes(
 
     // Modify column (requires table recreation)
     if (request.method === 'PATCH' && url.pathname.match(/^\/api\/tables\/[^/]+\/[^/]+\/columns\/[^/]+\/modify$/)) {
-      const tableName = decodeURIComponent(pathParts[4]);
-      const columnName = decodeURIComponent(pathParts[6]);
+      const tableName = decodeURIComponent(pathParts[4] ?? '');
+      const columnName = decodeURIComponent(pathParts[6] ?? '');
       console.log('[Tables] Modifying column:', columnName, 'in table:', tableName);
       
       const body = await request.json() as {
@@ -945,8 +952,8 @@ export async function handleTableRoutes(
 
     // Delete column (requires table recreation)
     if (request.method === 'DELETE' && url.pathname.match(/^\/api\/tables\/[^/]+\/[^/]+\/columns\/[^/]+$/)) {
-      const tableName = decodeURIComponent(pathParts[4]);
-      const columnName = decodeURIComponent(pathParts[6]);
+      const tableName = decodeURIComponent(pathParts[4] ?? '');
+      const columnName = decodeURIComponent(pathParts[6] ?? '');
       console.log('[Tables] Deleting column:', columnName, 'from table:', tableName);
       
       // Mock response for local development
@@ -999,7 +1006,7 @@ export async function handleTableRoutes(
 
     // Delete rows with undo snapshot
     if (request.method === 'POST' && url.pathname.match(/^\/api\/tables\/[^/]+\/[^/]+\/rows\/delete$/)) {
-      const tableName = decodeURIComponent(pathParts[4]);
+      const tableName = decodeURIComponent(pathParts[4] ?? '');
       console.log('[Tables] Deleting rows from table:', tableName);
       
       const body = await request.json() as { 
@@ -1581,7 +1588,7 @@ export async function handleTableRoutes(
 
     // Modify foreign key constraint
     if (request.method === 'PATCH' && url.pathname.match(/^\/api\/tables\/[^/]+\/foreign-keys\/[^/]+$/)) {
-      const constraintName = decodeURIComponent(pathParts[5]);
+      const constraintName = decodeURIComponent(pathParts[5] ?? '');
       console.log('[Tables] Modifying foreign key constraint:', constraintName);
       
       const body = await request.json() as {
@@ -1618,7 +1625,7 @@ export async function handleTableRoutes(
 
     // Delete foreign key constraint
     if (request.method === 'DELETE' && url.pathname.match(/^\/api\/tables\/[^/]+\/foreign-keys\/[^/]+$/)) {
-      const constraintName = decodeURIComponent(pathParts[5]);
+      const constraintName = decodeURIComponent(pathParts[5] ?? '');
       console.log('[Tables] Deleting foreign key constraint:', constraintName);
       
       // Mock response for local development
@@ -1836,9 +1843,18 @@ async function simulateCascadeImpact(
   
   if (targetRowCount === 0) {
     // No rows to delete, return empty simulation
-    return {
+    const emptyResult: {
+      targetTable: string;
+      whereClause?: string;
+      totalAffectedRows: number;
+      maxDepth: number;
+      cascadePaths: never[];
+      affectedTables: never[];
+      warnings: never[];
+      constraints: never[];
+      circularDependencies: never[];
+    } = {
       targetTable,
-      whereClause,
       totalAffectedRows: 0,
       maxDepth: 0,
       cascadePaths: [],
@@ -1847,6 +1863,8 @@ async function simulateCascadeImpact(
       constraints: [],
       circularDependencies: []
     };
+    if (whereClause) emptyResult.whereClause = whereClause;
+    return emptyResult;
   }
   
   // Get all tables in database
@@ -2048,9 +2066,18 @@ async function simulateCascadeImpact(
     });
   }
   
-  return {
+  const result: {
+    targetTable: string;
+    whereClause?: string;
+    totalAffectedRows: number;
+    maxDepth: number;
+    cascadePaths: typeof cascadePaths;
+    affectedTables: Array<{ tableName: string; action: string; rowsBefore: number; rowsAfter: number; depth: number }>;
+    warnings: typeof warnings;
+    constraints: typeof constraints;
+    circularDependencies: Array<{ tables: string[]; message: string }>;
+  } = {
     targetTable,
-    whereClause,
     totalAffectedRows: totalAffected,
     maxDepth: currentMaxDepth,
     cascadePaths,
@@ -2062,6 +2089,8 @@ async function simulateCascadeImpact(
       message: `Circular reference detected: ${path}`
     }))
   };
+  if (whereClause) result.whereClause = whereClause;
+  return result;
 }
 
 /**
@@ -2269,16 +2298,25 @@ async function addForeignKeyConstraint(
   }
   
   // Recreate table with foreign key constraint
+  const constraint: {
+    columns: string[];
+    refTable: string;
+    refColumns: string[];
+    onDelete: string;
+    onUpdate: string;
+    name?: string;
+  } = {
+    columns: [sourceColumn],
+    refTable: targetTable,
+    refColumns: [targetColumn],
+    onDelete,
+    onUpdate,
+  };
+  if (constraintName) constraint.name = constraintName;
+  
   await recreateTableWithForeignKey(dbId, sourceTable, {
     action: 'add',
-    constraint: {
-      columns: [sourceColumn],
-      refTable: targetTable,
-      refColumns: [targetColumn],
-      onDelete,
-      onUpdate,
-      name: constraintName
-    }
+    constraint
   }, env);
 }
 
@@ -2296,14 +2334,13 @@ async function modifyForeignKeyConstraint(
 ): Promise<void> {
   // Parse constraint name to get table and column info
   const parts = constraintName.split('_');
-  if (parts.length < 5 || parts[0] !== 'fk') {
-    throw new Error('Invalid constraint name format. Expected: fk_sourceTable_sourceColumn_targetTable_targetColumn');
-  }
-  
   const sourceTable = parts[1];
   const sourceColumn = parts[2];
   const targetTable = parts[3];
   const targetColumn = parts[4];
+  if (parts.length < 5 || parts[0] !== 'fk' || !sourceTable || !sourceColumn || !targetTable || !targetColumn) {
+    throw new Error('Invalid constraint name format. Expected: fk_sourceTable_sourceColumn_targetTable_targetColumn');
+  }
   
   // Get current constraint to preserve values not being changed
   const fkQuery = `PRAGMA foreign_key_list("${sanitizeIdentifier(sourceTable)}")`;
@@ -2354,14 +2391,13 @@ async function deleteForeignKeyConstraint(
 ): Promise<void> {
   // Parse constraint name
   const parts = constraintName.split('_');
-  if (parts.length < 5 || parts[0] !== 'fk') {
-    throw new Error('Invalid constraint name format');
-  }
-  
   const sourceTable = parts[1];
   const sourceColumn = parts[2];
   const targetTable = parts[3];
   const targetColumn = parts[4];
+  if (parts.length < 5 || parts[0] !== 'fk' || !sourceTable || !sourceColumn || !targetTable || !targetColumn) {
+    throw new Error('Invalid constraint name format');
+  }
   
   // Recreate table without the constraint
   await recreateTableWithForeignKey(dbId, sourceTable, {
@@ -2501,6 +2537,10 @@ async function executeQueryViaAPI(
   };
   
   // REST API returns array of results, take the first one
-  return data.result[0];
+  const firstResult = data.result[0];
+  if (!firstResult) {
+    throw new Error('Empty result from D1 API');
+  }
+  return firstResult;
 }
 

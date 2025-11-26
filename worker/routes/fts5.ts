@@ -119,15 +119,20 @@ export async function handleFTS5Routes(
           const countResult = await executeQueryViaAPI(dbId, countQuery, env);
           const rowCount = (countResult.results[0] as { count: number })?.count || 0;
           
-          fts5Tables.push({
+          const tableInfo: FTS5TableInfo = {
             name: table.name,
             type: 'fts5',
             columns: config?.columns || [],
             tokenizer: config?.tokenizer || { type: 'unicode61' },
-            contentTable: config?.contentTable,
             rowCount,
-            prefixIndex: config?.prefixIndex,
-          });
+          };
+          if (config?.contentTable) {
+            tableInfo.contentTable = config.contentTable;
+          }
+          if (config?.prefixIndex) {
+            tableInfo.prefixIndex = config.prefixIndex;
+          }
+          fts5Tables.push(tableInfo);
         }
       }
       
@@ -230,8 +235,10 @@ export async function handleFTS5Routes(
         tableName: body.ftsTableName,
         columns: body.columns,
         tokenizer: body.tokenizer,
-        prefixIndex: body.prefixIndex,
       };
+      if (body.prefixIndex) {
+        ftsConfig.prefixIndex = body.prefixIndex;
+      }
       
       if (body.externalContent) {
         ftsConfig.contentTable = body.sourceTable;
@@ -278,7 +285,7 @@ export async function handleFTS5Routes(
 
     // Get FTS5 table configuration
     if (request.method === 'GET' && url.pathname.match(/^\/api\/fts5\/[^/]+\/[^/]+\/config$/)) {
-      const tableName = decodeURIComponent(pathParts[4]);
+      const tableName = decodeURIComponent(pathParts[4] ?? '');
       console.log('[FTS5] Getting config for FTS5 table:', tableName);
       
       if (isLocalDev) {
@@ -330,7 +337,7 @@ export async function handleFTS5Routes(
 
     // Delete FTS5 table
     if (request.method === 'DELETE' && url.pathname.match(/^\/api\/fts5\/[^/]+\/[^/]+$/)) {
-      const tableName = decodeURIComponent(pathParts[4]);
+      const tableName = decodeURIComponent(pathParts[4] ?? '');
       console.log('[FTS5] Deleting FTS5 table:', tableName);
       
       if (isLocalDev) {
@@ -360,7 +367,7 @@ export async function handleFTS5Routes(
 
     // Rebuild FTS5 index
     if (request.method === 'POST' && url.pathname.match(/^\/api\/fts5\/[^/]+\/[^/]+\/rebuild$/)) {
-      const tableName = decodeURIComponent(pathParts[4]);
+      const tableName = decodeURIComponent(pathParts[4] ?? '');
       console.log('[FTS5] Rebuilding FTS5 index for:', tableName);
       
       if (isLocalDev) {
@@ -392,7 +399,7 @@ export async function handleFTS5Routes(
 
     // Optimize FTS5 index
     if (request.method === 'POST' && url.pathname.match(/^\/api\/fts5\/[^/]+\/[^/]+\/optimize$/)) {
-      const tableName = decodeURIComponent(pathParts[4]);
+      const tableName = decodeURIComponent(pathParts[4] ?? '');
       console.log('[FTS5] Optimizing FTS5 index for:', tableName);
       
       if (isLocalDev) {
@@ -424,7 +431,7 @@ export async function handleFTS5Routes(
 
     // Search FTS5 table
     if (request.method === 'POST' && url.pathname.match(/^\/api\/fts5\/[^/]+\/[^/]+\/search$/)) {
-      const tableName = decodeURIComponent(pathParts[4]);
+      const tableName = decodeURIComponent(pathParts[4] ?? '');
       console.log('[FTS5] Searching FTS5 table:', tableName);
       
       const body = await request.json() as FTS5SearchParams;
@@ -491,11 +498,16 @@ export async function handleFTS5Routes(
       const total = (countResult.results[0] as { total: number })?.total || 0;
       
       // Format results
-      const results = (searchResult.results as Array<Record<string, unknown>>).map(row => ({
-        row,
-        rank: row.rank as number,
-        snippet: includeSnippet ? (row.snippet as string) : undefined,
-      }));
+      const results = (searchResult.results as Array<Record<string, unknown>>).map(row => {
+        const result: { row: Record<string, unknown>; rank: number; snippet?: string } = {
+          row,
+          rank: row.rank as number,
+        };
+        if (includeSnippet && row.snippet) {
+          result.snippet = row.snippet as string;
+        }
+        return result;
+      });
       
       const response: FTS5SearchResponse = {
         results,
@@ -519,7 +531,7 @@ export async function handleFTS5Routes(
 
     // Get FTS5 table statistics
     if (request.method === 'GET' && url.pathname.match(/^\/api\/fts5\/[^/]+\/[^/]+\/stats$/)) {
-      const tableName = decodeURIComponent(pathParts[4]);
+      const tableName = decodeURIComponent(pathParts[4] ?? '');
       console.log('[FTS5] Getting stats for FTS5 table:', tableName);
       
       if (isLocalDev) {
@@ -649,6 +661,10 @@ async function executeQueryViaAPI(
     success: boolean;
   };
   
-  return data.result[0];
+  const firstResult = data.result[0];
+  if (!firstResult) {
+    throw new Error('Empty result from D1 API');
+  }
+  return firstResult;
 }
 

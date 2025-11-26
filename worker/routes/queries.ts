@@ -304,18 +304,22 @@ async function executeQueryViaAPI(
     success: boolean;
   };
   
+  const firstResult = data.result?.[0];
   console.log('[Queries] D1 API response:', JSON.stringify({
     success: data.success,
     resultLength: data.result?.length,
-    firstResult: data.result?.[0] ? {
-      resultsLength: Array.isArray(data.result[0].results) ? data.result[0].results.length : 'not array',
-      meta: data.result[0].meta,
-      success: data.result[0].success
+    firstResult: firstResult ? {
+      resultsLength: Array.isArray(firstResult.results) ? firstResult.results.length : 'not array',
+      meta: firstResult.meta,
+      success: firstResult.success
     } : 'no result'
   }));
   
   // REST API returns array of results, take the first one
-  return data.result[0];
+  if (!firstResult) {
+    throw new Error('Empty result from D1 API');
+  }
+  return firstResult;
 }
 
 /**
