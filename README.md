@@ -23,7 +23,7 @@ This Docker image provides a modern, full-featured web application for managing 
 - Create, rename, delete, download, optimize, and upload databases
 - Bulk operations with multi-select
 - Upload/import SQL files
-- **Job history tracking** - Track all database operations with detailed history
+- **NEW ✨Job history tracking** - Track all database operations with detailed history
 
 ### Table Operations
 - Visual schema designer
@@ -45,8 +45,8 @@ This Docker image provides a modern, full-featured web application for managing 
 - **FTS5 Full-Text Search** - Create and manage virtual tables
 - **Constraint Validator** - Detect orphans and integrity violations
 - **Index Analyzer** - Smart index recommendations
-- **Time Travel** - View bookmarks, checkpoint history, and CLI restore commands
-- **Read Replication** - Enable/disable global read replicas with D1 Sessions API info
+- **NEW ✨Time Travel** - View bookmarks, checkpoint history, and CLI restore commands
+- **NEW ✨Read Replication** - Enable/disable global read replicas with D1 Sessions API info
 
 ### User Experience
 - Dark/Light/System themes
