@@ -9,6 +9,17 @@ These features have been implemented and deployed since the initial v1.0.0 relea
 
 ### 🎉 Major New Features
 
+#### Time Travel
+- **Current Bookmark Display** - View the current database bookmark (point-in-time state)
+- **CLI Restore Commands** - Copy-ready Wrangler CLI commands for point-in-time recovery
+- **Checkpoint History** - View saved checkpoints captured before destructive operations
+- **Manual Checkpoints** - Create manual checkpoint snapshots at any time
+- **Automatic Capture** - Bookmarks automatically captured before DROP TABLE, DROP COLUMN, and DELETE operations
+- **Retention Info** - Clear display of Time Travel retention periods (30 days Paid / 7 days Free)
+- **Dedicated Tab** - New "Time Travel" tab in database view alongside existing features
+- **Non-Blocking** - Bookmark operations don't slow down normal database operations
+- **Graceful Degradation** - UI remains functional even if bookmark fetch fails
+
 #### Job History
 - **Operation Tracking** - Comprehensive tracking of bulk operations (export, import, delete, rename, optimize)
 - **Job List View** - View all jobs with status badges, progress, error counts, and timestamps
@@ -162,6 +173,10 @@ These features have been implemented and deployed since the initial v1.0.0 relea
 - `GET /api/indexes/:dbId/analyze` - Analyze database and return index recommendations
 - `POST /api/undo/:dbId/list` - List available undo operations for a database
 - `POST /api/undo/:dbId/restore/:operationId` - Restore a previous operation
+- `GET /api/time-travel/:dbId/bookmark` - Get current database bookmark
+- `GET /api/time-travel/:dbId/history` - Get stored checkpoint history
+- `POST /api/time-travel/:dbId/capture` - Manually capture a checkpoint
+- `DELETE /api/time-travel/:dbId/history/:id` - Delete a checkpoint entry
 
 ---
 
@@ -170,7 +185,7 @@ These features have been implemented and deployed since the initial v1.0.0 relea
 #### Still Planned
 - Dependency export as JSON documentation files
 - Force delete mode with audit logging for power users
-- Time Travel API integration for point-in-time recovery
+- Read Replication support via D1 Sessions API
 - Analytics dashboard with comprehensive usage metrics
 
 ---

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Table, RefreshCw, Plus, Search, Loader2, Wand2, Copy, Download, Trash2, Pencil, AlertTriangle, Network, Sparkles, Zap } from 'lucide-react';
+import { ArrowLeft, Table, RefreshCw, Plus, Search, Loader2, Wand2, Copy, Download, Trash2, Pencil, AlertTriangle, Network, Sparkles, Zap, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -33,6 +33,7 @@ import { FTS5Manager } from './FTS5Manager';
 import { ConstraintValidator } from './ConstraintValidator';
 import { IndexAnalyzer } from './IndexAnalyzer';
 import { CircularDependencyDetector } from './CircularDependencyDetector';
+import { TimeTravelInfo } from './TimeTravelInfo';
 
 interface DatabaseViewProps {
   databaseId: string;
@@ -48,7 +49,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSchemaDesigner, setShowSchemaDesigner] = useState(false);
-  const [activeTab, setActiveTab] = useState<'tables' | 'builder' | 'relationships' | 'circular' | 'fts5' | 'constraints' | 'performance'>('tables');
+  const [activeTab, setActiveTab] = useState<'tables' | 'builder' | 'relationships' | 'circular' | 'fts5' | 'constraints' | 'performance' | 'time-travel'>('tables');
   const [relationshipsView, setRelationshipsView] = useState<'editor' | 'diagram'>('editor');
   
   // Selection state
@@ -433,6 +434,14 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
               <Zap className="h-4 w-4 mr-2" />
               Performance
             </Button>
+            <Button
+              variant={activeTab === 'time-travel' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setActiveTab('time-travel')}
+            >
+              <Clock className="h-4 w-4 mr-2" />
+              Time Travel
+            </Button>
           </div>
           {activeTab === 'tables' && (
             <>
@@ -491,6 +500,8 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
         <ConstraintValidator databaseId={databaseId} databaseName={databaseName} />
       ) : activeTab === 'performance' ? (
         <IndexAnalyzer databaseId={databaseId} databaseName={databaseName} />
+      ) : activeTab === 'time-travel' ? (
+        <TimeTravelInfo databaseId={databaseId} databaseName={databaseName} />
       ) : (
         <>
           {/* Search Bar */}

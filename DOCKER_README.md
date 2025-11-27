@@ -1,10 +1,14 @@
 # D1 Database Manager - Docker
 
+[![GitHub](https://img.shields.io/badge/GitHub-neverinfamous/d1--manager-blue?logo=github)](https://github.com/neverinfamous/d1-manager)
 [![Docker Pulls](https://img.shields.io/docker/pulls/writenotenow/d1-manager)](https://hub.docker.com/r/writenotenow/d1-manager)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 ![Version](https://img.shields.io/badge/version-v1.0.0-green)
+![Status](https://img.shields.io/badge/status-Production%2FStable-brightgreen)
+[![Security](https://img.shields.io/badge/Security-Enhanced-green.svg)](https://github.com/neverinfamous/d1-manager/blob/main/SECURITY.md)
+[![Type Safety](https://img.shields.io/badge/TypeScript-Strict-blue.svg)](https://github.com/neverinfamous/d1-manager)
 
-Run D1 Database Manager in Docker for development, testing, or self-hosted deployments.
+This Docker image provides a modern, full-featured web application for managing Cloudflare D1 databases with enterprise-grade authentication via Cloudflare Access (Zero Trust). Run D1 Database Manager in Docker for development, testing, or self-hosted deployments.
 
 **[Live Demo](https://d1.adamic.tech/)** • **[Wiki](https://github.com/neverinfamous/d1-manager/wiki)** • **[GitHub](https://github.com/neverinfamous/d1-manager)**
 
@@ -13,10 +17,10 @@ Run D1 Database Manager in Docker for development, testing, or self-hosted deplo
 ## 🎯 Features
 
 ### Database Management
-- Create, rename, delete, and optimize databases
+- Create, rename, delete, download, optimize, and upload databases
 - Bulk operations with multi-select
 - Upload/import SQL files
-- Job history tracking [NEW]
+- **✨ Job history tracking** - Track all database operations with detailed history
 
 ### Table Operations
 - Visual schema designer
@@ -38,6 +42,7 @@ Run D1 Database Manager in Docker for development, testing, or self-hosted deplo
 - **FTS5 Full-Text Search** - Create and manage virtual tables
 - **Constraint Validator** - Detect orphans and integrity violations
 - **Index Analyzer** - Smart index recommendations
+- **Time Travel** - View bookmarks, checkpoint history, and CLI restore commands
 
 ---
 

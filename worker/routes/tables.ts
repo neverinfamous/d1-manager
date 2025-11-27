@@ -3,6 +3,7 @@ import { sanitizeIdentifier } from '../utils/helpers';
 import { trackDatabaseAccess } from '../utils/database-tracking';
 import { captureTableSnapshot, captureColumnSnapshot, captureRowSnapshot, saveUndoSnapshot } from '../utils/undo';
 import { isProtectedDatabase, createProtectedDatabaseResponse, getDatabaseInfo } from '../utils/database-protection';
+import { captureBookmark } from '../utils/time-travel';
 
 /**
  * Note: This route handler requires dynamic D1 database access
@@ -414,6 +415,21 @@ export async function handleTableRoutes(
             ...corsHeaders
           }
         });
+      }
+      
+      // Capture Time Travel bookmark before destructive operation
+      try {
+        await captureBookmark(
+          dbId,
+          undefined, // Database name not needed for internal ops
+          env,
+          'pre_drop_table',
+          `Before dropping table "${tableName}"`,
+          userEmail || undefined
+        );
+      } catch (bookmarkErr) {
+        console.error('[Tables] Failed to capture Time Travel bookmark:', bookmarkErr);
+        // Continue - bookmark capture is best-effort
       }
       
       // Capture snapshot before drop
@@ -968,6 +984,21 @@ export async function handleTableRoutes(
         });
       }
       
+      // Capture Time Travel bookmark before destructive operation
+      try {
+        await captureBookmark(
+          dbId,
+          undefined,
+          env,
+          'pre_drop_column',
+          `Before dropping column "${columnName}" from "${tableName}"`,
+          userEmail || undefined
+        );
+      } catch (bookmarkErr) {
+        console.error('[Tables] Failed to capture Time Travel bookmark:', bookmarkErr);
+        // Continue - bookmark capture is best-effort
+      }
+      
       // Capture snapshot before drop
       try {
         const snapshot = await captureColumnSnapshot(dbId, tableName, columnName, env);
@@ -1037,6 +1068,21 @@ export async function handleTableRoutes(
             ...corsHeaders
           }
         });
+      }
+      
+      // Capture Time Travel bookmark before destructive operation
+      try {
+        await captureBookmark(
+          dbId,
+          undefined,
+          env,
+          'pre_delete_rows',
+          `Before deleting rows from "${tableName}"`,
+          userEmail || undefined
+        );
+      } catch (bookmarkErr) {
+        console.error('[Tables] Failed to capture Time Travel bookmark:', bookmarkErr);
+        // Continue - bookmark capture is best-effort
       }
       
       // Capture snapshot before delete

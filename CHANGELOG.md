@@ -15,6 +15,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - All code now properly handles potential undefined values from array access and API responses
 
 ### Added
+- **Time Travel** - View database bookmarks and manage checkpoints for point-in-time recovery
+  - Display current database bookmark with copy-to-clipboard functionality
+  - Generate CLI restore commands for Wrangler (`wrangler d1 time-travel restore`)
+  - Checkpoint history showing bookmarks captured before destructive operations
+  - Manual checkpoint creation for on-demand state snapshots
+  - Automatic bookmark capture before DROP TABLE, DROP COLUMN, and DELETE operations
+  - Retention period information (30 days Paid / 7 days Free)
+  - Dedicated "Time Travel" tab in database view
+  - New API endpoints: GET/POST `/api/time-travel/:dbId/bookmark`, `/history`, `/capture`
+  - Database schema with `bookmark_history` table for persistent storage
 - **Job History** - Track and monitor bulk operations with comprehensive job history and event timelines
   - View all bulk operations (export, import, delete, rename, optimize) in a dedicated Job History page
   - Filter jobs by status, operation type, database, date range, job ID, and minimum errors

@@ -287,9 +287,9 @@ export function JobHistory({ databases }: JobHistoryProps) {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Status Filter */}
             <div className="space-y-2">
-              <Label>Status</Label>
+              <Label htmlFor="status-filter">Status</Label>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger aria-label="Status filter">
+                <SelectTrigger id="status-filter" aria-label="Status filter">
                   <SelectValue placeholder="Status: All" />
                 </SelectTrigger>
                 <SelectContent>
@@ -305,9 +305,9 @@ export function JobHistory({ databases }: JobHistoryProps) {
 
             {/* Operation Type Filter */}
             <div className="space-y-2">
-              <Label>Operation Type</Label>
+              <Label htmlFor="operation-filter">Operation Type</Label>
               <Select value={operationFilter} onValueChange={setOperationFilter}>
-                <SelectTrigger aria-label="Operation type filter">
+                <SelectTrigger id="operation-filter" aria-label="Operation type filter">
                   <SelectValue placeholder="Operation: All" />
                 </SelectTrigger>
                 <SelectContent>
@@ -326,9 +326,9 @@ export function JobHistory({ databases }: JobHistoryProps) {
 
             {/* Database Filter */}
             <div className="space-y-2">
-              <Label>Database</Label>
+              <Label htmlFor="database-filter">Database</Label>
               <Select value={databaseFilter} onValueChange={setDatabaseFilter}>
-                <SelectTrigger aria-label="Database filter">
+                <SelectTrigger id="database-filter" aria-label="Database filter">
                   <SelectValue placeholder="Database: All" />
                 </SelectTrigger>
                 <SelectContent>
@@ -347,9 +347,9 @@ export function JobHistory({ databases }: JobHistoryProps) {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Date Range Filter */}
             <div className="space-y-2">
-              <Label>Date Range</Label>
+              <Label htmlFor="date-range-filter">Date Range</Label>
               <Select value={datePreset} onValueChange={setDatePreset}>
-                <SelectTrigger aria-label="Date range filter">
+                <SelectTrigger id="date-range-filter" aria-label="Date range filter">
                   <SelectValue placeholder="Date: All Time" />
                 </SelectTrigger>
                 <SelectContent>
@@ -396,9 +396,9 @@ export function JobHistory({ databases }: JobHistoryProps) {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Sort By */}
             <div className="space-y-2">
-              <Label>Sort By</Label>
+              <Label htmlFor="sort-by-filter">Sort By</Label>
               <Select value={sortBy} onValueChange={setSortBy}>
-                <SelectTrigger aria-label="Sort by">
+                <SelectTrigger id="sort-by-filter" aria-label="Sort by">
                   <SelectValue placeholder="Sort: Started At" />
                 </SelectTrigger>
                 <SelectContent>
@@ -413,8 +413,9 @@ export function JobHistory({ databases }: JobHistoryProps) {
 
             {/* Sort Order */}
             <div className="space-y-2">
-              <Label>Sort Order</Label>
+              <Label htmlFor="sort-order-button">Sort Order</Label>
               <Button
+                id="sort-order-button"
                 variant="outline"
                 onClick={toggleSortOrder}
                 className="w-full justify-start"

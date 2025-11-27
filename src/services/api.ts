@@ -1967,3 +1967,147 @@ export const getJobStatus = async (jobId: string): Promise<JobListItem> => {
   return data.result
 }
 
+// ============================================
+// Time Travel Types and API
+// ============================================
+
+export interface BookmarkInfo {
+  bookmark: string
+  capturedAt: string
+  databaseId: string
+  databaseName?: string
+  restoreCommand?: string | null
+}
+
+export interface BookmarkHistoryEntry {
+  id: number
+  database_id: string
+  database_name: string | null
+  bookmark: string
+  operation_type: string
+  description: string | null
+  captured_at: string
+  user_email: string | null
+  restoreCommand?: string | null
+}
+
+export interface BookmarkHistoryResponse {
+  result: BookmarkHistoryEntry[]
+  databaseName?: string
+  success: boolean
+}
+
+/**
+ * Get current bookmark for a database
+ * Bookmarks represent the current state of the database for Time Travel
+ */
+export const getCurrentBookmark = async (databaseId: string): Promise<BookmarkInfo> => {
+  const response = await fetch(
+    `${WORKER_API}/api/time-travel/${databaseId}/bookmark`,
+    {
+      method: 'GET',
+      credentials: 'include',
+      cache: 'no-store'
+    }
+  )
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+    throw new Error(error.error || `Failed to get bookmark: ${response.status}`)
+  }
+  
+  const data = await response.json() as { result: BookmarkInfo, success: boolean }
+  return data.result
+}
+
+/**
+ * Get bookmark history for a database
+ * Shows saved checkpoints from before destructive operations
+ */
+export const getBookmarkHistory = async (
+  databaseId: string,
+  limit?: number
+): Promise<BookmarkHistoryEntry[]> => {
+  const params = new URLSearchParams()
+  if (limit) params.set('limit', limit.toString())
+  
+  const url = `${WORKER_API}/api/time-travel/${databaseId}/history${params.toString() ? `?${params.toString()}` : ''}`
+  
+  const response = await fetch(url, {
+    method: 'GET',
+    credentials: 'include',
+    cache: 'no-store'
+  })
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+    throw new Error(error.error || `Failed to get bookmark history: ${response.status}`)
+  }
+  
+  const data = await response.json() as BookmarkHistoryResponse
+  return data.result
+}
+
+/**
+ * Manually capture a bookmark (checkpoint) for a database
+ */
+export const captureBookmark = async (
+  databaseId: string,
+  description?: string
+): Promise<BookmarkInfo> => {
+  const response = await fetch(
+    `${WORKER_API}/api/time-travel/${databaseId}/capture`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      credentials: 'include',
+      body: JSON.stringify({ description })
+    }
+  )
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+    throw new Error(error.error || `Failed to capture bookmark: ${response.status}`)
+  }
+  
+  const data = await response.json() as { result: BookmarkInfo, success: boolean }
+  return data.result
+}
+
+/**
+ * Delete a bookmark entry from history
+ */
+export const deleteBookmarkEntry = async (
+  databaseId: string,
+  bookmarkId: number
+): Promise<void> => {
+  const response = await fetch(
+    `${WORKER_API}/api/time-travel/${databaseId}/history/${bookmarkId}`,
+    {
+      method: 'DELETE',
+      credentials: 'include'
+    }
+  )
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+    throw new Error(error.error || `Failed to delete bookmark: ${response.status}`)
+  }
+}
+
+/**
+ * Generate CLI restore command for a bookmark
+ */
+export const generateRestoreCommand = (databaseName: string, bookmark: string): string => {
+  return `wrangler d1 time-travel restore ${databaseName} --bookmark=${bookmark}`
+}
+
+/**
+ * Get Time Travel info command for CLI
+ */
+export const generateTimeTravelInfoCommand = (databaseName: string): string => {
+  return `wrangler d1 time-travel info ${databaseName}`
+}
+

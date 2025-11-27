@@ -101,6 +101,22 @@ CREATE TABLE job_audit_events (
 CREATE INDEX idx_job_audit_events_job_id ON job_audit_events(job_id, timestamp DESC);
 CREATE INDEX idx_job_audit_events_user ON job_audit_events(user_email, timestamp DESC);
 
+-- Time Travel bookmark history (for tracking database state before operations)
+DROP TABLE IF EXISTS bookmark_history;
+CREATE TABLE bookmark_history (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  database_id TEXT NOT NULL,
+  database_name TEXT,
+  bookmark TEXT NOT NULL,
+  operation_type TEXT NOT NULL, -- 'manual', 'pre_drop_table', 'pre_delete_rows', 'pre_import', 'pre_rename'
+  description TEXT,
+  captured_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  user_email TEXT
+);
+
+CREATE INDEX idx_bookmark_history_database ON bookmark_history(database_id, captured_at DESC);
+CREATE INDEX idx_bookmark_history_user ON bookmark_history(user_email, captured_at DESC);
+
 -- ============================================
 -- NOTES:
 -- ============================================

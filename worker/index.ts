@@ -10,6 +10,7 @@ import { handleFTS5Routes } from './routes/fts5';
 import { handleConstraintRoutes } from './routes/constraints';
 import { handleIndexRoutes } from './routes/indexes';
 import { handleJobRoutes } from './routes/jobs';
+import { handleTimeTravelRoutes } from './routes/time-travel';
 import { trackDatabaseAccess } from './utils/database-tracking';
 
 async function handleApiRequest(request: Request, env: Env): Promise<Response> {
@@ -104,6 +105,13 @@ async function handleApiRequest(request: Request, env: Env): Promise<Response> {
     const jobResponse = await handleJobRoutes(request, env, url, corsHeaders, isLocalDev, userEmail);
     if (jobResponse) {
       return jobResponse;
+    }
+  }
+
+  if (url.pathname.startsWith('/api/time-travel/')) {
+    const timeTravelResponse = await handleTimeTravelRoutes(request, env, url, corsHeaders, isLocalDev, userEmail);
+    if (timeTravelResponse) {
+      return timeTravelResponse;
     }
   }
 

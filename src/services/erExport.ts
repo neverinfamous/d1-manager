@@ -1,5 +1,3 @@
-import html2canvas from 'html2canvas';
-
 /**
  * Export ER Diagram as PNG using html2canvas
  */
@@ -19,6 +17,9 @@ export async function exportERDiagramAsPNG(databaseName: string): Promise<void> 
   }
   
   try {
+    // Dynamic import for code splitting
+    const { default: html2canvas } = await import('html2canvas');
+    
     // Capture the canvas
     const canvas = await html2canvas(containerElement, {
       backgroundColor: '#ffffff',
@@ -68,6 +69,9 @@ export async function exportERDiagramAsSVG(databaseName: string): Promise<void> 
   }
   
   try {
+    // Dynamic import for code splitting
+    const { default: html2canvas } = await import('html2canvas');
+    
     // First capture as canvas
     const canvas = await html2canvas(containerElement, {
       backgroundColor: '#ffffff',
