@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **TypeScript Strict Mode** - Worker codebase now passes the most aggressive TypeScript strict settings
+  - Enabled `exactOptionalPropertyTypes` - Prevents undefined assignment to optional properties
+  - Enabled `noUncheckedIndexedAccess` - Array/object index access returns `T | undefined`
+  - Fixed ~95 type errors across 12 files for full strict compliance
+  - All code now properly handles potential undefined values from array access and API responses
+
 ### Added
 - **Job History** - Track and monitor bulk operations with comprehensive job history and event timelines
   - View all bulk operations (export, import, delete, rename, optimize) in a dedicated Job History page

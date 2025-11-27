@@ -1,38 +1,86 @@
-# D1 Database Manager - Docker Edition
+# D1 Database Manager - Docker
 
-[![GitHub](https://img.shields.io/badge/GitHub-neverinfamous/d1--manager-blue?logo=github)](https://github.com/neverinfamous/d1-manager)
 [![Docker Pulls](https://img.shields.io/docker/pulls/writenotenow/d1-manager)](https://hub.docker.com/r/writenotenow/d1-manager)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 ![Version](https://img.shields.io/badge/version-v1.0.0-green)
-![Status](https://img.shields.io/badge/status-Production%2FStable-brightgreen)
-[![Security](https://img.shields.io/badge/Security-Enhanced-green.svg)](https://github.com/neverinfamous/d1-manager/blob/main/SECURITY.md)
 
-**Version:** 1.0.0 | **Last Updated:** November 26, 2025 
-**Base Image:** Node.js 18-alpine | **Architecture:** linux/amd64, linux/arm64
+Run D1 Database Manager in Docker for development, testing, or self-hosted deployments.
 
-A fully containerized version of the D1 Database Manager for Cloudflare. This Docker image provides a modern, full-featured web application for managing Cloudflare D1 databases with enterprise-grade authentication via Cloudflare Access (Zero Trust).
-
-**🎯 [Try the Live Demo](https://d1.adamic.tech/)** - See D1 Database Manager in action
-
-**📰 [Read the v1.0.0 Release Article](https://adamic.tech/articles/2025-11-02-d1-manager-v1-0-0)** - Learn more about features, architecture, and deployment
-
-**📖 [View the Wiki](https://github.com/neverinfamous/d1-manager/wiki)** - Comprehensive documentation and guides
-
-**🚀 Docker Deployment:** Run the development server in a containerized environment for testing and local development.
+**[Live Demo](https://d1.adamic.tech/)** • **[Wiki](https://github.com/neverinfamous/d1-manager/wiki)** • **[GitHub](https://github.com/neverinfamous/d1-manager)**
 
 ---
 
-## 🐳 Quick Start
+## 🎯 Features
 
-### Pull and Run
+### Database Management
+- Create, rename, delete, and optimize databases
+- Bulk operations with multi-select
+- Upload/import SQL files
+- Job history tracking [NEW]
 
-1. **Pull the latest image:**
+### Table Operations
+- Visual schema designer
+- Clone, export (SQL/CSV), and bulk operations
+- Column management (add, modify, rename, delete)
+- Foreign key dependency analysis
+
+### Query Console
+- SQL editor with syntax highlighting
+- Query history and saved queries
+- CSV export
+
+### Advanced Features
+- **Row-Level Filtering** - Type-aware filters with OR logic, BETWEEN, IN operators
+- **Foreign Key Visualizer** - Interactive graph with add/modify/delete constraints
+- **ER Diagram** - Visual schema documentation with PNG/SVG/JSON export
+- **Cascade Impact Simulator** - Preview DELETE cascades before execution
+- **Undo/Rollback** - Restore dropped tables, columns, or deleted rows
+- **FTS5 Full-Text Search** - Create and manage virtual tables
+- **Constraint Validator** - Detect orphans and integrity violations
+- **Index Analyzer** - Smart index recommendations
+
+---
+
+## 🚀 Quick Start
+
+### 1. Set Up Metadata Database
+
+The D1 Manager requires a metadata database for query history, saved queries, and undo history.
+
+```bash
+npx wrangler login
+```
+
+```bash
+npx wrangler d1 create d1-manager-metadata
+```
+
+```bash
+git clone https://github.com/neverinfamous/d1-manager.git
+```
+
+```bash
+cd d1-manager
+```
+
+```bash
+npx wrangler d1 execute d1-manager-metadata --remote --file=worker/schema.sql
+```
+
+### 2. Get Cloudflare Credentials
+
+| Credential | Where to Find |
+|------------|---------------|
+| `ACCOUNT_ID` | Dashboard URL: `dash.cloudflare.com/{ACCOUNT_ID}/...` |
+| `API_KEY` | [API Tokens](https://dash.cloudflare.com/profile/api-tokens) → Create Token → **D1 Edit** permission |
+| `TEAM_DOMAIN` | [Zero Trust](https://one.dash.cloudflare.com/) → Settings → Custom Pages |
+| `POLICY_AUD` | Zero Trust → Access → Applications → Your App → AUD tag |
+
+### 3. Run Container
 
 ```bash
 docker pull writenotenow/d1-manager:latest
 ```
-
-2. **Run with environment variables:**
 
 ```bash
 docker run -d \
@@ -45,191 +93,30 @@ docker run -d \
   writenotenow/d1-manager:latest
 ```
 
-3. **Access the application:**
-
-Open `http://localhost:8080` in your browser
-
-### Using Docker Compose
-
-1. **Create a `docker-compose.yml` file:**
-
-```yaml
-version: '3.8'
-
-services:
-  d1-manager:
-    image: writenotenow/d1-manager:latest
-    container_name: d1-manager
-    ports:
-      - "8080:8080"
-    environment:
-      - ACCOUNT_ID=${ACCOUNT_ID}
-      - API_KEY=${API_KEY}
-      - TEAM_DOMAIN=${TEAM_DOMAIN}
-      - POLICY_AUD=${POLICY_AUD}
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-```
-
-2. **Create a `.env` file:**
-
-```env
-ACCOUNT_ID=your_cloudflare_account_id
-API_KEY=your_cloudflare_api_token
-TEAM_DOMAIN=https://yourteam.cloudflareaccess.com
-POLICY_AUD=your_cloudflare_access_aud_tag
-```
-
-3. **Run with Docker Compose:**
-
-```bash
-docker-compose up -d
-```
+Open **http://localhost:8080**
 
 ---
 
-## 🎯 What's Included
+## ⬆️ Upgrading
 
-This Docker image packages the complete D1 Database Manager with:
+### 1. Update Schema (Required for New Features)
 
-### Core Features
-- **Full Database Management** - List, create, rename, delete, and optimize D1 databases
-- **Advanced Table Operations** - Browse, create, modify, clone, and export tables with visual schema designer
-- **SQL Query Console** - Execute queries with syntax highlighting, history, and CSV export
-- **Row-Level Filtering** - Type-aware filtering with OR logic, BETWEEN, IN operators, and preset templates
-- **Bulk Operations** - Multi-select operations for databases and tables (bulk download, delete, clone, export)
-- **Job History** - Track and monitor bulk operations with status badges, progress tracking, and detailed event timelines
-- **Column Management** - Add, rename, modify, and delete columns with proper migration handling
-- **Foreign Key Visualizer/Editor** - Interactive graph-based relationship management with dual layout system (hierarchical/force-directed), add/modify/delete constraints, type validation, orphan detection, and color-coded edges
-- **Circular Dependency Detector** - Proactive schema analysis to identify circular foreign key chains with DFS algorithm, severity classification (Low/Medium/High), interactive visualization, pre-add validation, breaking suggestions, dedicated tab, and FK Visualizer integration with highlight button
-- **ER Relationship Diagram** - Visual entity-relationship diagram with dual view mode (toggle between FK Editor and ER Diagram), interactive navigation, hierarchical/force-directed layouts, and multi-format export (PNG/SVG/JSON)
-- **Foreign Key Navigation** - Click foreign key values to navigate between related tables with breadcrumb trail, auto-filtering, visual FK indicators with link icons and tooltips, and keyboard shortcuts (Alt+Left for back navigation)
-- **Dependency Analysis** - Foreign key relationship viewer before table deletion
-- **Cascade Impact Simulator** - Interactive graph visualization of DELETE operations with multi-format export (CSV/JSON/Text/PDF)
-- **Undo/Rollback System** - Restore dropped tables, columns, or deleted rows with 10-operation history per database
-- **FTS5 Full-Text Search** - Create and manage FTS5 virtual tables with tokenizers (unicode61, porter, trigram, ascii), BM25 ranking, highlighting, search operators, and performance metrics
-- **Constraint Validator** - Detect orphaned records, broken foreign keys, NOT NULL violations, and UNIQUE constraint violations with guided fix workflow
-- **Index Analyzer** - Intelligent index recommendations based on schema analysis and query patterns with priority scoring, impact estimation, and one-click creation
-- **Dark/Light Themes** - System-aware theme switching with persistence
-- **Responsive Design** - Works seamlessly on desktop, tablet, and mobile
-
-### Authentication
-- **Cloudflare Access (Zero Trust)** - Enterprise-grade authentication with JWT validation
-- **GitHub OAuth Integration** - Secure authentication via Cloudflare's identity providers
-- **Session Management** - Automatic token refresh and secure session handling
-
-### Technical Stack
-- React 19.2.0 with TypeScript 5.9.3
-- Vite 7.1.12 for optimized production builds
-- Tailwind CSS + shadcn/ui for modern UI
-- ReactFlow for interactive graph visualization
-- Cloudflare Workers runtime for serverless API
-- SQLite-compatible D1 database engine with FTS5 support
-
----
-
-## 📋 Environment Variables
-
-### Required Variables
-
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `ACCOUNT_ID` | Your Cloudflare Account ID | `a1b2c3d4e5f6g7h8i9j0` |
-| `API_KEY` | Cloudflare API Token with D1 Edit permissions | `abc123...xyz789` |
-| `TEAM_DOMAIN` | Cloudflare Access team domain | `https://yourteam.cloudflareaccess.com` |
-| `POLICY_AUD` | Cloudflare Access Application Audience (AUD) tag | `abc123def456...` |
-
-### Optional Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `PORT` | Port the application listens on | `8080` |
-| `NODE_ENV` | Node environment (production/development) | `production` |
-| `LOG_LEVEL` | Logging level (error/warn/info/debug) | `info` |
-
----
-
-## 🔧 Configuration Guide
-
-### 1. Set Up Metadata Database
-
-The D1 Manager requires a metadata database to store query history, saved queries, and undo history.
-
-**Authenticate with Cloudflare:**
-
-```bash
-npx wrangler login
-```
-
-**Create the metadata database:**
-
-```bash
-npx wrangler d1 create d1-manager-metadata
-```
-
-**Clone the repository to get schema.sql:**
-
-```bash
-git clone https://github.com/neverinfamous/d1-manager.git
-```
-
-```bash
-cd d1-manager
-```
-
-**Initialize the schema:**
+Run this after updating to add new tables (safe to run multiple times):
 
 ```bash
 npx wrangler d1 execute d1-manager-metadata --remote --file=worker/schema.sql
 ```
 
-**Note for existing users upgrading:** If you're upgrading from an earlier version, run the schema command again to add new tables (like `undo_history` for the rollback feature). Existing tables won't be affected.
+### 2. Update Container
 
-### 2. Get Your Cloudflare Account ID
+```bash
+docker pull writenotenow/d1-manager:latest
+```
 
-1. Log in to [Cloudflare Dashboard](https://dash.cloudflare.com)
-2. Navigate to any page in your account
-3. Copy the Account ID from the URL: `dash.cloudflare.com/{ACCOUNT_ID}/...`
+```bash
+docker stop d1-manager && docker rm d1-manager
+```
 
-### 3. Create a Cloudflare API Token
-
-1. Go to [Cloudflare API Tokens](https://dash.cloudflare.com/profile/api-tokens)
-2. Click **Create Token** → **Create Custom Token**
-3. Set the following permissions:
-   - **Account** → **D1** → **Edit**
-4. Click **Continue to summary** → **Create Token**
-5. Copy the token (it won't be shown again)
-
-### 4. Set Up Cloudflare Access (Zero Trust)
-
-1. Navigate to [Cloudflare Zero Trust](https://one.dash.cloudflare.com/)
-2. Go to **Settings → Authentication**
-3. Add GitHub as an identity provider (or use another provider)
-4. Create a new Access Application:
-   - **Application Type:** Self-hosted
-   - **Application Domain:** Your domain where D1 Manager will be accessible
-   - **Session Duration:** As per your security requirements
-5. Configure Access Policies (e.g., allow users from your GitHub organization)
-6. Copy the **Application Audience (AUD) tag** from the application settings
-
-### 5. Note Your Team Domain
-
-Your team domain is in the format: `https://yourteam.cloudflareaccess.com`
-
-You can find it in the Zero Trust dashboard under **Settings → Custom Pages**
-
----
-
-## 🚀 Deployment Options
-
-### Docker Run
-
-**Standard deployment:**
 ```bash
 docker run -d \
   -p 8080:8080 \
@@ -242,35 +129,12 @@ docker run -d \
   writenotenow/d1-manager:latest
 ```
 
-**With custom port:**
-```bash
-docker run -d \
-  -p 3000:8080 \
-  -e PORT=8080 \
-  -e ACCOUNT_ID=your_account_id \
-  -e API_KEY=your_api_token \
-  -e TEAM_DOMAIN=https://yourteam.cloudflareaccess.com \
-  -e POLICY_AUD=your_aud_tag \
-  --name d1-manager \
-  writenotenow/d1-manager:latest
-```
+---
 
-**With logging enabled:**
-```bash
-docker run -d \
-  -p 8080:8080 \
-  -e LOG_LEVEL=debug \
-  -e ACCOUNT_ID=your_account_id \
-  -e API_KEY=your_api_token \
-  -e TEAM_DOMAIN=https://yourteam.cloudflareaccess.com \
-  -e POLICY_AUD=your_aud_tag \
-  --name d1-manager \
-  writenotenow/d1-manager:latest
-```
+## 🐋 Docker Compose
 
-### Docker Compose
+Create `docker-compose.yml`:
 
-**Production deployment with health checks:**
 ```yaml
 version: '3.8'
 
@@ -285,284 +149,94 @@ services:
       - API_KEY=${API_KEY}
       - TEAM_DOMAIN=${TEAM_DOMAIN}
       - POLICY_AUD=${POLICY_AUD}
-      - LOG_LEVEL=info
-      - NODE_ENV=production
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
-    networks:
-      - d1-network
-
-networks:
-  d1-network:
-    driver: bridge
 ```
 
-**Behind a reverse proxy (Nginx/Traefik):**
-```yaml
-version: '3.8'
+Create `.env`:
 
-services:
-  d1-manager:
-    image: writenotenow/d1-manager:latest
-    container_name: d1-manager
-    expose:
-      - "8080"
-    environment:
-      - ACCOUNT_ID=${ACCOUNT_ID}
-      - API_KEY=${API_KEY}
-      - TEAM_DOMAIN=${TEAM_DOMAIN}
-      - POLICY_AUD=${POLICY_AUD}
-    restart: unless-stopped
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.d1-manager.rule=Host(`d1.yourdomain.com`)"
-      - "traefik.http.routers.d1-manager.entrypoints=websecure"
-      - "traefik.http.routers.d1-manager.tls.certresolver=myresolver"
-    networks:
-      - proxy-network
-
-networks:
-  proxy-network:
-    external: true
+```env
+ACCOUNT_ID=your_cloudflare_account_id
+API_KEY=your_cloudflare_api_token
+TEAM_DOMAIN=https://yourteam.cloudflareaccess.com
+POLICY_AUD=your_cloudflare_access_aud_tag
 ```
 
-### Kubernetes
+Run:
 
-**Basic deployment:**
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: d1-manager
-  labels:
-    app: d1-manager
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: d1-manager
-  template:
-    metadata:
-      labels:
-        app: d1-manager
-    spec:
-      containers:
-      - name: d1-manager
-        image: writenotenow/d1-manager:latest
-        ports:
-        - containerPort: 8080
-        env:
-        - name: ACCOUNT_ID
-          valueFrom:
-            secretKeyRef:
-              name: d1-manager-secrets
-              key: account-id
-        - name: API_KEY
-          valueFrom:
-            secretKeyRef:
-              name: d1-manager-secrets
-              key: api-key
-        - name: TEAM_DOMAIN
-          valueFrom:
-            secretKeyRef:
-              name: d1-manager-secrets
-              key: team-domain
-        - name: POLICY_AUD
-          valueFrom:
-            secretKeyRef:
-              name: d1-manager-secrets
-              key: policy-aud
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: 8080
-          initialDelaySeconds: 30
-          periodSeconds: 10
-        readinessProbe:
-          httpGet:
-            path: /health
-            port: 8080
-          initialDelaySeconds: 5
-          periodSeconds: 5
-        resources:
-          requests:
-            memory: "256Mi"
-            cpu: "100m"
-          limits:
-            memory: "512Mi"
-            cpu: "500m"
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: d1-manager
-spec:
-  selector:
-    app: d1-manager
-  ports:
-  - protocol: TCP
-    port: 80
-    targetPort: 8080
-  type: LoadBalancer
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: d1-manager-secrets
-type: Opaque
-stringData:
-  account-id: "your_account_id"
-  api-key: "your_api_token"
-  team-domain: "https://yourteam.cloudflareaccess.com"
-  policy-aud: "your_aud_tag"
+```bash
+docker-compose up -d
+```
+
+Upgrade:
+
+```bash
+docker-compose pull && docker-compose up -d
 ```
 
 ---
 
-## 🔍 Health Checks
+## 📋 Environment Variables
 
-The container includes a health endpoint at `/health` that returns:
-
-```json
-{
-  "status": "ok",
-  "version": "1.0.0",
-  "uptime": 12345,
-  "timestamp": "2025-11-02T12:00:00.000Z"
-}
-```
-
-Use this endpoint for:
-- Docker health checks
-- Load balancer health probes
-- Kubernetes liveness/readiness probes
-- Monitoring and alerting systems
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `ACCOUNT_ID` | ✅ | Cloudflare Account ID |
+| `API_KEY` | ✅ | API Token with D1 Edit permission |
+| `TEAM_DOMAIN` | ✅ | `https://yourteam.cloudflareaccess.com` |
+| `POLICY_AUD` | ✅ | Cloudflare Access Application AUD tag |
+| `PORT` | ❌ | Port (default: `8080`) |
+| `NODE_ENV` | ❌ | Environment (default: `production`) |
 
 ---
 
-## 📊 Container Specifications
+## 📊 Container Info
 
-### Image Details
-- **Base Image:** `node:18-alpine`
-- **Size:** ~150MB (compressed)
-- **Architecture:** `linux/amd64`, `linux/arm64`
-- **Exposed Ports:** `8080`
-- **User:** Non-root user (`node`)
-- **Working Directory:** `/app`
-
-### Performance
-- **Startup Time:** ~2-3 seconds
-- **Memory Usage:** 50-100MB (idle)
-- **CPU Usage:** Minimal (event-driven)
-
-### Security Features
-- Runs as non-root user
-- No shell utilities in minimal Alpine base
-- Environment-based secret management
-- JWT validation for all API requests
-- CORS protection enabled
-- Rate limiting (configurable)
+| Property | Value |
+|----------|-------|
+| Base Image | `node:18-alpine` |
+| Size | ~150MB |
+| Architectures | `linux/amd64`, `linux/arm64` |
+| Port | `8080` |
+| User | Non-root (`node`) |
+| Health Endpoint | `/health` |
 
 ---
 
-## 🔐 Security Best Practices
+## 🏷️ Available Tags
 
-### 1. Use Docker Secrets (Docker Swarm)
+| Tag | Description |
+|-----|-------------|
+| `latest` | Latest stable release |
+| `v1.0.0` | Specific version (recommended for production) |
+| `sha-XXXXXX` | Commit SHA for reproducible builds |
 
-**Create secrets:**
+---
+
+## 🔧 Building from Source
 
 ```bash
-echo "your_account_id" | docker secret create d1_account_id -
+git clone https://github.com/neverinfamous/d1-manager.git
 ```
 
 ```bash
-echo "your_api_token" | docker secret create d1_api_key -
+cd d1-manager
 ```
 
 ```bash
-echo "https://yourteam.cloudflareaccess.com" | docker secret create d1_team_domain -
+docker build -t d1-manager:local .
 ```
 
 ```bash
-echo "your_aud_tag" | docker secret create d1_policy_aud -
-```
-
-**Deploy with secrets:**
-
-```bash
-docker service create \
-  --name d1-manager \
-  --publish 8080:8080 \
-  --secret d1_account_id \
-  --secret d1_api_key \
-  --secret d1_team_domain \
-  --secret d1_policy_aud \
-  yourusername/d1-manager:latest
-```
-
-### 2. Use Kubernetes Secrets
-
-**Create secret:**
-
-```bash
-kubectl create secret generic d1-manager-secrets \
-  --from-literal=account-id='your_account_id' \
-  --from-literal=api-key='your_api_token' \
-  --from-literal=team-domain='https://yourteam.cloudflareaccess.com' \
-  --from-literal=policy-aud='your_aud_tag'
-```
-
-### 3. Restrict Network Access
-
-**Docker Compose with network isolation:**
-
-```yaml
-version: '3.8'
-
-services:
-  d1-manager:
-    image: writenotenow/d1-manager:latest
-    networks:
-      - backend
-    environment:
-      - ACCOUNT_ID=${ACCOUNT_ID}
-      - API_KEY=${API_KEY}
-      - TEAM_DOMAIN=${TEAM_DOMAIN}
-      - POLICY_AUD=${POLICY_AUD}
-
-  nginx:
-    image: nginx:alpine
-    ports:
-      - "443:443"
-    networks:
-      - backend
-      - frontend
-
-networks:
-  backend:
-    internal: true
-  frontend:
-    driver: bridge
-```
-
-### 4. Enable Read-Only Root Filesystem
-
-```bash
-docker run -d \
-  --read-only \
-  --tmpfs /tmp \
-  --tmpfs /app/tmp \
-  -p 8080:8080 \
+docker run -d -p 8080:8080 \
   -e ACCOUNT_ID=your_account_id \
   -e API_KEY=your_api_token \
   -e TEAM_DOMAIN=https://yourteam.cloudflareaccess.com \
   -e POLICY_AUD=your_aud_tag \
-  yourusername/d1-manager:latest
+  d1-manager:local
 ```
 
 ---
@@ -571,455 +245,54 @@ docker run -d \
 
 ### Container Won't Start
 
-**Check logs:**
-
 ```bash
 docker logs d1-manager
 ```
 
-**Common issues:**
-- Missing required environment variables
-- Invalid API token or Account ID
+Common causes:
+- Missing environment variables
 - Port already in use
-
-**Verify environment variables:**
-
-```bash
-docker inspect d1-manager | grep -A 10 Env
-```
-
-**Check if port is available:**
-
-```bash
-netstat -tuln | grep 8080
-```
-
-**Restart with correct variables:**
-
-```bash
-docker rm -f d1-manager
-```
-
-```bash
-docker run -d [correct options] yourusername/d1-manager:latest
-```
 
 ### Authentication Failures
 
-**Symptoms:**
-- Redirect loops
-- "Failed to authenticate" errors
-- 401/403 responses
-
-**Check:**
-1. Verify `TEAM_DOMAIN` includes `https://`
-2. Confirm `POLICY_AUD` matches your Access application
-3. Ensure your user is allowed in Access policies
-4. Check if API token has **D1 Edit** permissions
-
-**Check authentication logs:**
-
-```bash
-docker logs d1-manager | grep -i "auth\|jwt\|access"
-```
+- Verify `TEAM_DOMAIN` includes `https://`
+- Confirm `POLICY_AUD` matches your Access application
+- Check API token has **D1 Edit** permission
 
 ### Database Operations Fail
 
-**Symptoms:**
-- "Failed to list databases" error
-- Operations timeout
-- 500 errors
-
-**Check:**
-1. Verify `ACCOUNT_ID` is correct
-2. Confirm `API_KEY` has D1 Edit permissions (not just Read)
-3. Check Cloudflare API status
-4. Verify D1 databases exist in your account
-
-**Test API token:**
+Test your API token:
 
 ```bash
 curl -X GET "https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/d1/database" \
-  -H "Authorization: Bearer ${API_KEY}" \
-  -H "Content-Type: application/json"
+  -H "Authorization: Bearer ${API_KEY}"
 ```
 
-### High Memory Usage
-
-**Check container stats:**
-
-```bash
-docker stats d1-manager
-```
-
-**Set memory limits:**
-
-```bash
-docker run -d \
-  --memory="512m" \
-  --memory-swap="512m" \
-  [other options] \
-  yourusername/d1-manager:latest
-```
-
-### Networking Issues
-
-**Cannot access from host:**
-
-Check if container is running:
-
-```bash
-docker ps | grep d1-manager
-```
-
-Check port mapping:
-
-```bash
-docker port d1-manager
-```
-
-Test connectivity:
-
-```bash
-curl http://localhost:8080/health
-```
-
-**Cannot access from other containers:**
-
-Ensure containers are on the same network:
-
-```bash
-docker network inspect bridge
-```
-
-Create custom network:
-
-```bash
-docker network create d1-network
-```
-
-Run with custom network:
-
-```bash
-docker run --network d1-network [other options] yourusername/d1-manager:latest
-```
-
----
-
-## 📈 Monitoring and Logging
-
-### Docker Logs
-
-**Follow logs in real-time:**
-
-```bash
-docker logs -f d1-manager
-```
-
-**View last 100 lines:**
-
-```bash
-docker logs --tail 100 d1-manager
-```
-
-**View logs since 1 hour ago:**
-
-```bash
-docker logs --since 1h d1-manager
-```
-
-### Log Aggregation
-
-**Using Docker logging driver:**
-
-```yaml
-version: '3.8'
-
-services:
-  d1-manager:
-    image: writenotenow/d1-manager:latest
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-```
-
-**Forward to syslog:**
-
-```yaml
-version: '3.8'
-
-services:
-  d1-manager:
-    image: writenotenow/d1-manager:latest
-    logging:
-      driver: syslog
-      options:
-        syslog-address: "tcp://192.168.0.42:514"
-        tag: "d1-manager"
-```
-
-### Container Stats
-
-**View real-time stats:**
-
-```bash
-docker stats d1-manager
-```
-
-**View stats for all containers:**
-
-```bash
-docker stats
-```
-
----
-
-## 🔄 Updates and Maintenance
-
-### Updating to Latest Version
-
-**1. Pull latest image:**
-
-```bash
-docker pull writenotenow/d1-manager:latest
-```
-
-**2. Stop and remove old container:**
-
-```bash
-docker stop d1-manager && docker rm d1-manager
-```
-
-**3. Start new container with same configuration:**
-
-```bash
-docker run -d [same options as before] writenotenow/d1-manager:latest
-```
-
-**4. Update the metadata database schema (for new features like Job History):**
-
-If you're using Cloudflare Workers deployment with a D1 metadata database, run:
-
-```bash
-npx wrangler d1 execute d1-manager-metadata --remote --file=worker/schema.sql
-```
-
-> **Note:** This command is safe to run multiple times. It uses `CREATE TABLE IF NOT EXISTS` to add new tables without affecting existing data.
-
-### Using Docker Compose
-
-**Pull latest images:**
-
-```bash
-docker-compose pull
-```
-
-**Restart services:**
-
-```bash
-docker-compose up -d
-```
-
-### Version Pinning (Recommended for Production)
-
-**Pin to specific version:**
-
-```yaml
-version: '3.8'
-
-services:
-  d1-manager:
-    image: writenotenow/d1-manager:1.0.0
-```
-
-### Automated Updates with Watchtower
-
-```yaml
-version: '3.8'
-
-services:
-  d1-manager:
-    image: writenotenow/d1-manager:latest
-    # ... your configuration
-
-  watchtower:
-    image: containrrr/watchtower
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    command: --interval 3600 d1-manager
-```
-
----
-
-## 🏗️ Building from Source
-
-If you want to build the Docker image yourself:
-
-### Clone the Repository
-
-**Clone the repository:**
-
-```bash
-git clone https://github.com/neverinfamous/d1-manager.git
-```
-
-**Navigate to directory:**
-
-```bash
-cd d1-manager
-```
-
-### Build the Image
-
-**Build for your platform:**
-
-```bash
-docker build -t d1-manager:local .
-```
-
-**Build for multiple platforms:**
-
-```bash
-docker buildx build --platform linux/amd64,linux/arm64 -t d1-manager:local .
-```
-
-### Dockerfile Reference
-
-The Dockerfile uses a multi-stage build for optimal size:
-
-1. **Build Stage** - Compiles TypeScript and bundles React app with Vite
-2. **Production Stage** - Copies only production artifacts to minimal Alpine image
-
-**Key features:**
-- Minimal attack surface with Alpine Linux
-- Non-root user execution
-- Optimized layer caching
-- Health check integration
-- Environment variable validation
-
----
-
-## 📋 Available Tags
-
-| Tag | Description | Use Case |
-|-----|-------------|----------|
-| `latest` | Latest stable release from main branch | Development/Testing |
-| `v1.0.0` | Specific version number (matches README version) | Production (recommended) |
-| `sha-XXXXXX` | Short commit SHA (12 chars) | Reproducible builds and security audits |
-
----
-
-## 🌐 Reverse Proxy Examples
-
-### Nginx
-
-```nginx
-server {
-    listen 80;
-    server_name d1.yourdomain.com;
-    return 301 https://$host$request_uri;
-}
-
-server {
-    listen 443 ssl http2;
-    server_name d1.yourdomain.com;
-
-    ssl_certificate /etc/nginx/ssl/cert.pem;
-    ssl_certificate_key /etc/nginx/ssl/key.pem;
-
-    location / {
-        proxy_pass http://d1-manager:8080;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
-    }
-}
-```
-
-### Traefik
-
-```yaml
-version: '3.8'
-
-services:
-  d1-manager:
-    image: writenotenow/d1-manager:latest
-    networks:
-      - traefik-network
-    environment:
-      - ACCOUNT_ID=${ACCOUNT_ID}
-      - API_KEY=${API_KEY}
-      - TEAM_DOMAIN=${TEAM_DOMAIN}
-      - POLICY_AUD=${POLICY_AUD}
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.d1.rule=Host(`d1.yourdomain.com`)"
-      - "traefik.http.routers.d1.entrypoints=websecure"
-      - "traefik.http.routers.d1.tls=true"
-      - "traefik.http.routers.d1.tls.certresolver=letsencrypt"
-      - "traefik.http.services.d1.loadbalancer.server.port=8080"
-
-networks:
-  traefik-network:
-    external: true
-```
-
-### Caddy
-
-```caddyfile
-d1.yourdomain.com {
-    reverse_proxy d1-manager:8080
-}
-```
+📚 **More solutions:** [Wiki - Troubleshooting](https://github.com/neverinfamous/d1-manager/wiki/Troubleshooting)
 
 ---
 
 ## 📚 Additional Resources
 
-### Documentation
-- **Main Documentation:** [GitHub Repository](https://github.com/neverinfamous/d1-manager)
-- **Cloudflare D1:** [D1 Documentation](https://developers.cloudflare.com/d1/)
-- **Cloudflare Access:** [Zero Trust Documentation](https://developers.cloudflare.com/cloudflare-one/policies/access/)
-- **Docker Documentation:** [Docker Docs](https://docs.docker.com/)
-- **Wiki:** [D1 Manager Wiki](https://github.com/neverinfamous/d1-manager/wiki)
-- **FTS5 Guide:** [Full-Text Search Documentation](https://github.com/neverinfamous/d1-manager/wiki/FTS5-Full-Text-Search)
-
-### Support
-- 🐛 **Bug Reports:** [GitHub Issues](https://github.com/neverinfamous/d1-manager/issues)
-- 💬 **Discussions:** [GitHub Discussions](https://github.com/neverinfamous/d1-manager/discussions)
-- 📧 **Email:** admin@adamic.tech
-
-### Community
-- **Docker Hub:** [Image Repository](https://hub.docker.com/r/writenotenow/d1-manager)
-- **GitHub:** [Source Code](https://github.com/neverinfamous/d1-manager)
-- **License:** [MIT License](https://github.com/neverinfamous/d1-manager/blob/main/LICENSE)
+- **[Wiki Documentation](https://github.com/neverinfamous/d1-manager/wiki)**
+- **[GitHub Repository](https://github.com/neverinfamous/d1-manager)**
+- **[Cloudflare D1 Docs](https://developers.cloudflare.com/d1/)**
+- **[Cloudflare Access Docs](https://developers.cloudflare.com/cloudflare-one/policies/access/)**
 
 ---
 
-## 🤝 Contributing
+## 📞 Support
 
-We welcome contributions! See the [CONTRIBUTING.md](https://github.com/neverinfamous/d1-manager/blob/main/CONTRIBUTING.md) guide for details.
+- 🐛 **Bug Reports:** [GitHub Issues](https://github.com/neverinfamous/d1-manager/issues)
+- 💬 **Discussions:** [GitHub Discussions](https://github.com/neverinfamous/d1-manager/discussions)
+- 📧 **Email:** admin@adamic.tech
 
 ---
 
 ## 📄 License
 
-MIT License - see [LICENSE](https://github.com/neverinfamous/d1-manager/blob/main/LICENSE) file for details
-
----
-
-## ⭐ Show Your Support
-
-If you find this project useful, please consider giving it a star on GitHub!
+MIT License - see [LICENSE](https://github.com/neverinfamous/d1-manager/blob/main/LICENSE)
 
 ---
 
 **Made with ❤️ for the Cloudflare and Docker communities**
-
