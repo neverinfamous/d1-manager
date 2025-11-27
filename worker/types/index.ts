@@ -21,6 +21,22 @@ export interface D1DatabaseInfo {
   created_at: string;
   file_size?: number;
   num_tables?: number;
+  read_replication?: {
+    mode: 'auto' | 'disabled';
+  };
+}
+
+// Read Replication types
+export type ReadReplicationMode = 'auto' | 'disabled';
+
+export interface ReadReplicationConfig {
+  mode: ReadReplicationMode;
+}
+
+// Query serving metadata (from D1 result meta)
+export interface QueryServingInfo {
+  served_by_region?: string;
+  served_by_primary?: boolean;
 }
 
 // Table schema types

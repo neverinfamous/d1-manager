@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { api, type D1Database, getUndoHistory } from './services/api'
 import { auth } from './services/auth'
 import { useTheme } from './hooks/useTheme'
-import { Database, Plus, Moon, Sun, Monitor, Loader2, Code, GitCompare, Upload, Download, Trash2, Pencil, Zap, Undo, History, AlertCircle } from 'lucide-react'
+import { Database, Plus, Moon, Sun, Monitor, Loader2, Code, GitCompare, Upload, Download, Trash2, Pencil, Zap, Undo, History, AlertCircle, Globe } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
@@ -729,13 +729,21 @@ export default function App() {
                     <CardHeader className="pl-12">
                       <div className="flex items-start justify-between">
                         <Database className="h-8 w-8 text-primary" />
-                        <span className={`text-xs px-2 py-1 rounded-full ${
-                          db.version === 'production' 
-                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                            : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                        }`}>
-                          {db.version}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          {db.read_replication?.mode === 'auto' && (
+                            <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 flex items-center gap-1">
+                              <Globe className="h-3 w-3" />
+                              Replicated
+                            </span>
+                          )}
+                          <span className={`text-xs px-2 py-1 rounded-full ${
+                            db.version === 'production' 
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                              : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                          }`}>
+                            {db.version}
+                          </span>
+                        </div>
                       </div>
                       <CardTitle className="mt-4">{db.name}</CardTitle>
                       <CardDescription>{db.uuid}</CardDescription>

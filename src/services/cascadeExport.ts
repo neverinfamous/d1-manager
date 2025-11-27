@@ -76,7 +76,7 @@ export class CascadeExportService {
         targetTable: this.simulation.targetTable,
         whereClause: this.simulation.whereClause || null,
         exportedAt: new Date().toISOString(),
-        version: '1.0.0'
+        version: '1.1.0'
       },
       statistics: stats,
       simulation: {

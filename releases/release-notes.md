@@ -1,13 +1,23 @@
 # D1 Database Manager - Release Notes
 
-## Unreleased - Post-1.0.0 Enhancements
-**Status:** In Production (v1.0.0 codebase with continuous improvements)
+## Version 1.1.0 - Major Feature Release
+**Release Date:** November 27, 2025  
+**Status:** Production/Stable
 
-These features have been implemented and deployed since the initial v1.0.0 release, representing significant enhancements to the platform without requiring a formal version bump.
+This release introduces three major features (Read Replication, Time Travel, Job History), along with comprehensive TypeScript strict mode compliance fixing 100+ type issues across the codebase.
 
 ---
 
 ### 🎉 Major New Features
+
+#### Read Replication
+- **Replication Status Display** - View read replication status for each database (globe badge in database list)
+- **Enable/Disable Control** - Toggle read replication via dedicated Replication tab in database view
+- **Query Serving Info** - See which region served your queries in Query Console (served_by_region, served_by_primary)
+- **Sessions API Education** - Educational content about using Sessions API in your own applications
+- **Sessions API for Metadata** - Internal metadata database operations now use Sessions API for sequential consistency
+- **New API Endpoint** - PUT `/api/databases/:dbId/replication` to control read replication mode
+- **Comprehensive Documentation** - New wiki page with usage examples, best practices, and troubleshooting
 
 #### Time Travel
 - **Current Bookmark Display** - View the current database bookmark (point-in-time state)
@@ -147,14 +157,12 @@ These features have been implemented and deployed since the initial v1.0.0 relea
 ### 🛡️ Code Quality
 
 #### TypeScript Strict Mode
-- **Maximum Strictness Achieved** - Worker codebase now passes the most aggressive TypeScript strict settings
+- **Maximum Strictness Achieved** - Full codebase (frontend + worker) now passes the most aggressive TypeScript and ESLint strict settings
 - **`exactOptionalPropertyTypes: true`** - Prevents `undefined` from being assigned to optional properties (`prop?: T` vs `prop: T | undefined`)
 - **`noUncheckedIndexedAccess: true`** - Array and object index access now returns `T | undefined`, requiring explicit null checks
-- **~95 Errors Fixed** - Comprehensive type safety improvements across 12 files:
-  - `utils/helpers.ts`, `utils/query-parser.ts`, `utils/fts5-helpers.ts`
-  - `utils/circular-dependency-detector.ts`, `utils/index-analyzer.ts`, `utils/undo.ts`
-  - `routes/constraints.ts`, `routes/databases.ts`, `routes/fts5.ts`
-  - `routes/queries.ts`, `routes/tables.ts`, `routes/undo.ts`
+- **100+ Errors Fixed** - Comprehensive type safety improvements across frontend and worker:
+  - Worker: `utils/helpers.ts`, `utils/query-parser.ts`, `utils/fts5-helpers.ts`, `utils/circular-dependency-detector.ts`, `utils/index-analyzer.ts`, `utils/undo.ts`, `routes/constraints.ts`, `routes/databases.ts`, `routes/fts5.ts`, `routes/queries.ts`, `routes/tables.ts`, `routes/undo.ts`
+  - Frontend: Components, services, and type definitions
 - **Safety Patterns** - All API responses, array accesses, regex matches, and optional properties now properly handle undefined cases
 - **Production Confidence** - Eliminates entire categories of runtime errors from undefined access
 
@@ -177,6 +185,7 @@ These features have been implemented and deployed since the initial v1.0.0 relea
 - `GET /api/time-travel/:dbId/history` - Get stored checkpoint history
 - `POST /api/time-travel/:dbId/capture` - Manually capture a checkpoint
 - `DELETE /api/time-travel/:dbId/history/:id` - Delete a checkpoint entry
+- `PUT /api/databases/:dbId/replication` - Enable/disable read replication for a database
 
 ---
 
@@ -185,7 +194,6 @@ These features have been implemented and deployed since the initial v1.0.0 relea
 #### Still Planned
 - Dependency export as JSON documentation files
 - Force delete mode with audit logging for power users
-- Read Replication support via D1 Sessions API
 - Analytics dashboard with comprehensive usage metrics
 
 ---

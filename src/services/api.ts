@@ -8,7 +8,13 @@ export interface D1Database {
   created_at: string
   file_size?: number
   num_tables?: number
+  read_replication?: {
+    mode: 'auto' | 'disabled'
+  }
 }
+
+// Read replication types
+export type ReadReplicationMode = 'auto' | 'disabled'
 
 // Table types
 export interface TableInfo {
@@ -72,6 +78,8 @@ export interface QueryResult<T = Record<string, unknown>> {
     rows_written?: number
     changes?: number
     last_row_id?: number
+    served_by_region?: string
+    served_by_primary?: boolean
   }
   success: boolean
 }
@@ -159,6 +167,30 @@ class APIService {
     
     if (!response.ok) {
       throw new Error(`Failed to get database info: ${response.statusText}`)
+    }
+    
+    const data = await response.json()
+    return data.result
+  }
+
+  /**
+   * Set read replication mode for a database
+   * @param databaseId - Database UUID
+   * @param mode - 'auto' to enable read replication, 'disabled' to disable
+   */
+  async setReadReplication(databaseId: string, mode: ReadReplicationMode): Promise<D1Database> {
+    const response = await fetch(`${WORKER_API}/api/databases/${databaseId}/replication`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      credentials: 'include',
+      body: JSON.stringify({ mode })
+    })
+    
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+      throw new Error(error.error || error.message || `Failed to set read replication: ${response.statusText}`)
     }
     
     const data = await response.json()

@@ -12,17 +12,18 @@ export default defineConfig({
   },
   build: {
     // Increase chunk size warning limit (default is 500 kB)
-    // Main app bundle is ~740 kB with heavy dependencies already split out
-    chunkSizeWarningLimit: 750,
+    // Main app bundle is ~750 kB with heavy dependencies split out
+    chunkSizeWarningLimit: 800,
     rollupOptions: {
       output: {
         // Manual chunks for better code splitting
         manualChunks: {
           // Vendor chunks for large dependencies
           'vendor-react': ['react', 'react-dom'],
-          'vendor-reactflow': ['reactflow'],
+          'vendor-reactflow': ['reactflow', '@reactflow/core', '@reactflow/minimap', '@reactflow/controls', '@reactflow/background'],
           'vendor-pdf': ['jspdf'],
           'vendor-zip': ['jszip'],
+          'vendor-ui': ['@radix-ui/react-dialog', '@radix-ui/react-select', '@radix-ui/react-checkbox', '@radix-ui/react-label', '@radix-ui/react-radio-group', '@radix-ui/react-accordion', '@radix-ui/react-progress', '@radix-ui/react-slot'],
         },
       },
     },

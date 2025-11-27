@@ -357,7 +357,8 @@ export async function handleDatabaseRoutes(
               version: 'production',
               created_at: new Date().toISOString(),
               file_size: 1024 * 1024, // 1MB
-              num_tables: 5
+              num_tables: 5,
+              read_replication: { mode: 'auto' }
             },
             {
               uuid: 'mock-db-2',
@@ -365,7 +366,8 @@ export async function handleDatabaseRoutes(
               version: 'production',
               created_at: new Date(Date.now() - 86400000).toISOString(),
               file_size: 512 * 1024, // 512KB
-              num_tables: 3
+              num_tables: 3,
+              read_replication: { mode: 'disabled' }
             }
           ],
           success: true
@@ -457,7 +459,8 @@ export async function handleDatabaseRoutes(
             version: 'production',
             created_at: new Date().toISOString(),
             file_size: 1024 * 1024,
-            num_tables: 5
+            num_tables: 5,
+            read_replication: { mode: 'disabled' }
           },
           success: true
         }), {
@@ -497,6 +500,114 @@ export async function handleDatabaseRoutes(
       }
       
       return new Response(JSON.stringify(data), {
+        headers: {
+          'Content-Type': 'application/json',
+          ...corsHeaders
+        }
+      });
+    }
+
+    // Set read replication mode
+    if (request.method === 'PUT' && url.pathname.match(/^\/api\/databases\/[^/]+\/replication$/)) {
+      const dbId = url.pathname.split('/')[3];
+      const body = await request.json() as { mode: 'auto' | 'disabled' };
+      console.log('[Databases] Setting read replication for:', dbId, 'mode:', body.mode);
+      
+      if (!body.mode || !['auto', 'disabled'].includes(body.mode)) {
+        return new Response(JSON.stringify({
+          error: 'Invalid mode',
+          message: 'Mode must be either "auto" or "disabled"',
+          success: false
+        }), {
+          status: 400,
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        });
+      }
+      
+      // Mock response for local development
+      if (isLocalDev) {
+        console.log('[Databases] Simulating read replication change for local development');
+        return new Response(JSON.stringify({
+          result: {
+            uuid: dbId,
+            read_replication: { mode: body.mode }
+          },
+          success: true
+        }), {
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        });
+      }
+      
+      // First get the database to verify it exists and is not protected
+      const dbInfoResponse = await fetch(
+        `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database/${dbId}`,
+        { headers: cfHeaders }
+      );
+      
+      if (!dbInfoResponse.ok) {
+        const errorText = await dbInfoResponse.text();
+        console.error('[Databases] Database not found:', errorText);
+        return new Response(JSON.stringify({
+          error: 'Database not found',
+          message: 'The specified database does not exist.',
+          success: false
+        }), {
+          status: 404,
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        });
+      }
+      
+      const dbInfo = await dbInfoResponse.json() as { result: D1DatabaseInfo };
+      
+      if (isProtectedDatabase(dbInfo.result.name)) {
+        console.warn('[Databases] Attempted to modify protected database:', dbInfo.result.name);
+        return createProtectedDatabaseResponse(corsHeaders);
+      }
+      
+      // Update read replication mode via Cloudflare API
+      const response = await fetch(
+        `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database/${dbId}`,
+        {
+          method: 'PUT',
+          headers: cfHeaders,
+          body: JSON.stringify({
+            read_replication: { mode: body.mode }
+          })
+        }
+      );
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[Databases] Read replication update error:', errorText);
+        return new Response(JSON.stringify({
+          error: 'Failed to update read replication',
+          message: `API error: ${response.status}`,
+          success: false
+        }), {
+          status: response.status,
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        });
+      }
+      
+      const data = await response.json() as { result?: unknown; success?: boolean };
+      console.log('[Databases] Read replication updated successfully');
+      
+      return new Response(JSON.stringify({
+        result: data.result,
+        success: true
+      }), {
         headers: {
           'Content-Type': 'application/json',
           ...corsHeaders

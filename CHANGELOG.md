@@ -5,16 +5,17 @@ All notable changes to the D1 Database Manager project will be documented in thi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
-### Changed
-- **TypeScript Strict Mode** - Worker codebase now passes the most aggressive TypeScript strict settings
-  - Enabled `exactOptionalPropertyTypes` - Prevents undefined assignment to optional properties
-  - Enabled `noUncheckedIndexedAccess` - Array/object index access returns `T | undefined`
-  - Fixed ~95 type errors across 12 files for full strict compliance
-  - All code now properly handles potential undefined values from array access and API responses
+## [1.1.0] - 2025-11-27
 
 ### Added
+- **Read Replication** - Enable/disable global read replicas with D1 Sessions API support
+  - View read replication status for each database in database list (globe badge)
+  - Enable/disable read replication via dedicated Replication tab
+  - See which region served your queries in Query Console (served_by_region, served_by_primary)
+  - Educational content about Sessions API for user applications
+  - Sessions API wrapper for metadata database operations (sequential consistency)
+  - New API endpoint: PUT `/api/databases/:dbId/replication`
+  - Comprehensive wiki documentation
 - **Time Travel** - View database bookmarks and manage checkpoints for point-in-time recovery
   - Display current database bookmark with copy-to-clipboard functionality
   - Generate CLI restore commands for Wrangler (`wrangler d1 time-travel restore`)
@@ -54,6 +55,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Real-time progress indicator showing verification step
 
 ### Changed
+- **TypeScript Strict Mode** - Full codebase now passes the most aggressive TypeScript and ESLint strict settings
+  - Enabled `exactOptionalPropertyTypes` - Prevents undefined assignment to optional properties
+  - Enabled `noUncheckedIndexedAccess` - Array/object index access returns `T | undefined`
+  - Fixed 100+ type errors across frontend and worker for full strict compliance
+  - All code now properly handles potential undefined values from array access and API responses
 - **Database Rename Error Handling** - Enhanced error messages with multi-line support for detailed verification failures
 - **FTS5 Detection** - Added immediate detection and blocking of rename attempts for databases containing FTS5 virtual tables
 

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Play, Loader2, Download, History, Save, Trash2 } from 'lucide-react';
+import { Play, Loader2, Download, History, Save, Trash2, Globe, Server } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -25,6 +25,8 @@ interface QueryResult {
   rows: unknown[][];
   rowsAffected?: number;
   executionTime: number;
+  servedByRegion?: string;
+  servedByPrimary?: boolean;
 }
 
 export function QueryConsole({ databaseId, databaseName }: QueryConsoleProps) {
@@ -71,13 +73,17 @@ export function QueryConsole({ databaseId, databaseName }: QueryConsoleProps) {
           columns,
           rows,
           rowsAffected: response.meta?.rows_written || response.meta?.rows_read,
-          executionTime: endTime - startTime
+          executionTime: endTime - startTime,
+          servedByRegion: response.meta?.served_by_region,
+          servedByPrimary: response.meta?.served_by_primary
         });
       } else {
         setResult({
           columns: [],
           rows: [],
-          executionTime: endTime - startTime
+          executionTime: endTime - startTime,
+          servedByRegion: response.meta?.served_by_region,
+          servedByPrimary: response.meta?.served_by_primary
         });
       }
     } catch (err) {
@@ -303,6 +309,17 @@ export function QueryConsole({ databaseId, databaseName }: QueryConsoleProps) {
                 <span className="text-xs text-muted-foreground">
                   Executed in {result.executionTime.toFixed(2)}ms
                 </span>
+                {result.servedByRegion && (
+                  <span className="text-xs text-muted-foreground flex items-center gap-1" title={result.servedByPrimary ? 'Served by primary database' : 'Served by read replica'}>
+                    {result.servedByPrimary ? (
+                      <Server className="h-3 w-3" />
+                    ) : (
+                      <Globe className="h-3 w-3 text-blue-500" />
+                    )}
+                    {result.servedByRegion}
+                    {!result.servedByPrimary && <span className="text-blue-500">(replica)</span>}
+                  </span>
+                )}
                 {result.rows.length > 0 && (
                   <Button variant="outline" size="sm" onClick={handleExportCSV}>
                     <Download className="h-4 w-4 mr-2" />

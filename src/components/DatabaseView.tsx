@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Table, RefreshCw, Plus, Search, Loader2, Wand2, Copy, Download, Trash2, Pencil, AlertTriangle, Network, Sparkles, Zap, Clock } from 'lucide-react';
+import { ArrowLeft, Table, RefreshCw, Plus, Search, Loader2, Wand2, Copy, Download, Trash2, Pencil, AlertTriangle, Network, Sparkles, Zap, Clock, Globe } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -34,6 +34,7 @@ import { ConstraintValidator } from './ConstraintValidator';
 import { IndexAnalyzer } from './IndexAnalyzer';
 import { CircularDependencyDetector } from './CircularDependencyDetector';
 import { TimeTravelInfo } from './TimeTravelInfo';
+import { ReadReplicationInfo } from './ReadReplicationInfo';
 
 interface DatabaseViewProps {
   databaseId: string;
@@ -49,7 +50,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSchemaDesigner, setShowSchemaDesigner] = useState(false);
-  const [activeTab, setActiveTab] = useState<'tables' | 'builder' | 'relationships' | 'circular' | 'fts5' | 'constraints' | 'performance' | 'time-travel'>('tables');
+  const [activeTab, setActiveTab] = useState<'tables' | 'builder' | 'relationships' | 'circular' | 'fts5' | 'constraints' | 'performance' | 'time-travel' | 'replication'>('tables');
   const [relationshipsView, setRelationshipsView] = useState<'editor' | 'diagram'>('editor');
   
   // Selection state
@@ -442,6 +443,14 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
               <Clock className="h-4 w-4 mr-2" />
               Time Travel
             </Button>
+            <Button
+              variant={activeTab === 'replication' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setActiveTab('replication')}
+            >
+              <Globe className="h-4 w-4 mr-2" />
+              Replication
+            </Button>
           </div>
           {activeTab === 'tables' && (
             <>
@@ -502,6 +511,8 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
         <IndexAnalyzer databaseId={databaseId} databaseName={databaseName} />
       ) : activeTab === 'time-travel' ? (
         <TimeTravelInfo databaseId={databaseId} databaseName={databaseName} />
+      ) : activeTab === 'replication' ? (
+        <ReadReplicationInfo databaseId={databaseId} databaseName={databaseName} />
       ) : (
         <>
           {/* Search Bar */}

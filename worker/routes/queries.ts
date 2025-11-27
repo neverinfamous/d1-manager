@@ -75,7 +75,9 @@ export async function handleQueryRoutes(
             meta: {
               duration: 0.5,
               rows_read: 2,
-              rows_written: 0
+              rows_written: 0,
+              served_by_region: 'MOCK',
+              served_by_primary: true
             },
             success: true
           }
