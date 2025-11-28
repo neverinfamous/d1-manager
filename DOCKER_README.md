@@ -2,7 +2,7 @@
 
 Last Updated November 27, 2025 - Production/Stable v1.1.0
 
-Tech Stack: React 19.2.0 | Vite 7.2.4 | TypeScript 5.9.3 | Cloudflare Workers + Zero Trust
+Tech Stack: TypeScript 5.9.3 | React 19.2.0 | shadcn/ui | Tailwind CSS | Vite 7.2.4 | Cloudflare Workers + Zero Trust
 
 [![GitHub](https://img.shields.io/badge/GitHub-neverinfamous/d1--manager-blue?logo=github)](https://github.com/neverinfamous/d1-manager)
 [![Docker Pulls](https://img.shields.io/docker/pulls/writenotenow/d1-manager)](https://hub.docker.com/r/writenotenow/d1-manager)
@@ -10,11 +10,12 @@ Tech Stack: React 19.2.0 | Vite 7.2.4 | TypeScript 5.9.3 | Cloudflare Workers + 
 ![Version](https://img.shields.io/badge/version-v1.1.0-green)
 ![Status](https://img.shields.io/badge/status-Production%2FStable-brightgreen)
 [![Security](https://img.shields.io/badge/Security-Enhanced-green.svg)](https://github.com/neverinfamous/d1-manager/blob/main/SECURITY.md)
+[![CodeQL](https://img.shields.io/badge/CodeQL-Passing-brightgreen.svg)](https://github.com/neverinfamous/d1-manager/security/code-scanning)
 [![Type Safety](https://img.shields.io/badge/TypeScript-Strict-blue.svg)](https://github.com/neverinfamous/d1-manager)
 
 This Docker image provides a modern, full-featured web application for managing Cloudflare D1 databases with enterprise-grade authentication via Cloudflare Access (Zero Trust). Run D1 Database Manager in Docker for development, testing, or self-hosted deployments.
 
-**[Live Demo](https://d1.adamic.tech/)** • **[Wiki](https://github.com/neverinfamous/d1-manager/wiki)** • **[GitHub](https://github.com/neverinfamous/d1-manager)** • **[Changelog](https://github.com/neverinfamous/d1-manager/wiki/Changelog)** • **[Release Article](https://adamic.tech/articles/d1-manager)**
+**[Live Demo](https://d1.adamic.tech/)** • **[GitHub](https://github.com/neverinfamous/d1-manager)** • **[Wiki](https://github.com/neverinfamous/d1-manager/wiki)**  **[Changelog](https://github.com/neverinfamous/d1-manager/wiki/Changelog)** • **[Release Article](https://adamic.tech/articles/d1-manager)**
 
 ---
 
