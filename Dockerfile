@@ -77,13 +77,15 @@ RUN cd /tmp && \
     mv package /usr/local/lib/node_modules/npm/node_modules/tar && \
     rm -rf /tmp/*
 
+# Upgrade Alpine base packages to fix CVEs
+# - busybox 1.37.0-r19 -> 1.37.0-r20 fixes CVE-2025-46394 & CVE-2024-58251 (LOW)
+RUN apk upgrade --no-cache busybox busybox-binsh
+
 # Install runtime dependencies only
 # Security Notes:
 # - Application dependencies: glob@11.1.0, tar@7.5.2 (patched via package.json overrides)
 # - npm CLI dependencies: glob@11.1.0, tar@7.5.2 (manually patched in npm's installation)
-# - curl 8.14.1-r2 has CVE-2025-10966 (MEDIUM) with no fix available yet (Alpine base package)
-# - busybox 1.37.0-r19 has CVE-2025-46394 & CVE-2024-58251 (LOW) with no fixes available yet (Alpine base package)
-# Alpine base package vulnerabilities (curl, busybox) are accepted risks with no available patches
+# - curl: using latest available in Alpine repos
 RUN apk add --no-cache \
     curl \
     ca-certificates
