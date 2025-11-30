@@ -90,6 +90,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Accessibility (FTS5 Schema Designer)** - Fixed "SQL Preview" label to use proper heading element
 - **Accessibility (Schema Designer)** - Fixed "SQL Preview" label to use proper heading element
 
+### Security
+- **Stack Trace Exposure** - Removed internal stack traces from FTS5 error responses (now logged server-side only)
+- **Docker: Busybox CVEs** - Upgraded busybox 1.37.0-r19 → 1.37.0-r20 fixing CVE-2025-46394 and CVE-2024-58251
+- **Docker: ARM64 Build** - Switched to native ARM64 runners to fix QEMU emulation failures
+
 ---
 
 ## [1.1.0] - 2025-11-27
