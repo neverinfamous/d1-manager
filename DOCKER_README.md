@@ -1,4 +1,4 @@
-# D1 Database Manager - Docker
+# D1 Database Manager
 
 Last Updated November 30, 2025 - Production/Stable v1.1.1
 
