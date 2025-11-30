@@ -162,6 +162,7 @@ export async function handleQueryRoutes(
         }
         
         // Return detailed error message to authenticated admin users
+        // lgtm[js/stack-trace-exposure] - Intentional: D1 Manager is an admin tool behind Zero Trust auth; SQL error details help admins debug queries
         return new Response(JSON.stringify({ 
           error: cleanErrorMsg,
           message: cleanErrorMsg

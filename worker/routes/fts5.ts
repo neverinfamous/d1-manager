@@ -667,9 +667,12 @@ export async function handleFTS5Routes(
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Unknown error';
     console.error('[FTS5] Error:', errorMessage);
+    // Log stack trace server-side only (not exposed to client)
+    if (err instanceof Error && err.stack) {
+      console.error('[FTS5] Stack:', err.stack);
+    }
     return new Response(JSON.stringify({ 
-      error: errorMessage,
-      details: err instanceof Error ? err.stack : undefined
+      error: errorMessage
     }), { 
       status: 500,
       headers: {
