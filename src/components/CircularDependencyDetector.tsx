@@ -2,11 +2,10 @@ import { useState, useEffect } from 'react';
 import ReactFlow, {
   Node,
   Edge,
-  Controls,
   Background,
-  MiniMap,
   useNodesState,
   useEdgesState,
+  useReactFlow,
   Panel,
   ReactFlowProvider,
   MarkerType
@@ -59,6 +58,7 @@ function CircularDependencyDetectorContent({ databaseId, onNavigateToRelationshi
   
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const { zoomIn, zoomOut, fitView } = useReactFlow();
 
   // Fetch circular dependencies
   useEffect(() => {
@@ -71,7 +71,7 @@ function CircularDependencyDetectorContent({ databaseId, onNavigateToRelationshi
         
         // Auto-select first cycle if exists
         if (detectedCycles.length > 0) {
-          setSelectedCycle(detectedCycles[0]);
+          setSelectedCycle(detectedCycles[0] ?? null);
         }
       } catch (err) {
         console.error('[CircularDependencyDetector] Error fetching cycles:', err);
@@ -112,8 +112,8 @@ function CircularDependencyDetectorContent({ databaseId, onNavigateToRelationshi
         // Create edges for the cycle
         const cycleEdges: Edge[] = [];
         for (let i = 0; i < selectedCycle.tables.length; i++) {
-          const source = selectedCycle.tables[i];
-          const target = selectedCycle.tables[(i + 1) % selectedCycle.tables.length];
+          const source = selectedCycle.tables[i]!;
+          const target = selectedCycle.tables[(i + 1) % selectedCycle.tables.length]!;
           
           // Find the FK edge in the graph
           const fkEdge = fkGraph.edges.find(e => e.source === source && e.target === target);
@@ -399,9 +399,31 @@ function CircularDependencyDetectorContent({ databaseId, onNavigateToRelationshi
                   minZoom={0.5}
                   maxZoom={2}
                 >
-                  <Controls />
                   <Background />
-                  <MiniMap />
+                  {/* Custom controls with dark mode support */}
+                  <Panel position="bottom-left" className="bg-card border rounded-lg shadow-lg p-1 flex flex-col gap-1">
+                    <button
+                      onClick={() => zoomIn()}
+                      className="w-7 h-7 flex items-center justify-center rounded hover:bg-muted text-foreground"
+                      title="Zoom In"
+                    >
+                      +
+                    </button>
+                    <button
+                      onClick={() => zoomOut()}
+                      className="w-7 h-7 flex items-center justify-center rounded hover:bg-muted text-foreground"
+                      title="Zoom Out"
+                    >
+                      −
+                    </button>
+                    <button
+                      onClick={() => fitView({ padding: 0.2, duration: 200 })}
+                      className="w-7 h-7 flex items-center justify-center rounded hover:bg-muted text-foreground text-xs"
+                      title="Fit View"
+                    >
+                      ⤢
+                    </button>
+                  </Panel>
                   <Panel position="top-right" className="bg-background border rounded p-2 text-xs">
                     <div className="font-semibold mb-1">Legend:</div>
                     <div className="space-y-1">

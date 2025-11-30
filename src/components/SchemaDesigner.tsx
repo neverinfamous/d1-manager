@@ -168,9 +168,9 @@ export function SchemaDesigner({ open, onOpenChange, onCreateTable }: SchemaDesi
           </div>
 
           {/* Columns */}
-          <div className="space-y-4">
+          <fieldset className="space-y-4">
             <div className="flex items-center justify-between">
-              <Label>Columns</Label>
+              <legend className="text-sm font-medium leading-none">Columns</legend>
               <Button type="button" variant="outline" size="sm" onClick={addColumn}>
                 <Plus className="h-4 w-4 mr-2" />
                 Add Column
@@ -184,7 +184,10 @@ export function SchemaDesigner({ open, onOpenChange, onCreateTable }: SchemaDesi
                     <div className="grid grid-cols-12 gap-3 items-start">
                       {/* Column Name */}
                       <div className="col-span-3">
+                        <label htmlFor={`col-name-${column.id}`} className="sr-only">Column name</label>
                         <Input
+                          id={`col-name-${column.id}`}
+                          name={`col-name-${column.id}`}
                           placeholder="Column name"
                           value={column.name}
                           onChange={(e) => updateColumn(column.id, 'name', e.target.value)}
@@ -193,7 +196,10 @@ export function SchemaDesigner({ open, onOpenChange, onCreateTable }: SchemaDesi
 
                       {/* Column Type */}
                       <div className="col-span-2">
+                        <label htmlFor={`col-type-${column.id}`} className="sr-only">Column type</label>
                         <select
+                          id={`col-type-${column.id}`}
+                          name={`col-type-${column.id}`}
                           className="w-full h-10 px-3 rounded-md border border-input bg-background"
                           value={column.type}
                           onChange={(e) => updateColumn(column.id, 'type', e.target.value)}
@@ -209,6 +215,7 @@ export function SchemaDesigner({ open, onOpenChange, onCreateTable }: SchemaDesi
                         <input
                           type="checkbox"
                           id={`pk-${column.id}`}
+                          name={`pk-${column.id}`}
                           checked={column.primaryKey}
                           onChange={(e) => updateColumn(column.id, 'primaryKey', e.target.checked)}
                           className="rounded"
@@ -224,6 +231,7 @@ export function SchemaDesigner({ open, onOpenChange, onCreateTable }: SchemaDesi
                         <input
                           type="checkbox"
                           id={`nn-${column.id}`}
+                          name={`nn-${column.id}`}
                           checked={column.notNull}
                           onChange={(e) => updateColumn(column.id, 'notNull', e.target.checked)}
                           className="rounded"
@@ -236,7 +244,10 @@ export function SchemaDesigner({ open, onOpenChange, onCreateTable }: SchemaDesi
 
                       {/* Default Value */}
                       <div className="col-span-2">
+                        <label htmlFor={`col-default-${column.id}`} className="sr-only">Default value</label>
                         <Input
+                          id={`col-default-${column.id}`}
+                          name={`col-default-${column.id}`}
                           placeholder="Default"
                           value={column.defaultValue}
                           onChange={(e) => updateColumn(column.id, 'defaultValue', e.target.value)}
@@ -260,13 +271,13 @@ export function SchemaDesigner({ open, onOpenChange, onCreateTable }: SchemaDesi
                 </Card>
               ))}
             </div>
-          </div>
+          </fieldset>
 
           {/* SQL Preview */}
           {tableName && columns.length > 0 && (
             <div className="space-y-2">
-              <Label>SQL Preview</Label>
-              <pre className="p-4 bg-muted rounded-md text-sm font-mono overflow-x-auto">
+              <h4 className="text-sm font-medium">SQL Preview</h4>
+              <pre className="p-4 bg-muted rounded-md text-sm font-mono overflow-x-auto" aria-label="SQL Preview">
                 {generateSQL()}
               </pre>
             </div>

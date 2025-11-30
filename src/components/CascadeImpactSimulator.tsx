@@ -2,9 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import ReactFlow, {
   Node,
   Edge,
-  Controls,
   Background,
-  MiniMap,
   useNodesState,
   useEdgesState,
   Panel,
@@ -276,12 +274,6 @@ export function CascadeImpactSimulator({
                       maxZoom={2}
                     >
                       <Background />
-                      <Controls />
-                      <MiniMap 
-                        nodeStrokeWidth={3}
-                        zoomable
-                        pannable
-                      />
                       <Panel position="top-right" className="bg-background/95 backdrop-blur-sm p-4 rounded-lg shadow-lg m-2">
                         <div className="text-xs space-y-2">
                           <div className="font-semibold mb-2">Legend</div>

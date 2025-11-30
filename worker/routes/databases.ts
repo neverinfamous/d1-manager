@@ -1055,27 +1055,165 @@ export async function handleDatabaseRoutes(
           throw new Error('No target database specified');
         }
         
-        // Import SQL content using D1's import API
-        const importResponse = await fetch(
+        // Import SQL content using D1's import API (4-step process)
+        // Step 1: Generate MD5 hash of SQL content
+        const encoder = new TextEncoder();
+        const data = encoder.encode(body.sqlContent);
+        const hashBuffer = await crypto.subtle.digest('MD5', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const etag = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        
+        console.log('[Databases] Import Step 1: Init upload with etag:', etag);
+        
+        // Step 2: Initialize upload - get R2 upload URL
+        const initResponse = await fetch(
           `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database/${targetDbId}/import`,
           {
             method: 'POST',
             headers: cfHeaders,
             body: JSON.stringify({
               action: 'init',
-              // Split SQL content into manageable chunks if needed
-              sql: body.sqlContent
+              etag: etag
             })
           }
         );
         
-        if (!importResponse.ok) {
-          const errorText = await importResponse.text();
-          console.error('[Databases] Import error:', errorText);
-          throw new Error(`Failed to import database: ${importResponse.status}`);
+        if (!initResponse.ok) {
+          const errorText = await initResponse.text();
+          console.error('[Databases] Import init error:', errorText);
+          throw new Error(`Failed to initialize import: ${initResponse.status}`);
         }
         
-        const importData = await importResponse.json() as { result: unknown };
+        const initData = await initResponse.json() as { 
+          result: { 
+            upload_url: string; 
+            filename: string;
+          };
+          success: boolean;
+        };
+        
+        if (!initData.success || !initData.result?.upload_url) {
+          console.error('[Databases] Import init failed:', initData);
+          throw new Error('Failed to get upload URL from init response');
+        }
+        
+        console.log('[Databases] Import Step 2: Uploading SQL to R2, filename:', initData.result.filename);
+        
+        // Step 3: Upload SQL content to R2
+        const uploadResponse = await fetch(initData.result.upload_url, {
+          method: 'PUT',
+          body: body.sqlContent
+        });
+        
+        if (!uploadResponse.ok) {
+          const errorText = await uploadResponse.text();
+          console.error('[Databases] Import upload error:', errorText);
+          throw new Error(`Failed to upload SQL content: ${uploadResponse.status}`);
+        }
+        
+        // Verify ETag from R2 response
+        const r2Etag = uploadResponse.headers.get('ETag')?.replace(/"/g, '') || '';
+        console.log('[Databases] Import R2 ETag:', r2Etag, 'Expected:', etag);
+        
+        if (r2Etag && r2Etag !== etag) {
+          console.warn('[Databases] ETag mismatch, but continuing with import');
+        }
+        
+        console.log('[Databases] Import Step 3: Starting ingestion');
+        
+        // Step 4: Start ingestion
+        const ingestResponse = await fetch(
+          `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database/${targetDbId}/import`,
+          {
+            method: 'POST',
+            headers: cfHeaders,
+            body: JSON.stringify({
+              action: 'ingest',
+              etag: etag,
+              filename: initData.result.filename
+            })
+          }
+        );
+        
+        if (!ingestResponse.ok) {
+          const errorText = await ingestResponse.text();
+          console.error('[Databases] Import ingest error:', errorText);
+          throw new Error(`Failed to start ingestion: ${ingestResponse.status}`);
+        }
+        
+        const ingestData = await ingestResponse.json() as { 
+          result: { 
+            at_bookmark?: string;
+            success?: boolean;
+            error?: string;
+            messages?: string[];
+            num_queries?: number;
+          };
+          success: boolean;
+        };
+        
+        console.log('[Databases] Import Step 4: Polling for completion, bookmark:', ingestData.result?.at_bookmark);
+        
+        // Step 5: Poll for completion
+        if (ingestData.result?.at_bookmark) {
+          let pollAttempts = 0;
+          const maxPollAttempts = 60; // Max 60 seconds of polling
+          
+          while (pollAttempts < maxPollAttempts) {
+            const pollResponse = await fetch(
+              `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database/${targetDbId}/import`,
+              {
+                method: 'POST',
+                headers: cfHeaders,
+                body: JSON.stringify({
+                  action: 'poll',
+                  current_bookmark: ingestData.result.at_bookmark
+                })
+              }
+            );
+            
+            if (!pollResponse.ok) {
+              console.warn('[Databases] Poll request failed, continuing...');
+              pollAttempts++;
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              continue;
+            }
+            
+            const pollData = await pollResponse.json() as {
+              result: {
+                success?: boolean;
+                error?: string;
+                num_queries?: number;
+                messages?: string[];
+              };
+              success: boolean;
+            };
+            
+            console.log('[Databases] Poll response:', pollData.result);
+            
+            if (pollData.result?.success) {
+              console.log('[Databases] Import completed successfully');
+              break;
+            }
+            
+            if (pollData.result?.error && pollData.result.error !== 'Not currently importing anything.') {
+              throw new Error(`Import failed: ${pollData.result.error}`);
+            }
+            
+            // Check for "Not currently importing anything" which means import is done
+            if (pollData.result?.error === 'Not currently importing anything.') {
+              console.log('[Databases] Import completed (no active import)');
+              break;
+            }
+            
+            pollAttempts++;
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+          
+          if (pollAttempts >= maxPollAttempts) {
+            console.warn('[Databases] Import poll timeout, but upload may have succeeded');
+          }
+        }
         
         // Complete the job successfully
         if (db) {
@@ -1093,7 +1231,11 @@ export async function handleDatabaseRoutes(
         }
         
         return new Response(JSON.stringify({
-          result: importData.result,
+          result: { 
+            imported: true,
+            databaseId: targetDbId,
+            numQueries: ingestData.result?.num_queries
+          },
           success: true
         }), {
           headers: {
@@ -1236,37 +1378,81 @@ export async function handleDatabaseRoutes(
         );
         
         if (!startExportResponse.ok) {
+          const errorText = await startExportResponse.text();
+          console.error('[Databases] Export start failed:', errorText);
           throw new Error('Failed to start database export');
         }
         
-        const exportStartData = await startExportResponse.json() as { result: { at_bookmark: string } };
-        const bookmark = exportStartData.result.at_bookmark;
+        const exportStartData = await startExportResponse.json() as { 
+          result: { 
+            at_bookmark?: string;
+            status?: string;
+            signed_url?: string;
+            result?: { signed_url?: string };
+          };
+          success: boolean;
+        };
+        console.log('[Databases] Export API response:', JSON.stringify(exportStartData));
         
-        // Poll for export completion
         let signedUrl: string | null = null;
-        let attempts = 0;
-        const maxAttempts = 60; // 2 minutes max
         
-        while (!signedUrl && attempts < maxAttempts) {
-          await new Promise(resolve => setTimeout(resolve, 2000));
+        // Check if export is already complete (small databases complete immediately)
+        if (exportStartData.result?.status === 'complete' && exportStartData.result?.result?.signed_url) {
+          console.log('[Databases] Export already complete (immediate)');
+          signedUrl = exportStartData.result.result.signed_url;
+        } else if (exportStartData.result?.signed_url) {
+          console.log('[Databases] Export already complete (direct signed_url)');
+          signedUrl = exportStartData.result.signed_url;
+        } else if (exportStartData.result?.at_bookmark) {
+          // Need to poll for completion
+          const bookmark = exportStartData.result.at_bookmark;
+          console.log('[Databases] Got bookmark, polling for completion:', bookmark);
           
-          const pollResponse = await fetch(
-            `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database/${dbId}/export`,
-            {
-              method: 'POST',
-              headers: cfHeaders,
-              body: JSON.stringify({ current_bookmark: bookmark })
-            }
-          );
+          let attempts = 0;
+          const maxAttempts = 60; // 2 minutes max
           
-          if (pollResponse.ok) {
-            const pollData = await pollResponse.json() as { result: { signed_url?: string } };
-            if (pollData.result.signed_url) {
-              signedUrl = pollData.result.signed_url;
+          while (!signedUrl && attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            const pollResponse = await fetch(
+              `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database/${dbId}/export`,
+              {
+                method: 'POST',
+                headers: cfHeaders,
+                body: JSON.stringify({ 
+                  output_format: 'polling',
+                  current_bookmark: bookmark 
+                })
+              }
+            );
+            
+            if (pollResponse.ok) {
+              const pollData = await pollResponse.json() as { 
+                result: { 
+                  signed_url?: string;
+                  status?: string;
+                  result?: { signed_url?: string };
+                } 
+              };
+              
+              // Check both possible locations for signed_url
+              const url = pollData.result?.signed_url || pollData.result?.result?.signed_url;
+              if (url) {
+                console.log('[Databases] Export ready after', attempts + 1, 'polls');
+                signedUrl = url;
+              } else if (attempts % 10 === 0) {
+                console.log('[Databases] Still waiting for export... (attempt', attempts + 1, '/', maxAttempts, ')');
+              }
+            } else {
+              const errorText = await pollResponse.text();
+              console.error('[Databases] Poll request failed:', pollResponse.status, errorText);
             }
+            
+            attempts++;
           }
-          
-          attempts++;
+        } else {
+          console.error('[Databases] Export API did not return expected response:', JSON.stringify(exportStartData));
+          throw new Error('Failed to start database export - unexpected API response');
         }
         
         if (!signedUrl) {
@@ -1281,25 +1467,150 @@ export async function handleDatabaseRoutes(
         }
         
         const sqlContent = await downloadResponse.text();
+        console.log('[Databases] Downloaded SQL content:', sqlContent.length, 'bytes');
         
-        // Step 4: Import into new database
+        // Step 4: Import into new database using multi-step process
         console.log('[Databases] Step 4: Importing into new database');
-        const importResponse = await fetch(
+        
+        // 4a: Calculate MD5 hash for etag
+        const encoder = new TextEncoder();
+        const data = encoder.encode(sqlContent);
+        const hashBuffer = await crypto.subtle.digest('MD5', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const etag = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        console.log('[Databases] Calculated etag (MD5):', etag);
+        
+        // 4b: Init upload to get presigned URL
+        console.log('[Databases] Step 4b: Initializing import upload');
+        const initResponse = await fetch(
           `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database/${newDbId}/import`,
           {
             method: 'POST',
             headers: cfHeaders,
             body: JSON.stringify({
               action: 'init',
-              sql: sqlContent
+              etag: etag
             })
           }
         );
         
-        if (!importResponse.ok) {
-          const errorText = await importResponse.text();
-          console.error('[Databases] Import error:', errorText);
-          throw new Error('Failed to import data into new database');
+        if (!initResponse.ok) {
+          const errorText = await initResponse.text();
+          console.error('[Databases] Import init error:', errorText);
+          throw new Error('Failed to initialize import');
+        }
+        
+        const initData = await initResponse.json() as { 
+          result: { upload_url: string; filename: string };
+          success: boolean;
+        };
+        console.log('[Databases] Got upload URL and filename:', initData.result.filename);
+        
+        const uploadUrl = initData.result.upload_url;
+        const filename = initData.result.filename;
+        
+        // 4c: Upload SQL content to R2
+        console.log('[Databases] Step 4c: Uploading SQL to R2');
+        const uploadResponse = await fetch(uploadUrl, {
+          method: 'PUT',
+          body: sqlContent
+        });
+        
+        if (!uploadResponse.ok) {
+          const errorText = await uploadResponse.text();
+          console.error('[Databases] R2 upload error:', errorText);
+          throw new Error('Failed to upload SQL content');
+        }
+        
+        // Verify etag from R2 response
+        const r2Etag = uploadResponse.headers.get('ETag')?.replace(/"/g, '');
+        console.log('[Databases] R2 upload complete, ETag:', r2Etag);
+        
+        if (r2Etag && r2Etag !== etag) {
+          console.warn('[Databases] ETag mismatch - expected:', etag, 'got:', r2Etag);
+          // Continue anyway, some environments may have different etag handling
+        }
+        
+        // 4d: Start ingestion
+        console.log('[Databases] Step 4d: Starting ingestion');
+        const ingestResponse = await fetch(
+          `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database/${newDbId}/import`,
+          {
+            method: 'POST',
+            headers: cfHeaders,
+            body: JSON.stringify({
+              action: 'ingest',
+              etag: etag,
+              filename: filename
+            })
+          }
+        );
+        
+        if (!ingestResponse.ok) {
+          const errorText = await ingestResponse.text();
+          console.error('[Databases] Ingest error:', errorText);
+          throw new Error('Failed to start import ingestion');
+        }
+        
+        const ingestData = await ingestResponse.json() as {
+          result: { at_bookmark?: string; success?: boolean };
+          success: boolean;
+        };
+        console.log('[Databases] Ingestion started:', JSON.stringify(ingestData));
+        
+        // 4e: Poll for import completion
+        if (ingestData.result?.at_bookmark) {
+          console.log('[Databases] Step 4e: Polling for import completion');
+          const importBookmark = ingestData.result.at_bookmark;
+          let importAttempts = 0;
+          const maxImportAttempts = 60; // 2 minutes max
+          let importComplete = false;
+          
+          while (!importComplete && importAttempts < maxImportAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            const pollResponse = await fetch(
+              `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database/${newDbId}/import`,
+              {
+                method: 'POST',
+                headers: cfHeaders,
+                body: JSON.stringify({
+                  action: 'poll',
+                  current_bookmark: importBookmark
+                })
+              }
+            );
+            
+            if (pollResponse.ok) {
+              const pollData = await pollResponse.json() as {
+                result: { success?: boolean; error?: string };
+              };
+              
+              if (pollData.result?.success) {
+                console.log('[Databases] Import completed successfully after', importAttempts + 1, 'polls');
+                importComplete = true;
+              } else if (pollData.result?.error === 'Not currently importing anything.') {
+                console.log('[Databases] Import completed (no active import)');
+                importComplete = true;
+              } else if (pollData.result?.error) {
+                console.error('[Databases] Import poll error:', pollData.result.error);
+                throw new Error(`Import failed: ${pollData.result.error}`);
+              } else if (importAttempts % 10 === 0) {
+                console.log('[Databases] Still importing... (attempt', importAttempts + 1, '/', maxImportAttempts, ')');
+              }
+            } else {
+              const errorText = await pollResponse.text();
+              console.error('[Databases] Import poll request failed:', pollResponse.status, errorText);
+            }
+            
+            importAttempts++;
+          }
+          
+          if (!importComplete) {
+            throw new Error('Import timeout - database may be too large');
+          }
+        } else {
+          console.log('[Databases] Import completed immediately (no polling needed)');
         }
         
         // Step 5: Verify import

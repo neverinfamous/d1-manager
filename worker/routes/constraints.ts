@@ -718,7 +718,7 @@ async function applyFixes(
         results.push({
           violationId,
           success: true,
-          rowsAffected: (fixResult.meta?.changes as number) || 0
+          rowsAffected: (fixResult.meta?.['changes'] as number) || 0
         });
       } else {
         results.push({

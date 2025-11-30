@@ -1,10 +1,19 @@
-import { useState } from 'react';
-import { Play, Loader2, Download, History, Save, Trash2, Globe, Server } from 'lucide-react';
+import { useState, useMemo, useRef } from 'react';
+import { Play, Loader2, Download, History, Save, Trash2, Globe, Server, AlertCircle, CheckCircle2, Copy, FileCode } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -14,6 +23,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { executeQuery, getSavedQueries, createSavedQuery, deleteSavedQuery, type SavedQuery } from '@/services/api';
+import { handleSqlKeydown } from '@/lib/sqlAutocomplete';
+import { validateSql } from '@/lib/sqlValidator';
+import { sqlTemplateGroups, sqlTemplates } from '@/lib/sqlTemplates';
 
 interface QueryConsoleProps {
   databaseId: string;
@@ -30,7 +42,7 @@ interface QueryResult {
 }
 
 export function QueryConsole({ databaseId, databaseName }: QueryConsoleProps) {
-  const [query, setQuery] = useState('SELECT * FROM sqlite_master WHERE type=\'table\';');
+  const [query, setQuery] = useState('');
   const [result, setResult] = useState<QueryResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [executing, setExecuting] = useState(false);
@@ -42,6 +54,11 @@ export function QueryConsole({ databaseId, databaseName }: QueryConsoleProps) {
   const [savedQueries, setSavedQueries] = useState<SavedQuery[]>([]);
   const [savingQuery, setSavingQuery] = useState(false);
   const [loadingQueries, setLoadingQueries] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Real-time SQL validation
+  const validation = useMemo(() => validateSql(query), [query]);
 
   const handleExecute = async () => {
     if (!query.trim()) {
@@ -60,9 +77,10 @@ export function QueryConsole({ databaseId, databaseName }: QueryConsoleProps) {
       // Response is already unwrapped by api.ts: { results: [], meta: {}, success: boolean }
       if (response.results && response.results.length > 0) {
         const resultsArray = response.results as Record<string, unknown>[];
+        const firstRow = resultsArray[0];
         
         // Extract columns from first row
-        const columns = Object.keys(resultsArray[0]);
+        const columns = firstRow ? Object.keys(firstRow) : [];
         
         // Convert results to rows array
         const rows = resultsArray.map((row: Record<string, unknown>) =>
@@ -72,18 +90,19 @@ export function QueryConsole({ databaseId, databaseName }: QueryConsoleProps) {
         setResult({
           columns,
           rows,
-          rowsAffected: response.meta?.rows_written || response.meta?.rows_read,
           executionTime: endTime - startTime,
-          servedByRegion: response.meta?.served_by_region,
-          servedByPrimary: response.meta?.served_by_primary
+          ...(response.meta?.rows_written !== undefined && { rowsAffected: response.meta.rows_written }),
+          ...(response.meta?.rows_read !== undefined && !response.meta?.rows_written && { rowsAffected: response.meta.rows_read }),
+          ...(response.meta?.served_by_region && { servedByRegion: response.meta.served_by_region }),
+          ...(response.meta?.served_by_primary !== undefined && { servedByPrimary: response.meta.served_by_primary })
         });
       } else {
         setResult({
           columns: [],
           rows: [],
           executionTime: endTime - startTime,
-          servedByRegion: response.meta?.served_by_region,
-          servedByPrimary: response.meta?.served_by_primary
+          ...(response.meta?.served_by_region && { servedByRegion: response.meta.served_by_region }),
+          ...(response.meta?.served_by_primary !== undefined && { servedByPrimary: response.meta.served_by_primary })
         });
       }
     } catch (err) {
@@ -101,10 +120,38 @@ export function QueryConsole({ databaseId, databaseName }: QueryConsoleProps) {
     return String(value);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  // Handle keyboard events for autocomplete and execution
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Ctrl/Cmd+Enter to execute
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
       handleExecute();
+      return;
+    }
+
+    // SQL autocomplete handling
+    const textarea = e.currentTarget;
+    const result = handleSqlKeydown(
+      e.key,
+      textarea.value,
+      textarea.selectionStart,
+      textarea.selectionEnd,
+      e.shiftKey
+    );
+
+    if (result.handled) {
+      e.preventDefault();
+      if (result.newValue !== undefined) {
+        setQuery(result.newValue);
+        // Set cursor position after React updates the value
+        if (result.newCursorPos !== undefined) {
+          const cursorPos = result.newCursorPos;
+          requestAnimationFrame(() => {
+            textarea.selectionStart = cursorPos;
+            textarea.selectionEnd = cursorPos;
+          });
+        }
+      }
     }
   };
 
@@ -218,9 +265,47 @@ export function QueryConsole({ databaseId, databaseName }: QueryConsoleProps) {
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold">Query Console</h3>
-          <p className="text-sm text-muted-foreground">{databaseName}</p>
+          <p className="text-base text-muted-foreground">
+            <span className="font-medium">Database:</span> {databaseName}
+          </p>
         </div>
         <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2">
+            <Label htmlFor="quick-queries-select" className="sr-only">
+              Quick Queries
+            </Label>
+            <Select
+              value=""
+              onValueChange={(templateId) => {
+                const template = sqlTemplates.find(t => t.id === templateId);
+                if (template) {
+                  setQuery(template.query);
+                }
+              }}
+            >
+              <SelectTrigger id="quick-queries-select" className="w-[180px] h-9">
+                <FileCode className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Quick Queries" />
+              </SelectTrigger>
+              <SelectContent className="max-h-80">
+                {sqlTemplateGroups.map((group, groupIndex) => (
+                  <SelectGroup key={group.id} className={groupIndex % 2 === 1 ? 'bg-muted/50' : ''}>
+                    <SelectLabel className="text-xs font-semibold text-primary">
+                      {group.label}
+                    </SelectLabel>
+                    {group.templates.map((template) => (
+                      <SelectItem key={template.id} value={template.id}>
+                        <div className="flex flex-col">
+                          <span>{template.name}</span>
+                          <span className="text-xs text-muted-foreground">{template.description}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <Button variant="outline" size="sm" onClick={handleShowSavedQueries}>
             <History className="h-4 w-4 mr-2" />
             Saved Queries
@@ -236,35 +321,89 @@ export function QueryConsole({ databaseId, databaseName }: QueryConsoleProps) {
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-medium">SQL Query</CardTitle>
-            <Button
-              size="sm"
-              onClick={handleExecute}
-              disabled={executing}
-            >
-              {executing ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Executing...
-                </>
-              ) : (
-                <>
-                  <Play className="h-4 w-4 mr-2" />
-                  Execute (Ctrl+Enter)
-                </>
+            <div className="flex items-center gap-3">
+              <CardTitle className="text-sm font-medium">SQL Query</CardTitle>
+              {query.trim() && (
+                <span className={`text-xs flex items-center gap-1 ${
+                  validation.isValid ? 'text-green-600 dark:text-green-400' : 'text-destructive'
+                }`}>
+                  {validation.isValid ? (
+                    <>
+                      <CheckCircle2 className="h-3 w-3" />
+                      Valid SQL
+                    </>
+                  ) : (
+                    <>
+                      <AlertCircle className="h-3 w-3" />
+                      {validation.error}
+                    </>
+                  )}
+                </span>
               )}
-            </Button>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  navigator.clipboard.writeText(query);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                }}
+                disabled={!query.trim()}
+                title="Copy query to clipboard"
+              >
+                <Copy className="h-4 w-4 mr-1" />
+                {copied ? 'Copied!' : 'Copy'}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setQuery('');
+                  setError(null);
+                  setResult(null);
+                }}
+                disabled={!query.trim()}
+                title="Clear query"
+              >
+                <Trash2 className="h-4 w-4 mr-1" />
+                Clear
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleExecute}
+                disabled={executing || !query.trim()}
+              >
+                {executing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Executing...
+                  </>
+                ) : (
+                  <>
+                    <Play className="h-4 w-4 mr-2" />
+                    Execute (Ctrl+Enter)
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
           <textarea
+            ref={textareaRef}
             id="sql-query-input"
             name="sql-query"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Enter your SQL query here..."
-            className="w-full h-48 p-4 font-mono text-sm bg-muted rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+            className={`w-full h-48 p-4 font-mono text-sm rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-ring ${
+              query.trim() && !validation.isValid
+                ? 'bg-destructive/5 border border-destructive'
+                : 'bg-muted'
+            }`}
             aria-label="SQL Query Input"
           />
           <div className="flex items-center justify-between mt-3">
@@ -276,13 +415,13 @@ export function QueryConsole({ databaseId, databaseName }: QueryConsoleProps) {
               />
               <Label
                 htmlFor="skip-validation"
-                className="text-xs font-normal cursor-pointer text-muted-foreground"
+                className="text-sm font-normal cursor-pointer text-muted-foreground"
               >
-                Skip validation (allows DROP, DELETE without confirmation)
+                Allow destructive queries (DROP, DELETE, TRUNCATE)
               </Label>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Press Ctrl+Enter (Cmd+Enter on Mac) to execute
+            <p className="text-sm text-muted-foreground">
+              Auto-pairs brackets and quotes • Tab for indent • Ctrl+Enter to execute
             </p>
           </div>
         </CardContent>

@@ -82,7 +82,7 @@ export function MigrationWizard({ databases }: MigrationWizardProps) {
     setTasks(migrationTasks);
 
     for (let i = 0; i < selectedTables.length; i++) {
-      const table = selectedTables[i];
+      const table = selectedTables[i]!;
       
       // Update status to running
       setTasks(prev => prev.map((t, idx) =>
@@ -123,11 +123,13 @@ export function MigrationWizard({ databases }: MigrationWizardProps) {
           
           if (data.length > 0) {
             // Get column names
-            const cols = Object.keys(data[0]);
+            const firstRow = data[0];
+            const cols = firstRow ? Object.keys(firstRow) : [];
             
             // Insert data row by row (D1 REST API doesn't support batched INSERTs)
             for (let rowIdx = 0; rowIdx < data.length; rowIdx++) {
               const row = data[rowIdx];
+              if (!row) continue;
               try {
                 const values = cols.map(col => {
                   const val = row[col];
@@ -206,7 +208,7 @@ export function MigrationWizard({ databases }: MigrationWizardProps) {
           <div className="flex items-center justify-between">
             {(['Select', 'Configure', 'Preview', 'Migrate', 'Complete'] as const).map((label, idx) => {
               const steps: MigrationStep[] = ['select', 'configure', 'preview', 'migrate', 'complete'];
-              const currentStepStatus = getStepStatus(steps[idx]);
+              const currentStepStatus = getStepStatus(steps[idx]!);
               
               return (
               <div key={label} className="flex items-center">
@@ -252,8 +254,10 @@ export function MigrationWizard({ databases }: MigrationWizardProps) {
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Source Database</label>
+                <label htmlFor="source-database-select" className="text-sm font-medium">Source Database</label>
                 <select
+                  id="source-database-select"
+                  name="source-database"
                   className="w-full h-10 px-3 rounded-md border border-input bg-background"
                   value={sourceDb}
                   onChange={(e) => handleSourceChange(e.target.value)}
@@ -266,8 +270,10 @@ export function MigrationWizard({ databases }: MigrationWizardProps) {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">Target Database</label>
+                <label htmlFor="target-database-select" className="text-sm font-medium">Target Database</label>
                 <select
+                  id="target-database-select"
+                  name="target-database"
                   className="w-full h-10 px-3 rounded-md border border-input bg-background"
                   value={targetDb}
                   onChange={(e) => setTargetDb(e.target.value)}
@@ -461,8 +467,9 @@ export function MigrationWizard({ databases }: MigrationWizardProps) {
           <Button variant="outline" onClick={() => {
             const steps: MigrationStep[] = ['select', 'configure', 'preview', 'migrate', 'complete'];
             const currentIndex = steps.indexOf(step);
-            if (currentIndex > 0) {
-              setStep(steps[currentIndex - 1]);
+            const prevStep = steps[currentIndex - 1];
+            if (currentIndex > 0 && prevStep) {
+              setStep(prevStep);
             }
           }}>
             Back

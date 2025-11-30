@@ -226,7 +226,13 @@ export function TableView({
           return false;
         }
         
-        // Otherwise include it (will be set to NULL or default)
+        // If it's a NOT NULL column with a default value, skip it when empty
+        // so SQLite will use the default value (SQLite only applies defaults when column is omitted)
+        if (col.notnull && col.dflt_value) {
+          return false;
+        }
+        
+        // Otherwise include it (will be set to NULL)
         return true;
       });
       
@@ -293,7 +299,7 @@ export function TableView({
       
       const setClause = updateColumns.map(col => {
         const value = editValues[col.name];
-        if (value === '' || value === null) return `"${col.name}" = NULL`;
+        if (value === '' || value === null || value === undefined) return `"${col.name}" = NULL`;
         if (!isNaN(Number(value)) && value.trim() !== '') return `"${col.name}" = ${value}`;
         return `"${col.name}" = '${value.replace(/'/g, "''")}'`;
       }).join(', ');
@@ -407,7 +413,7 @@ export function TableView({
         name: addColumnValues.name,
         type: addColumnValues.type,
         notnull: addColumnValues.notnull,
-        defaultValue: addColumnValues.defaultValue || undefined
+        ...(addColumnValues.defaultValue && { defaultValue: addColumnValues.defaultValue })
       });
       
       setShowAddColumnDialog(false);
@@ -472,7 +478,7 @@ export function TableView({
       await api.modifyColumn(databaseId, tableName, modifyingColumn.name, {
         type: modifyColumnValues.type,
         notnull: modifyColumnValues.notnull,
-        defaultValue: modifyColumnValues.defaultValue || undefined
+        ...(modifyColumnValues.defaultValue && { defaultValue: modifyColumnValues.defaultValue })
       });
       
       setShowModifyColumnDialog(false);
@@ -1328,7 +1334,7 @@ export function TableView({
       <CascadeImpactSimulator
         databaseId={databaseId}
         targetTable={tableName}
-        whereClause={cascadeSimulatorWhereClause}
+        {...(cascadeSimulatorWhereClause && { whereClause: cascadeSimulatorWhereClause })}
         open={showCascadeSimulator}
         onClose={() => setShowCascadeSimulator(false)}
       />

@@ -73,7 +73,7 @@ const getBuiltInPresets = (columns: ColumnInfo[]): FilterPreset[] => {
   
   // Date-based presets
   if (dateColumns.length > 0) {
-    const dateCol = dateColumns[0].name;
+    const dateCol = dateColumns[0]!.name;
     const today = new Date();
     const sevenDaysAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
     const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -87,7 +87,7 @@ const getBuiltInPresets = (columns: ColumnInfo[]): FilterPreset[] => {
       filters: {
         [dateCol]: {
           type: 'gte',
-          value: sevenDaysAgo.toISOString().split('T')[0]
+          value: sevenDaysAgo.toISOString().split('T')[0]!
         }
       }
     });
@@ -99,7 +99,7 @@ const getBuiltInPresets = (columns: ColumnInfo[]): FilterPreset[] => {
       filters: {
         [dateCol]: {
           type: 'gte',
-          value: thirtyDaysAgo.toISOString().split('T')[0]
+          value: thirtyDaysAgo.toISOString().split('T')[0]!
         }
       }
     });
@@ -111,7 +111,7 @@ const getBuiltInPresets = (columns: ColumnInfo[]): FilterPreset[] => {
       filters: {
         [dateCol]: {
           type: 'gte',
-          value: startOfMonth.toISOString().split('T')[0]
+          value: startOfMonth.toISOString().split('T')[0]!
         }
       }
     });
@@ -123,7 +123,7 @@ const getBuiltInPresets = (columns: ColumnInfo[]): FilterPreset[] => {
       filters: {
         [dateCol]: {
           type: 'gte',
-          value: startOfYear.toISOString().split('T')[0]
+          value: startOfYear.toISOString().split('T')[0]!
         }
       }
     });
@@ -131,7 +131,7 @@ const getBuiltInPresets = (columns: ColumnInfo[]): FilterPreset[] => {
   
   // Numeric range presets
   if (numericColumns.length > 0) {
-    const numCol = numericColumns[0].name;
+    const numCol = numericColumns[0]!.name;
     
     presets.push({
       id: 'range-0-100',

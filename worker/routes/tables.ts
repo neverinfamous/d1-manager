@@ -3,7 +3,7 @@ import { sanitizeIdentifier } from '../utils/helpers';
 import { trackDatabaseAccess } from '../utils/database-tracking';
 import { captureTableSnapshot, captureColumnSnapshot, captureRowSnapshot, saveUndoSnapshot } from '../utils/undo';
 import { isProtectedDatabase, createProtectedDatabaseResponse, getDatabaseInfo } from '../utils/database-protection';
-import { captureBookmark } from '../utils/time-travel';
+// NOTE: captureBookmark disabled - Export API was causing database locks
 
 /**
  * Note: This route handler requires dynamic D1 database access
@@ -417,22 +417,11 @@ export async function handleTableRoutes(
         });
       }
       
-      // Capture Time Travel bookmark before destructive operation
-      try {
-        await captureBookmark(
-          dbId,
-          undefined, // Database name not needed for internal ops
-          env,
-          'pre_drop_table',
-          `Before dropping table "${tableName}"`,
-          userEmail || undefined
-        );
-      } catch (bookmarkErr) {
-        console.error('[Tables] Failed to capture Time Travel bookmark:', bookmarkErr);
-        // Continue - bookmark capture is best-effort
-      }
+      // NOTE: Bookmark capture via Export API is disabled - it was causing database locks
+      // TODO: Re-enable when D1 export API behavior is fixed
+      // The Export API with output_format:'polling' appears to trigger real exports
       
-      // Capture snapshot before drop
+      // Capture snapshot before drop (best effort)
       try {
         const snapshot = await captureTableSnapshot(dbId, tableName, env);
         await saveUndoSnapshot(
@@ -446,8 +435,24 @@ export async function handleTableRoutes(
           env
         );
       } catch (snapshotErr) {
+        const errMsg = snapshotErr instanceof Error ? snapshotErr.message : String(snapshotErr);
         console.error('[Tables] Failed to capture snapshot:', snapshotErr);
-        // Continue with drop even if snapshot fails
+        
+        // Check if database is locked by export - if so, skip the drop entirely
+        if (errMsg.includes('Currently processing a long-running export')) {
+          console.log('[Tables] Database locked by export - cannot delete table');
+          return new Response(JSON.stringify({
+            error: 'Database is temporarily locked',
+            message: 'The database is currently processing an export. Please wait a few minutes and try again.'
+          }), {
+            status: 503,
+            headers: {
+              'Content-Type': 'application/json',
+              ...corsHeaders
+            }
+          });
+        }
+        // For other errors, continue with drop
       }
       
       const sanitizedTable = sanitizeIdentifier(tableName);
@@ -984,20 +989,8 @@ export async function handleTableRoutes(
         });
       }
       
-      // Capture Time Travel bookmark before destructive operation
-      try {
-        await captureBookmark(
-          dbId,
-          undefined,
-          env,
-          'pre_drop_column',
-          `Before dropping column "${columnName}" from "${tableName}"`,
-          userEmail || undefined
-        );
-      } catch (bookmarkErr) {
-        console.error('[Tables] Failed to capture Time Travel bookmark:', bookmarkErr);
-        // Continue - bookmark capture is best-effort
-      }
+      // NOTE: Bookmark capture disabled - Export API was causing database locks
+      // TODO: Re-enable when D1 export API behavior is fixed
       
       // Capture snapshot before drop
       try {
@@ -1070,20 +1063,8 @@ export async function handleTableRoutes(
         });
       }
       
-      // Capture Time Travel bookmark before destructive operation
-      try {
-        await captureBookmark(
-          dbId,
-          undefined,
-          env,
-          'pre_delete_rows',
-          `Before deleting rows from "${tableName}"`,
-          userEmail || undefined
-        );
-      } catch (bookmarkErr) {
-        console.error('[Tables] Failed to capture Time Travel bookmark:', bookmarkErr);
-        // Continue - bookmark capture is best-effort
-      }
+      // NOTE: Bookmark capture disabled - Export API was causing database locks
+      // TODO: Re-enable when D1 export API behavior is fixed
       
       // Capture snapshot before delete
       try {
@@ -1112,7 +1093,7 @@ export async function handleTableRoutes(
       
       return new Response(JSON.stringify({
         success: true,
-        rowsDeleted: result.meta?.changes || 0
+        rowsDeleted: result.meta?.['changes'] || 0
       }), {
         headers: {
           'Content-Type': 'application/json',
@@ -1714,10 +1695,21 @@ export async function handleTableRoutes(
   } catch (err) {
     // Log full error details on server only
     console.error('[Tables] Error:', err);
-    // Return generic error to client (security: don't expose stack traces)
+    
+    // Extract meaningful error message
+    let errorMessage = 'Unable to complete table operation. Please try again.';
+    const errorStr = err instanceof Error ? err.message : String(err);
+    
+    // Check for D1-specific errors
+    if (errorStr.includes('Currently processing a long-running export')) {
+      errorMessage = 'Database is currently processing an export. Please wait a few minutes and try again.';
+    } else if (errorStr.includes('SQLITE_BUSY')) {
+      errorMessage = 'Database is busy. Please wait a moment and try again.';
+    }
+    
     return new Response(JSON.stringify({ 
       error: 'Table operation failed',
-      message: 'Unable to complete table operation. Please try again.'
+      message: errorMessage
     }), { 
       status: 500,
       headers: {
@@ -2234,7 +2226,8 @@ async function getAllForeignKeysForDatabase(
     // Process foreign keys
     for (const fk of fks) {
       // Generate unique constraint ID
-      const constraintId = `fk_${table.name}_${fk.from}_${fk.table}_${fk.to}`;
+      // Use double underscore as separator to handle column names with single underscores
+      const constraintId = `fk__${table.name}__${fk.from}__${fk.table}__${fk.to}`;
       
       if (!processedConstraints.has(constraintId)) {
         edges.push({
@@ -2378,14 +2371,14 @@ async function modifyForeignKeyConstraint(
   },
   env: Env
 ): Promise<void> {
-  // Parse constraint name to get table and column info
-  const parts = constraintName.split('_');
+  // Parse constraint name to get table and column info (uses __ as separator)
+  const parts = constraintName.split('__');
   const sourceTable = parts[1];
   const sourceColumn = parts[2];
   const targetTable = parts[3];
   const targetColumn = parts[4];
   if (parts.length < 5 || parts[0] !== 'fk' || !sourceTable || !sourceColumn || !targetTable || !targetColumn) {
-    throw new Error('Invalid constraint name format. Expected: fk_sourceTable_sourceColumn_targetTable_targetColumn');
+    throw new Error('Invalid constraint name format. Expected: fk__sourceTable__sourceColumn__targetTable__targetColumn');
   }
   
   // Get current constraint to preserve values not being changed
@@ -2435,8 +2428,8 @@ async function deleteForeignKeyConstraint(
   constraintName: string,
   env: Env
 ): Promise<void> {
-  // Parse constraint name
-  const parts = constraintName.split('_');
+  // Parse constraint name (uses __ as separator)
+  const parts = constraintName.split('__');
   const sourceTable = parts[1];
   const sourceColumn = parts[2];
   const targetTable = parts[3];
@@ -2495,16 +2488,35 @@ async function recreateTableWithForeignKey(
     }
     
     // 2. Parse and modify the CREATE TABLE statement
-    let newCreateSql = createSql.replace(new RegExp(`CREATE TABLE ${sanitizedTable}`, 'i'), `CREATE TABLE ${sanitizedTempTable}`);
+    // Handle both quoted and unquoted table names: CREATE TABLE "tablename" or CREATE TABLE tablename
+    let newCreateSql = createSql.replace(
+      new RegExp(`CREATE TABLE\\s+["']?${sanitizedTable}["']?`, 'i'), 
+      `CREATE TABLE "${sanitizedTempTable}"`
+    );
     
     // Remove old constraint if modifying or removing
     if (modification.action === 'modify' || modification.action === 'remove') {
       const oldConst = modification.oldConstraint || modification.constraint;
+      const columnName = oldConst.columns[0];
+      const refTableName = oldConst.refTable;
+      
+      // Pattern to match: CONSTRAINT name FOREIGN KEY ("col") REFERENCES "table" ("col") ON DELETE/UPDATE...
+      // Handle both quoted and unquoted identifiers
       const fkPattern = new RegExp(
-        `\\s*,?\\s*FOREIGN KEY\\s*\\([^)]*${oldConst.columns[0]}[^)]*\\)\\s*REFERENCES\\s*${oldConst.refTable}\\s*\\([^)]+\\)[^,)]*`,
+        `\\s*,?\\s*CONSTRAINT\\s+\\w+\\s+FOREIGN KEY\\s*\\(\\s*["']?${columnName}["']?\\s*\\)\\s*REFERENCES\\s*["']?${refTableName}["']?\\s*\\([^)]+\\)(?:\\s+ON\\s+(?:DELETE|UPDATE)\\s+(?:NO ACTION|CASCADE|RESTRICT|SET NULL|SET DEFAULT))*`,
         'gi'
       );
       newCreateSql = newCreateSql.replace(fkPattern, '');
+      
+      // Also handle FK without CONSTRAINT keyword
+      const fkPatternNoConstraint = new RegExp(
+        `\\s*,?\\s*FOREIGN KEY\\s*\\(\\s*["']?${columnName}["']?\\s*\\)\\s*REFERENCES\\s*["']?${refTableName}["']?\\s*\\([^)]+\\)(?:\\s+ON\\s+(?:DELETE|UPDATE)\\s+(?:NO ACTION|CASCADE|RESTRICT|SET NULL|SET DEFAULT))*`,
+        'gi'
+      );
+      newCreateSql = newCreateSql.replace(fkPatternNoConstraint, '');
+      
+      // Clean up any trailing commas before closing paren
+      newCreateSql = newCreateSql.replace(/,(\s*\))/g, '$1');
     }
     
     // Add new constraint if adding or modifying
@@ -2517,12 +2529,10 @@ async function recreateTableWithForeignKey(
       newCreateSql = newCreateSql.replace(/\)(\s*;?\s*)$/i, `, ${fkClause})$1`);
     }
     
-    // 3. Create temporary table
-    await executeQueryViaAPI(dbId, newCreateSql, env);
-    
-    // 4. Copy data
-    const copyQuery = `INSERT INTO ${sanitizedTempTable} SELECT * FROM ${sanitizedTable}`;
-    await executeQueryViaAPI(dbId, copyQuery, env);
+    // 3-4. Create temp table and copy data in a single batch with FK checks disabled
+    // D1 requires multi-statement batches to maintain PRAGMA state
+    const batchSql = `PRAGMA foreign_keys = OFF; ${newCreateSql}; INSERT INTO "${sanitizedTempTable}" SELECT * FROM "${sanitizedTable}"; PRAGMA foreign_keys = ON;`;
+    await executeQueryViaAPI(dbId, batchSql, env);
     
     // 5. Get indexes
     const indexQuery = `SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name='${sanitizedTable}' AND sql IS NOT NULL`;
@@ -2530,10 +2540,10 @@ async function recreateTableWithForeignKey(
     const indexes = (indexResult.results as Array<{ sql: string }>).map(r => r.sql);
     
     // 6. Drop original table
-    await executeQueryViaAPI(dbId, `DROP TABLE ${sanitizedTable}`, env);
+    await executeQueryViaAPI(dbId, `DROP TABLE "${sanitizedTable}"`, env);
     
     // 7. Rename temporary table
-    await executeQueryViaAPI(dbId, `ALTER TABLE ${sanitizedTempTable} RENAME TO ${sanitizedTable}`, env);
+    await executeQueryViaAPI(dbId, `ALTER TABLE "${sanitizedTempTable}" RENAME TO "${sanitizedTable}"`, env);
     
     // 8. Recreate indexes
     for (const indexSql of indexes) {
@@ -2543,7 +2553,7 @@ async function recreateTableWithForeignKey(
   } catch (err) {
     // Attempt cleanup if temporary table exists
     try {
-      await executeQueryViaAPI(dbId, `DROP TABLE IF EXISTS ${sanitizedTempTable}`, env);
+      await executeQueryViaAPI(dbId, `DROP TABLE IF EXISTS "${sanitizedTempTable}"`, env);
     } catch {
       // Ignore cleanup errors
     }

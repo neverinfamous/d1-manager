@@ -94,7 +94,8 @@ export function FTS5FromTableConverter({
       const textColumns = schema
         .filter(col => col.type.toUpperCase().includes('TEXT') || col.type.toUpperCase().includes('VARCHAR'))
         .map(col => col.name);
-      setSelectedColumns(textColumns.length > 0 ? textColumns : [schema[0]?.name].filter(Boolean));
+      const fallbackColumn = schema[0]?.name;
+      setSelectedColumns(textColumns.length > 0 ? textColumns : fallbackColumn ? [fallbackColumn] : []);
     } catch (err) {
       console.error('Failed to load columns:', err);
       setColumns([]);
@@ -277,8 +278,8 @@ export function FTS5FromTableConverter({
 
           {/* Column Selection */}
           {columns.length > 0 && (
-            <div className="space-y-2">
-              <Label className="text-base font-semibold">Columns to Index</Label>
+            <fieldset className="space-y-2">
+              <legend className="text-base font-semibold">Columns to Index</legend>
               <p className="text-sm text-muted-foreground">
                 Select which columns to include in the full-text search
               </p>
@@ -297,7 +298,7 @@ export function FTS5FromTableConverter({
                   </div>
                 ))}
               </div>
-            </div>
+            </fieldset>
           )}
 
           {/* External Content Option */}
@@ -387,11 +388,11 @@ export function FTS5FromTableConverter({
 
           {/* SQL Preview */}
           <div className="space-y-2">
-            <Label className="text-base font-semibold flex items-center gap-2">
-              <FileText className="h-4 w-4" />
+            <h4 className="text-base font-semibold flex items-center gap-2">
+              <FileText className="h-4 w-4" aria-hidden="true" />
               SQL Preview
-            </Label>
-            <pre className="p-4 bg-muted rounded-lg text-xs overflow-x-auto max-h-64">
+            </h4>
+            <pre className="p-4 bg-muted rounded-lg text-xs overflow-x-auto max-h-64" aria-label="SQL Preview">
               <code>{generateSQL()}</code>
             </pre>
           </div>

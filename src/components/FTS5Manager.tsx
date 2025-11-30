@@ -22,6 +22,7 @@ import {
   rebuildFTS5Index,
   optimizeFTS5,
   getFTS5Stats,
+  listTables,
 } from '@/services/api';
 import type { FTS5TableInfo, FTS5TableConfig, FTS5CreateFromTableParams, FTS5Stats as FTS5StatsType } from '@/services/fts5-types';
 
@@ -32,6 +33,7 @@ interface FTS5ManagerProps {
 
 export function FTS5Manager({ databaseId }: FTS5ManagerProps) {
   const [fts5Tables, setFts5Tables] = useState<FTS5TableInfo[]>([]);
+  const [canConvertTables, setCanConvertTables] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showSchemaDesigner, setShowSchemaDesigner] = useState(false);
@@ -61,6 +63,17 @@ export function FTS5Manager({ databaseId }: FTS5ManagerProps) {
       setError(null);
       const tables = await listFTS5Tables(databaseId);
       setFts5Tables(tables);
+      
+      // Only show "Convert Table" button when there are regular tables AND no FTS5 tables yet
+      // (as a "get started" action - once you have FTS5 tables, use "Create FTS5 Table" instead)
+      try {
+        const allTables = await listTables(databaseId);
+        const regularTables = allTables.filter(t => t.type === 'table');
+        setCanConvertTables(regularTables.length > 0 && tables.length === 0);
+      } catch {
+        // If we can't check, default to not showing
+        setCanConvertTables(false);
+      }
       
       // Load stats for each table
       const stats: Record<string, FTS5StatsType> = {};
@@ -165,9 +178,11 @@ export function FTS5Manager({ databaseId }: FTS5ManagerProps) {
           <Button variant="outline" size="icon" onClick={loadFTS5Tables} disabled={loading}>
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           </Button>
-          <Button variant="outline" onClick={() => setShowConverter(true)}>
-            Convert Table
-          </Button>
+          {canConvertTables && (
+            <Button variant="outline" onClick={() => setShowConverter(true)}>
+              Convert Table
+            </Button>
+          )}
           <Button onClick={() => setShowSchemaDesigner(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Create FTS5 Table
@@ -348,11 +363,14 @@ export function FTS5Manager({ databaseId }: FTS5ManagerProps) {
                         </div>
 
                         {/* Stats for this table */}
-                        {tableStats[table.name] && (
-                          <div className="pt-2 border-t">
-                            <FTS5Stats stats={tableStats[table.name]} />
-                          </div>
-                        )}
+                        {tableStats[table.name] && (() => {
+                          const stats = tableStats[table.name]!;
+                          return (
+                            <div className="pt-2 border-t">
+                              <FTS5Stats stats={stats} />
+                            </div>
+                          );
+                        })()}
                       </CardContent>
                     </Card>
                   ))}

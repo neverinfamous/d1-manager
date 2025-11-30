@@ -21,7 +21,7 @@ export async function validateAccessJWT(request: Request, env: Env): Promise<str
     });
 
     // Extract email from JWT payload
-    const email = payload.email as string;
+    const email = payload['email'] as string;
     if (!email) {
       console.log('[Auth] JWT payload missing email');
       return null;

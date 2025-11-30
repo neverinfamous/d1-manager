@@ -1,13 +1,11 @@
 # D1 Database Manager for Cloudflare
 
-Last Updated November 27, 2025 - Production/Stable v1.1.0
-
-Tech Stack: TypeScript 5.9.3 | React 19.2.0 | shadcn/ui | Tailwind CSS | Vite 7.2.4 | Cloudflare Workers + Zero Trust
+Last Updated November 30, 2025 - Production/Stable v1.1.1
 
 [![GitHub](https://img.shields.io/badge/GitHub-neverinfamous/d1--manager-blue?logo=github)](https://github.com/neverinfamous/d1-manager)
 [![Docker Pulls](https://img.shields.io/docker/pulls/writenotenow/d1-manager)](https://hub.docker.com/r/writenotenow/d1-manager)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-![Version](https://img.shields.io/badge/version-v1.1.0-green)
+![Version](https://img.shields.io/badge/version-v1.1.1-green)
 ![Status](https://img.shields.io/badge/status-Production%2FStable-brightgreen)
 [![Security](https://img.shields.io/badge/Security-Enhanced-green.svg)](https://github.com/neverinfamous/d1-manager/blob/main/SECURITY.md)
 [![CodeQL](https://img.shields.io/badge/CodeQL-Passing-brightgreen.svg)](https://github.com/neverinfamous/d1-manager/security/code-scanning)
@@ -16,6 +14,10 @@ Tech Stack: TypeScript 5.9.3 | React 19.2.0 | shadcn/ui | Tailwind CSS | Vite 7.
 This Docker image provides a modern, full-featured web application for managing Cloudflare D1 databases with enterprise-grade authentication via Cloudflare Access (Zero Trust). Run D1 Database Manager in Docker for development, testing, or self-hosted deployments.
 
 **[Live Demo](https://d1.adamic.tech/)** • **[Docker](https://hub.docker.com/r/writenotenow/d1-manager)** • **[Wiki](https://github.com/neverinfamous/d1-manager/wiki)** • **[Changelog](https://github.com/neverinfamous/d1-manager/wiki/Changelog)** • **[Release Article](https://adamic.tech/articles/d1-manager)**
+## Tech Stack
+
+**Frontend**: React 19.2.0 | Vite 7.2.4 | TypeScript 5.9.3 | Tailwind CSS | shadcn/ui 
+**Backend**: Cloudflare Workers + KV + D1 + R2 + Durable Objects + Zero Trust
 
 ---
 
@@ -25,6 +27,7 @@ This Docker image provides a modern, full-featured web application for managing 
 - Create, rename, delete, download, optimize, and upload databases
 - Bulk operations with multi-select
 - Upload/import SQL files
+- **Database search filter** - Quickly find databases by name
 - **NEW ✨Job history tracking** - Track all database operations with detailed history
 
 ### Table Operations
@@ -32,6 +35,7 @@ This Docker image provides a modern, full-featured web application for managing 
 - Clone, export (SQL/CSV), and bulk operations
 - Column management (add, modify, rename, delete)
 - Foreign key dependency analysis
+- **Table search filter** - Quickly find tables by name
 
 ### Query Console
 - SQL editor with syntax highlighting

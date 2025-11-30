@@ -179,7 +179,12 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
       return;
     }
     
-    setRenameDialogState(prev => prev ? { ...prev, isRenaming: true, error: undefined } : null);
+    setRenameDialogState(prev => {
+      if (!prev) return null;
+      const { error: _error, ...rest } = prev;
+      void _error;
+      return { ...rest, isRenaming: true };
+    });
     setError(null);
     
     try {
@@ -217,7 +222,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
     // Validate all names
     for (const oldName of cloneDialogState.tableNames) {
       const newName = cloneDialogState.cloneNames[oldName];
-      if (!newName.trim()) {
+      if (!newName?.trim()) {
         setCloneDialogState(prev => prev ? { ...prev, error: `Clone name required for ${oldName}` } : null);
         return;
       }
@@ -227,13 +232,18 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
       }
     }
     
-    setCloneDialogState(prev => prev ? { ...prev, isCloning: true, error: undefined } : null);
+    setCloneDialogState(prev => {
+      if (!prev) return null;
+      const { error: _error, ...rest } = prev;
+      void _error;
+      return { ...rest, isCloning: true };
+    });
     setError(null);
     
     try {
       const tablesToClone = cloneDialogState.tableNames.map(name => ({
         name,
-        newName: cloneDialogState.cloneNames[name]
+        newName: cloneDialogState.cloneNames[name]!
       }));
       
       const result = await api.cloneTables(databaseId, tablesToClone, (current, total) => {
@@ -273,12 +283,17 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
   const handleExportTables = async () => {
     if (!exportDialogState) return;
     
-    setExportDialogState(prev => prev ? { ...prev, isExporting: true, error: undefined } : null);
+    setExportDialogState(prev => {
+      if (!prev) return null;
+      const { error: _error, ...rest } = prev;
+      void _error;
+      return { ...rest, isExporting: true };
+    });
     setError(null);
     
     try {
       if (exportDialogState.tableNames.length === 1) {
-        await api.exportTable(databaseId, exportDialogState.tableNames[0], exportDialogState.format);
+        await api.exportTable(databaseId, exportDialogState.tableNames[0]!, exportDialogState.format);
       } else {
         await api.exportTables(databaseId, exportDialogState.tableNames, exportDialogState.format, (progress) => {
           setExportDialogState(prev => prev ? { ...prev, progress } : null);
@@ -332,7 +347,12 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
   const handleDeleteTables = async () => {
     if (!deleteDialogState) return;
     
-    setDeleteDialogState(prev => prev ? { ...prev, isDeleting: true, error: undefined } : null);
+    setDeleteDialogState(prev => {
+      if (!prev) return null;
+      const { error: _error, ...rest } = prev;
+      void _error;
+      return { ...rest, isDeleting: true };
+    });
     setError(null);
     
     try {
@@ -501,7 +521,10 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
       ) : activeTab === 'circular' ? (
         <CircularDependencyDetector 
           databaseId={databaseId}
-          onNavigateToRelationships={() => setActiveTab('relationships')}
+          onNavigateToRelationships={() => {
+            setRelationshipsView('editor');
+            setActiveTab('relationships');
+          }}
         />
       ) : activeTab === 'fts5' ? (
         <FTS5Manager databaseId={databaseId} databaseName={databaseName} />
@@ -522,6 +545,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
               <Input
                 id="table-search"
                 name="table-search"
+                autoComplete="off"
                 placeholder="Search tables..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -717,11 +741,12 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
                   id="rename-table-name"
                   placeholder="new_table_name"
                   value={renameDialogState.newName}
-                  onChange={(e) => setRenameDialogState(prev => prev ? {
-                    ...prev,
-                    newName: e.target.value,
-                    error: undefined
-                  } : null)}
+                  onChange={(e) => setRenameDialogState(prev => {
+                    if (!prev) return null;
+                    const { error: _error, ...rest } = prev;
+                    void _error;
+                    return { ...rest, newName: e.target.value };
+                  })}
                   disabled={renameDialogState.isRenaming}
                 />
               </div>
@@ -771,14 +796,18 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
                     id={`clone-${tableName}`}
                     placeholder={`${tableName}_copy`}
                     value={cloneDialogState.cloneNames[tableName]}
-                    onChange={(e) => setCloneDialogState(prev => prev ? {
-                      ...prev,
-                      cloneNames: {
-                        ...prev.cloneNames,
-                        [tableName]: e.target.value
-                      },
-                      error: undefined
-                    } : null)}
+                    onChange={(e) => setCloneDialogState(prev => {
+                      if (!prev) return null;
+                      const { error: _error, ...rest } = prev;
+                      void _error;
+                      return {
+                        ...rest,
+                        cloneNames: {
+                          ...prev.cloneNames,
+                          [tableName]: e.target.value
+                        }
+                      };
+                    })}
                     disabled={cloneDialogState.isCloning}
                   />
                 </div>
@@ -922,35 +951,39 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
               )}
 
               {/* Single table delete */}
-              {!deleteDialogState.loadingDependencies && deleteDialogState.tableNames.length === 1 && (
-                <div className="space-y-4">
-                  <p className="text-sm">
-                    Table: <strong>{deleteDialogState.tableNames[0]}</strong>
-                  </p>
-                  
-                  <div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleSimulateCascadeImpact(deleteDialogState.tableNames[0])}
-                      className="w-full"
-                    >
-                      <AlertTriangle className="h-4 w-4 mr-2" />
-                      Simulate Cascade Impact
-                    </Button>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Preview the full cascade impact of deleting this table
+              {!deleteDialogState.loadingDependencies && deleteDialogState.tableNames.length === 1 && (() => {
+                const firstTableName = deleteDialogState.tableNames[0]!;
+                const tableDeps = deleteDialogState.dependencies?.[firstTableName];
+                return (
+                  <div className="space-y-4">
+                    <p className="text-sm">
+                      Table: <strong>{firstTableName}</strong>
                     </p>
+                    
+                    <div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleSimulateCascadeImpact(firstTableName)}
+                        className="w-full"
+                      >
+                        <AlertTriangle className="h-4 w-4 mr-2" />
+                        Simulate Cascade Impact
+                      </Button>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Preview the full cascade impact of deleting this table
+                      </p>
+                    </div>
+                    
+                    {tableDeps && (
+                      <TableDependenciesView
+                        tableName={firstTableName}
+                        dependencies={tableDeps}
+                      />
+                    )}
                   </div>
-                  
-                  {deleteDialogState.dependencies && deleteDialogState.dependencies[deleteDialogState.tableNames[0]] && (
-                    <TableDependenciesView
-                      tableName={deleteDialogState.tableNames[0]}
-                      dependencies={deleteDialogState.dependencies[deleteDialogState.tableNames[0]]}
-                    />
-                  )}
-                </div>
-              )}
+                );
+              })()}
 
               {/* Bulk delete with per-table accordion */}
               {!deleteDialogState.loadingDependencies && deleteDialogState.tableNames.length > 1 && (

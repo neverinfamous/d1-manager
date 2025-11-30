@@ -243,12 +243,13 @@ class APIService {
     const failed: Array<{ id: string, error: string }> = []
     
     for (let i = 0; i < databaseIds.length; i++) {
+      const dbId = databaseIds[i]!
       try {
-        await this.deleteDatabase(databaseIds[i])
-        succeeded.push(databaseIds[i])
+        await this.deleteDatabase(dbId)
+        succeeded.push(dbId)
       } catch (err) {
         failed.push({
-          id: databaseIds[i],
+          id: dbId,
           error: err instanceof Error ? err.message : 'Unknown error'
         })
       }
@@ -306,8 +307,9 @@ class APIService {
       const exports = data.result
       let fileCount = 0
       for (const db of databases) {
-        if (exports[db.uuid]) {
-          zip.file(`${db.name}.sql`, exports[db.uuid])
+        const sqlExport = exports[db.uuid]
+        if (sqlExport) {
+          zip.file(`${db.name}.sql`, sqlExport)
           fileCount++
         }
       }
@@ -333,7 +335,7 @@ class APIService {
       
       onProgress?.(100)
       
-      return { skipped: data.skipped }
+      return data.skipped ? { skipped: data.skipped } : {}
     } catch (error) {
       console.error('Database export failed:', error)
       throw new Error(error instanceof Error ? error.message : 'Failed to export databases')
@@ -454,7 +456,7 @@ class APIService {
     const failed: Array<{ id: string; name: string; error: string }> = []
     
     for (let i = 0; i < databaseIds.length; i++) {
-      const dbId = databaseIds[i]
+      const dbId = databaseIds[i]!
       
       try {
         // Get database name for progress reporting
@@ -792,12 +794,13 @@ class APIService {
     const failed: Array<{ name: string, error: string }> = []
     
     for (let i = 0; i < tableNames.length; i++) {
+      const tableName = tableNames[i]!
       try {
-        await this.deleteTable(databaseId, tableNames[i])
-        succeeded.push(tableNames[i])
+        await this.deleteTable(databaseId, tableName)
+        succeeded.push(tableName)
       } catch (err) {
         failed.push({
-          name: tableNames[i],
+          name: tableName,
           error: err instanceof Error ? err.message : 'Unknown error'
         })
       }
@@ -844,12 +847,13 @@ class APIService {
     const failed: Array<{ name: string, error: string }> = []
     
     for (let i = 0; i < tables.length; i++) {
+      const table = tables[i]!
       try {
-        await this.cloneTable(databaseId, tables[i].name, tables[i].newName)
-        succeeded.push({ oldName: tables[i].name, newName: tables[i].newName })
+        await this.cloneTable(databaseId, table.name, table.newName)
+        succeeded.push({ oldName: table.name, newName: table.newName })
       } catch (err) {
         failed.push({
-          name: tables[i].name,
+          name: table.name,
           error: err instanceof Error ? err.message : 'Unknown error'
         })
       }
@@ -911,19 +915,20 @@ class APIService {
       const exports: Array<{ name: string, content: string }> = []
       
       for (let i = 0; i < tableNames.length; i++) {
+        const tableName = tableNames[i]!
         const response = await fetch(
-          `${WORKER_API}/api/tables/${databaseId}/${encodeURIComponent(tableNames[i])}/export?format=${format}`,
+          `${WORKER_API}/api/tables/${databaseId}/${encodeURIComponent(tableName)}/export?format=${format}`,
           { credentials: 'include' }
         )
         
         if (!response.ok) {
-          throw new Error(`Failed to export table ${tableNames[i]}: ${response.statusText}`)
+          throw new Error(`Failed to export table ${tableName}: ${response.statusText}`)
         }
         
         const data = await response.json() as { result: { content: string, filename: string }, success: boolean }
         
         if (!data.success) {
-          throw new Error(`Export operation failed for table ${tableNames[i]}`)
+          throw new Error(`Export operation failed for table ${tableName}`)
         }
         
         exports.push({
@@ -987,8 +992,35 @@ class APIService {
     })
     
     if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error || error.message || `Query failed: ${response.statusText}`)
+      // Handle cases where response might not be JSON (e.g., Cloudflare WAF blocking)
+      let errorMessage = 'Query execution failed'
+      
+      // Check for specific HTTP status codes first
+      if (response.status === 403) {
+        errorMessage = 'Request blocked by security rules. If you\'re testing SQL injection, this is expected - Cloudflare WAF is protecting your database.'
+      } else if (response.status === 401) {
+        errorMessage = 'Authentication required. Please log in again.'
+      } else {
+        // Try to parse JSON error response
+        try {
+          const error = await response.json()
+          if (error.error) {
+            errorMessage = error.error
+          } else if (error.message) {
+            errorMessage = error.message
+          } else if (error.errors && Array.isArray(error.errors) && error.errors.length > 0) {
+            // D1 API error format: { errors: [{ code: 7500, message: "..." }] }
+            const d1Error = error.errors[0]
+            errorMessage = d1Error.message || d1Error.error || 'Unknown D1 error'
+            // Clean up common D1 error suffixes
+            errorMessage = errorMessage.replace(/: SQLITE_ERROR$/, '').replace(/: SQLITE_AUTH$/, '')
+          }
+        } catch {
+          // Response wasn't JSON (e.g., HTML error page from CDN/WAF)
+          errorMessage = `Request failed: ${response.status} ${response.statusText}`
+        }
+      }
+      throw new Error(errorMessage)
     }
     
     const data = await response.json()

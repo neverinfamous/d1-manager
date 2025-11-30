@@ -55,9 +55,28 @@ export function buildFTS5CreateStatement(config: FTS5TableConfig): string {
 
 /**
  * Build tokenizer string with parameters
+ * 
+ * Note: In FTS5, 'porter' is a stemmer filter that wraps another tokenizer.
+ * It must be specified as 'porter unicode61' or 'porter ascii', not just 'porter'.
  */
 export function buildTokenizerString(config: TokenizerConfig): string {
   const { type, parameters } = config;
+  
+  // Porter is a wrapper tokenizer - it needs a base tokenizer (default: unicode61)
+  // Syntax: "porter unicode61" or "porter ascii"
+  if (type === 'porter') {
+    const baseTokenizer = 'unicode61';
+    const params: string[] = [];
+    
+    if (parameters?.remove_diacritics !== undefined) {
+      params.push(`remove_diacritics ${parameters.remove_diacritics}`);
+    }
+    
+    if (params.length > 0) {
+      return `porter ${baseTokenizer} ${params.join(' ')}`;
+    }
+    return `porter ${baseTokenizer}`;
+  }
   
   if (!parameters || Object.keys(parameters).length === 0) {
     return type;
@@ -401,22 +420,68 @@ export function buildFTS5PopulateQuery(
 }
 
 /**
- * Sanitize FTS5 search query to prevent SQL injection
- * Note: This is a basic sanitizer - the MATCH query is still parameterized in the actual query
+ * Escape special regex characters in a string
+ */
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Sanitize FTS5 search query to prevent SQL injection and handle special characters
+ * 
+ * FTS5 special characters:
+ * - `*` at end of word = prefix matching (keep if valid)
+ * - `-` at start of word = NOT operator (keep if valid)
+ * - `^` = column boost
+ * - `:` = column filter (e.g., title:search)
+ * - `"` = phrase delimiter (keep matched pairs)
+ * - `(` and `)` = grouping
+ * - `@` = not valid in FTS5
+ * - `+` = not a standard FTS5 operator
  */
 export function sanitizeFTS5Query(query: string): string {
-  // FTS5 queries can contain: text, "phrases", AND, OR, NOT, NEAR, *, column filters
-  // We mainly want to prevent SQL injection attempts
+  if (!query || typeof query !== 'string') {
+    return '';
+  }
   
-  // Remove any SQL keywords that could be dangerous
-  const dangerous = [';', '--', '/*', '*/', 'UNION', 'DROP', 'DELETE', 'INSERT', 'UPDATE', 'CREATE'];
-  let sanitized = query;
+  let sanitized = query.trim();
   
-  for (const keyword of dangerous) {
-    const regex = new RegExp(keyword, 'gi');
+  // Remove SQL injection attempts
+  const sqlDangerous = [';', '--', '/*', '*/', 'UNION', 'DROP', 'DELETE', 'INSERT', 'UPDATE', 'CREATE'];
+  for (const keyword of sqlDangerous) {
+    const regex = new RegExp(escapeRegex(keyword), 'gi');
     sanitized = sanitized.replace(regex, '');
   }
   
-  return sanitized.trim();
+  // Remove characters that are not valid in FTS5 queries
+  // Keep: alphanumeric, spaces, quotes, parentheses, *, -, ^, :, _
+  // Remove: @, #, $, %, &, !, etc.
+  sanitized = sanitized.replace(/[@#$%&!=\\<>]/g, ' ');
+  
+  // Handle standalone special characters that would cause FTS5 syntax errors
+  // Remove standalone * - ^ : + that aren't part of valid expressions
+  sanitized = sanitized
+    .replace(/^\*+$/g, '')           // Just asterisks
+    .replace(/^-+$/g, '')            // Just dashes
+    .replace(/^\^+$/g, '')           // Just carets
+    .replace(/^:+$/g, '')            // Just colons
+    .replace(/^\++$/g, '')           // Just plus signs
+    .replace(/\s+\*(?!\w)/g, ' ')    // Standalone * not after word
+    .replace(/(?<!\w)\*\s+/g, ' ')   // Standalone * not before word (except prefix match)
+    .replace(/:\s*$/g, '')           // Trailing colon with nothing after
+    .replace(/^\s*:/g, '')           // Leading colon with nothing before
+    .replace(/\s+:\s+/g, ' ')        // Standalone colon between spaces
+    .replace(/\(\s*\)/g, '')         // Empty parentheses
+    .replace(/"\s*"/g, '');          // Empty quotes
+  
+  // Clean up multiple spaces
+  sanitized = sanitized.replace(/\s+/g, ' ').trim();
+  
+  // If after all sanitization we have only special characters or nothing, return empty
+  if (/^[\s*\-^:+()""]*$/.test(sanitized)) {
+    return '';
+  }
+  
+  return sanitized;
 }
 

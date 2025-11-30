@@ -226,8 +226,9 @@ export function QueryBuilder({ databaseId, databaseName }: QueryBuilderProps) {
       if (response.results && response.results.length > 0) {
         const rows = response.results as Record<string, unknown>[];
         setResults(rows);
-        if (rows.length > 0) {
-          setResultColumns(Object.keys(rows[0]));
+        const firstRow = rows[0];
+        if (rows.length > 0 && firstRow) {
+          setResultColumns(Object.keys(firstRow));
         } else {
           setResultColumns([]);
         }
@@ -319,8 +320,10 @@ export function QueryBuilder({ databaseId, databaseName }: QueryBuilderProps) {
         <CardContent className="space-y-4">
           {/* Table Selection */}
           <div className="space-y-2">
-            <Label>Select Table</Label>
+            <Label htmlFor="table-select">Select Table</Label>
             <select
+              id="table-select"
+              name="table-select"
               className="w-full h-10 px-3 rounded-md border border-input bg-background"
               value={selectedTable}
               onChange={(e) => setSelectedTable(e.target.value)}
@@ -335,12 +338,14 @@ export function QueryBuilder({ databaseId, databaseName }: QueryBuilderProps) {
           {selectedTable && (
             <>
               {/* Column Selection */}
-              <div className="space-y-2">
-                <Label>Select Columns</Label>
+              <fieldset className="space-y-2">
+                <legend className="text-sm font-medium leading-none">Select Columns</legend>
                 <div className="flex flex-wrap gap-2">
                   <label className="flex items-center gap-2">
                     <input
                       type="checkbox"
+                      id="select-all-columns"
+                      name="select-all-columns"
                       checked={selectedColumns.includes('*')}
                       onChange={(e) => {
                         if (e.target.checked) {
@@ -354,6 +359,8 @@ export function QueryBuilder({ databaseId, databaseName }: QueryBuilderProps) {
                     <label key={col.name} className="flex items-center gap-2">
                       <input
                         type="checkbox"
+                        id={`select-col-${col.name}`}
+                        name={`select-col-${col.name}`}
                         checked={selectedColumns.includes(col.name) && !selectedColumns.includes('*')}
                         onChange={(e) => {
                           if (e.target.checked) {
@@ -369,12 +376,12 @@ export function QueryBuilder({ databaseId, databaseName }: QueryBuilderProps) {
                     </label>
                   ))}
                 </div>
-              </div>
+              </fieldset>
 
               {/* WHERE Conditions */}
-              <div className="space-y-2">
+              <fieldset className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label>WHERE Conditions</Label>
+                  <legend className="text-sm font-medium leading-none">WHERE Conditions</legend>
                   <Button variant="outline" size="sm" onClick={addCondition}>
                     <Plus className="h-4 w-4 mr-2" />
                     Add Condition
@@ -390,7 +397,10 @@ export function QueryBuilder({ databaseId, databaseName }: QueryBuilderProps) {
                             AND
                           </div>
                         )}
+                        <label htmlFor={`condition-col-${condition.id}`} className="sr-only">Column</label>
                         <select
+                          id={`condition-col-${condition.id}`}
+                          name={`condition-col-${condition.id}`}
                           className="flex-1 h-10 px-3 rounded-md border border-input bg-background"
                           value={condition.column}
                           onChange={(e) => updateCondition(condition.id, 'column', e.target.value)}
@@ -400,7 +410,10 @@ export function QueryBuilder({ databaseId, databaseName }: QueryBuilderProps) {
                             <option key={col.name} value={col.name}>{col.name}</option>
                           ))}
                         </select>
+                        <label htmlFor={`condition-op-${condition.id}`} className="sr-only">Operator</label>
                         <select
+                          id={`condition-op-${condition.id}`}
+                          name={`condition-op-${condition.id}`}
                           className="w-40 h-10 px-3 rounded-md border border-input bg-background"
                           value={condition.operator}
                           onChange={(e) => updateCondition(condition.id, 'operator', e.target.value)}
@@ -410,12 +423,17 @@ export function QueryBuilder({ databaseId, databaseName }: QueryBuilderProps) {
                           ))}
                         </select>
                         {!['IS NULL', 'IS NOT NULL'].includes(condition.operator) && (
-                          <Input
-                            className="flex-1"
-                            placeholder="Value..."
-                            value={condition.value}
-                            onChange={(e) => updateCondition(condition.id, 'value', e.target.value)}
-                          />
+                          <>
+                            <label htmlFor={`condition-val-${condition.id}`} className="sr-only">Value</label>
+                            <Input
+                              id={`condition-val-${condition.id}`}
+                              name={`condition-val-${condition.id}`}
+                              className="flex-1"
+                              placeholder="Value..."
+                              value={condition.value}
+                              onChange={(e) => updateCondition(condition.id, 'value', e.target.value)}
+                            />
+                          </>
                         )}
                         <Button
                           variant="ghost"
@@ -428,13 +446,15 @@ export function QueryBuilder({ databaseId, databaseName }: QueryBuilderProps) {
                     ))}
                   </div>
                 )}
-              </div>
+              </fieldset>
 
               {/* ORDER BY and LIMIT */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Order By</Label>
+                  <Label htmlFor="order-by-select">Order By</Label>
                   <select
+                    id="order-by-select"
+                    name="order-by-select"
                     className="w-full h-10 px-3 rounded-md border border-input bg-background"
                     value={orderBy}
                     onChange={(e) => setOrderBy(e.target.value)}
@@ -447,8 +467,10 @@ export function QueryBuilder({ databaseId, databaseName }: QueryBuilderProps) {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Direction</Label>
+                  <Label htmlFor="order-direction-select">Direction</Label>
                   <select
+                    id="order-direction-select"
+                    name="order-direction-select"
                     className="w-full h-10 px-3 rounded-md border border-input bg-background"
                     value={orderDirection}
                     onChange={(e) => setOrderDirection(e.target.value as 'ASC' | 'DESC')}
@@ -461,8 +483,10 @@ export function QueryBuilder({ databaseId, databaseName }: QueryBuilderProps) {
               </div>
 
               <div className="space-y-2">
-                <Label>Limit</Label>
+                <Label htmlFor="limit-input">Limit</Label>
                 <Input
+                  id="limit-input"
+                  name="limit-input"
                   type="number"
                   value={limit}
                   onChange={(e) => setLimit(e.target.value)}

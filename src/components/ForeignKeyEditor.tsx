@@ -235,7 +235,7 @@ export function ForeignKeyEditor({
         targetColumn,
         onDelete,
         onUpdate,
-        constraintName: constraintName.trim() || undefined
+        ...(constraintName.trim() && { constraintName: constraintName.trim() })
       });
       
       // Reset form

@@ -102,7 +102,7 @@ export async function handleQueryRoutes(
             dbId,
             body.query,
             duration,
-            result.meta?.rows_written as number || 0,
+            result.meta?.['rows_written'] as number || 0,
             null,
             userEmail,
             env
@@ -120,30 +120,51 @@ export async function handleQueryRoutes(
         });
       } catch (err) {
         const duration = Date.now() - startTime;
-        const errorMsg = parseD1Error(err);
+        const rawErrorMsg = parseD1Error(err);
         
-        // Log full error details on server only (never expose to client)
-        console.error('[Queries] Query execution error:', errorMsg);
+        // Log full error details on server
+        console.error('[Queries] Query execution error:', rawErrorMsg);
         console.error('[Queries] Full error object:', err);
         
-        // Store error in query history (with full details for server-side tracking only)
+        // Extract clean error message from D1 error format
+        let cleanErrorMsg = rawErrorMsg;
+        
+        // Try to extract message from JSON error format: "Query failed: 400 - {...}"
+        const jsonMatch = rawErrorMsg.match(/Query failed: \d+ - (.+)/);
+        if (jsonMatch && jsonMatch[1]) {
+          try {
+            const errorJson = JSON.parse(jsonMatch[1]);
+            if (errorJson.errors && Array.isArray(errorJson.errors) && errorJson.errors.length > 0) {
+              cleanErrorMsg = errorJson.errors[0].message || errorJson.errors[0].error || rawErrorMsg;
+            }
+          } catch {
+            // Keep raw message if JSON parsing fails
+          }
+        }
+        
+        // Clean up SQLite error suffixes for cleaner display
+        cleanErrorMsg = cleanErrorMsg
+          .replace(/: SQLITE_ERROR$/, '')
+          .replace(/: SQLITE_AUTH$/, '')
+          .replace(/: SQLITE_CONSTRAINT$/, '');
+        
+        // Store error in query history
         if (!isLocalDev && userEmail) {
           await storeQueryHistory(
             dbId,
             body.query,
             duration,
             0,
-            errorMsg,
+            cleanErrorMsg,
             userEmail,
             env
           ).catch(histErr => console.error('[Queries] Failed to store error in history:', histErr));
         }
         
-        // Return generic static error message to client
-        // Security: Never expose error details, stack traces, or database information to end users
+        // Return detailed error message to authenticated admin users
         return new Response(JSON.stringify({ 
-          error: 'Query execution failed',
-          message: 'Unable to execute query. Please check your SQL syntax and try again.'
+          error: cleanErrorMsg,
+          message: cleanErrorMsg
         }), { 
           status: 400,
           headers: {

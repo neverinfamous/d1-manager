@@ -119,8 +119,11 @@ export function FTS5SearchDialog({
 
   const exportResults = () => {
     if (!searchResponse || searchResponse.results.length === 0) return;
+    
+    const firstResult = searchResponse.results[0];
+    if (!firstResult) return;
 
-    const headers = Object.keys(searchResponse.results[0].row);
+    const headers = Object.keys(firstResult.row);
     const csv = [
       headers.join(','),
       ...searchResponse.results.map(result => 
@@ -168,8 +171,8 @@ export function FTS5SearchDialog({
           {/* Left Sidebar - Filters */}
           <div className="col-span-1 space-y-4 overflow-y-auto pr-2">
             {/* Column Filter */}
-            <div className="space-y-2">
-              <Label className="text-sm font-semibold">Search In Columns</Label>
+            <fieldset className="space-y-2">
+              <legend className="text-sm font-semibold">Search In Columns</legend>
               <p className="text-xs text-muted-foreground">All columns if none selected</p>
               <div className="space-y-1 max-h-32 overflow-y-auto border rounded p-2">
                 {columns.map(col => (
@@ -186,11 +189,11 @@ export function FTS5SearchDialog({
                   </div>
                 ))}
               </div>
-            </div>
+            </fieldset>
 
             {/* Ranking Options */}
-            <div className="space-y-2">
-              <Label className="text-sm font-semibold">Ranking Function</Label>
+            <fieldset className="space-y-2">
+              <legend className="text-sm font-semibold">Ranking Function</legend>
               <RadioGroup value={rankingFunction} onValueChange={(v) => setRankingFunction(v as 'bm25' | 'bm25custom')}>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="bm25" id="bm25" />
@@ -228,15 +231,16 @@ export function FTS5SearchDialog({
                   </div>
                 </div>
               )}
-            </div>
+            </fieldset>
 
             {/* Result Options */}
-            <div className="space-y-2">
-              <Label className="text-sm font-semibold">Results</Label>
+            <fieldset className="space-y-2">
+              <legend className="text-sm font-semibold">Results</legend>
               <div>
                 <Label htmlFor="result-limit" className="text-xs">Limit</Label>
                 <Input
                   id="result-limit"
+                  name="result-limit"
                   type="number"
                   min="1"
                   max="1000"
@@ -245,7 +249,7 @@ export function FTS5SearchDialog({
                   className="h-8 text-sm"
                 />
               </div>
-            </div>
+            </fieldset>
 
             {/* Snippet Options */}
             <div className="space-y-2">
@@ -279,7 +283,10 @@ export function FTS5SearchDialog({
             {/* Search Input */}
             <div className="space-y-2">
               <div className="flex gap-2">
+                <label htmlFor="fts5-search-query" className="sr-only">Search query</label>
                 <Input
+                  id="fts5-search-query"
+                  name="fts5-search-query"
                   placeholder="Enter search query (e.g., apple AND orange, &quot;exact phrase&quot;, prefix*)"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}

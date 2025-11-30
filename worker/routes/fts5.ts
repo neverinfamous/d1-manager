@@ -434,10 +434,36 @@ export async function handleFTS5Routes(
       const tableName = decodeURIComponent(pathParts[4] ?? '');
       console.log('[FTS5] Searching FTS5 table:', tableName);
       
+      if (!tableName) {
+        return new Response(JSON.stringify({ 
+          error: 'Table name is required' 
+        }), { 
+          status: 400,
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        });
+      }
+      
       const body = await request.json() as FTS5SearchParams;
       
       // Sanitize query
       body.query = sanitizeFTS5Query(body.query);
+      
+      // Validate query is not empty after sanitization
+      if (!body.query || body.query.trim() === '') {
+        return new Response(JSON.stringify({ 
+          error: 'Invalid search query. Please enter text to search for. Special characters like @, #, $, %, & are not supported.',
+          hint: 'Try searching with words like "hello", "test", or use operators like "word1 AND word2"'
+        }), { 
+          status: 400,
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        });
+      }
       
       if (isLocalDev) {
         return new Response(JSON.stringify({
@@ -482,51 +508,74 @@ export async function handleFTS5Routes(
       
       // Build search query
       const { query: searchSQL, includeSnippet } = buildFTS5SearchQuery(tableName, body);
+      console.log('[FTS5] Search SQL:', searchSQL);
+      console.log('[FTS5] Search params:', JSON.stringify(body));
       
-      // Execute search
-      const startTime = Date.now();
-      const searchResult = await executeQueryViaAPI(dbId, searchSQL, env);
-      const executionTime = Date.now() - startTime;
-      
-      // Get total count (without limit)
-      const countQuery = `
-        SELECT COUNT(*) as total
-        FROM "${sanitizeIdentifier(tableName)}"
-        WHERE "${sanitizeIdentifier(tableName)}" MATCH '${body.query.replace(/'/g, "''")}'
-      `;
-      const countResult = await executeQueryViaAPI(dbId, countQuery, env);
-      const total = (countResult.results[0] as { total: number })?.total || 0;
-      
-      // Format results
-      const results = (searchResult.results as Array<Record<string, unknown>>).map(row => {
-        const result: { row: Record<string, unknown>; rank: number; snippet?: string } = {
-          row,
-          rank: row.rank as number,
+      try {
+        // Execute search
+        const startTime = Date.now();
+        const searchResult = await executeQueryViaAPI(dbId, searchSQL, env);
+        const executionTime = Date.now() - startTime;
+        
+        // Get total count (without limit) - use same table name format as search query
+        const countQuery = `SELECT COUNT(*) as total FROM "${tableName}" WHERE "${tableName}" MATCH '${body.query.replace(/'/g, "''")}'`;
+        console.log('[FTS5] Count SQL:', countQuery);
+        const countResult = await executeQueryViaAPI(dbId, countQuery, env);
+        const total = (countResult.results[0] as { total: number })?.total || 0;
+        
+        // Format results
+        const results = (searchResult.results as Array<Record<string, unknown>>).map(row => {
+          const result: { row: Record<string, unknown>; rank: number; snippet?: string } = {
+            row,
+            rank: row['rank'] as number,
+          };
+          if (includeSnippet && row['snippet']) {
+            result.snippet = row['snippet'] as string;
+          }
+          return result;
+        });
+        
+        const response: FTS5SearchResponse = {
+          results,
+          total,
+          executionTime,
+          meta: {
+            rowsScanned: searchResult.meta?.['rows_read'] as number,
+          },
         };
-        if (includeSnippet && row.snippet) {
-          result.snippet = row.snippet as string;
+        
+        return new Response(JSON.stringify({
+          result: response,
+          success: true
+        }), {
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        });
+      } catch (searchErr) {
+        const errMessage = searchErr instanceof Error ? searchErr.message : 'Search failed';
+        console.error('[FTS5] Search execution error:', errMessage);
+        
+        // Check for common FTS5 syntax errors and provide helpful messages
+        let userMessage = errMessage;
+        if (errMessage.includes('SQLITE_ERROR') || errMessage.includes('fts5: syntax error')) {
+          userMessage = `Invalid search syntax. The query "${body.query}" contains characters that FTS5 cannot process. Try using simple words or phrases.`;
+        } else if (errMessage.includes('unknown special query')) {
+          userMessage = `Invalid FTS5 operator in query. Try using simple words, "exact phrases", or operators like AND, OR, NOT.`;
         }
-        return result;
-      });
-      
-      const response: FTS5SearchResponse = {
-        results,
-        total,
-        executionTime,
-        meta: {
-          rowsScanned: searchResult.meta?.rows_read as number,
-        },
-      };
-      
-      return new Response(JSON.stringify({
-        result: response,
-        success: true
-      }), {
-        headers: {
-          'Content-Type': 'application/json',
-          ...corsHeaders
-        }
-      });
+        
+        return new Response(JSON.stringify({ 
+          error: userMessage,
+          hint: 'Valid examples: hello, "exact phrase", word1 AND word2, prefix*'
+        }), { 
+          status: 400,
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        });
+      }
     }
 
     // Get FTS5 table statistics
@@ -616,10 +665,11 @@ export async function handleFTS5Routes(
     });
 
   } catch (err) {
-    console.error('[FTS5] Error:', err);
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[FTS5] Error:', errorMessage);
     return new Response(JSON.stringify({ 
-      error: 'FTS5 operation failed',
-      message: err instanceof Error ? err.message : 'Unknown error'
+      error: errorMessage,
+      details: err instanceof Error ? err.stack : undefined
     }), { 
       status: 500,
       headers: {
@@ -638,6 +688,8 @@ async function executeQueryViaAPI(
   query: string,
   env: Env
 ): Promise<{ results: unknown[]; meta: Record<string, unknown>; success: boolean }> {
+  console.log('[FTS5] Executing query:', query);
+  
   const response = await fetch(
     `https://api.cloudflare.com/client/v4/accounts/${env.ACCOUNT_ID}/d1/database/${databaseId}/query`,
     {
@@ -653,18 +705,41 @@ async function executeQueryViaAPI(
   if (!response.ok) {
     const errorText = await response.text();
     console.error('[FTS5] Query error:', errorText);
-    throw new Error(`Query failed: ${response.status}`);
+    // Try to parse the error for a more helpful message
+    let errorMessage = `${response.status} - ${errorText}`;
+    try {
+      const errorJson = JSON.parse(errorText);
+      errorMessage = errorJson.errors?.[0]?.message || errorJson.error || errorText;
+    } catch {
+      // Keep the default error message if JSON parsing fails
+    }
+    throw new Error(`D1 query failed: ${errorMessage}`);
   }
   
   const data = await response.json() as { 
-    result: Array<{ results: unknown[]; meta: Record<string, unknown>; success: boolean }>;
+    result: Array<{ results: unknown[]; meta: Record<string, unknown>; success: boolean; error?: string }>;
     success: boolean;
+    errors?: Array<{ message: string }>;
   };
   
-  const firstResult = data.result[0];
+  // Check for API-level errors
+  if (!data.success && data.errors?.length) {
+    const errorMessage = data.errors.map(e => e.message).join('; ');
+    console.error('[FTS5] D1 API error:', errorMessage);
+    throw new Error(`D1 query failed: ${errorMessage}`);
+  }
+  
+  const firstResult = data.result?.[0];
   if (!firstResult) {
     throw new Error('Empty result from D1 API');
   }
+  
+  // Check for query-level errors
+  if (firstResult.error) {
+    console.error('[FTS5] Query execution error:', firstResult.error);
+    throw new Error(`SQL error: ${firstResult.error}`);
+  }
+  
   return firstResult;
 }
 

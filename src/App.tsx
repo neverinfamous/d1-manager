@@ -39,6 +39,7 @@ import { DatabaseComparison } from './components/DatabaseComparison'
 import { MigrationWizard } from './components/MigrationWizard'
 import { UndoHistoryDialog } from './components/UndoHistoryDialog'
 import { JobHistory } from './components/JobHistory'
+import { DatabaseSearchFilter } from './components/DatabaseSearchFilter'
 
 type View = 
   | { type: 'list' }
@@ -57,6 +58,7 @@ export default function App() {
   const [currentView, setCurrentView] = useState<View>({ type: 'list' })
   const [showComparison, setShowComparison] = useState(false)
   const [showMigration, setShowMigration] = useState(false)
+  const [databaseSearchQuery, setDatabaseSearchQuery] = useState('')
   const { theme, setTheme } = useTheme()
   
   // Undo state
@@ -152,6 +154,11 @@ export default function App() {
     }
   }
 
+  // Filter databases by search query
+  const filteredDatabases = databases.filter(db =>
+    db.name.toLowerCase().includes(databaseSearchQuery.toLowerCase())
+  )
+
   const handleCreateDatabase = async () => {
     if (!newDbName.trim()) return
 
@@ -172,7 +179,7 @@ export default function App() {
     const modes: Array<typeof theme> = ['system', 'light', 'dark']
     const currentIndex = modes.indexOf(theme)
     const nextIndex = (currentIndex + 1) % modes.length
-    setTheme(modes[nextIndex])
+    setTheme(modes[nextIndex]!)
   }
 
   const getThemeIcon = () => {
@@ -229,7 +236,7 @@ export default function App() {
   }
 
   const selectAllDatabases = () => {
-    setSelectedDatabases(databases.map(db => db.uuid))
+    setSelectedDatabases(filteredDatabases.map(db => db.uuid))
   }
 
   const clearSelection = () => {
@@ -328,8 +335,8 @@ export default function App() {
     try {
       await api.importDatabase(uploadFile, {
         createNew: uploadMode === 'create',
-        databaseName: uploadMode === 'create' ? uploadDbName : undefined,
-        targetDatabaseId: uploadMode === 'import' ? uploadTargetDb : undefined
+        ...(uploadMode === 'create' && uploadDbName && { databaseName: uploadDbName }),
+        ...(uploadMode === 'import' && uploadTargetDb && { targetDatabaseId: uploadTargetDb })
       })
       
       // Reload databases
@@ -389,7 +396,12 @@ export default function App() {
       return
     }
 
-    setRenameDialogState(prev => prev ? { ...prev, isRenaming: true, error: undefined } : null)
+    setRenameDialogState(prev => {
+      if (!prev) return null
+      const { error: _error, ...rest } = prev
+      void _error
+      return { ...rest, isRenaming: true }
+    })
     setError('')
 
     try {
@@ -449,7 +461,12 @@ export default function App() {
   const confirmOptimize = async () => {
     if (!optimizeDialogState) return
     
-    setOptimizeDialogState(prev => prev ? { ...prev, isOptimizing: true, error: undefined } : null)
+    setOptimizeDialogState(prev => {
+      if (!prev) return null
+      const { error: _error, ...rest } = prev
+      void _error
+      return { ...rest, isOptimizing: true }
+    })
     setError('')
     
     try {
@@ -552,9 +569,6 @@ export default function App() {
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h2 className="text-3xl font-bold">Databases</h2>
-                <p className="text-muted-foreground mt-1">
-                  {databases.length} {databases.length === 1 ? 'database' : 'databases'}
-                </p>
               </div>
             <Button onClick={() => setShowCreateDialog(true)}>
               <Plus className="h-4 w-4 mr-2" />
@@ -631,11 +645,21 @@ export default function App() {
             </Card>
           )}
 
+          {/* Database Search Filter */}
+          {databases.length > 0 && (
+            <DatabaseSearchFilter
+              searchQuery={databaseSearchQuery}
+              onSearchChange={setDatabaseSearchQuery}
+              filteredCount={filteredDatabases.length}
+              totalCount={databases.length}
+            />
+          )}
+
           {/* Bulk Operations Toolbar */}
-          {(selectedDatabases.length > 0 || databases.length > 0) && (
+          {(selectedDatabases.length > 0 || filteredDatabases.length > 0) && (
             <div className="flex items-center justify-between mb-6 p-4 border rounded-lg bg-card">
               <div className="flex items-center gap-4">
-                {databases.length > 0 && selectedDatabases.length === 0 && (
+                {filteredDatabases.length > 0 && selectedDatabases.length === 0 && (
                   <Button variant="outline" onClick={selectAllDatabases}>
                     Select All
                   </Button>
@@ -708,9 +732,22 @@ export default function App() {
               </div>
             )}
 
-            {!loading && databases.length > 0 && (
+            {!loading && databases.length > 0 && filteredDatabases.length === 0 && (
+              <div className="text-center py-12">
+                <Database className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+                <h3 className="text-xl font-semibold mb-2">No databases found</h3>
+                <p className="text-muted-foreground mb-4">
+                  No databases match your search query
+                </p>
+                <Button variant="outline" onClick={() => setDatabaseSearchQuery('')}>
+                  Clear Search
+                </Button>
+              </div>
+            )}
+
+            {!loading && filteredDatabases.length > 0 && (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {databases.map((db) => {
+                {filteredDatabases.map((db) => {
                   const isSelected = selectedDatabases.includes(db.uuid)
                   return (
                   <Card 
@@ -829,8 +866,8 @@ export default function App() {
             databaseId={currentView.databaseId}
             databaseName={currentView.databaseName}
             tableName={currentView.tableName}
-            navigationHistory={currentView.navigationHistory}
-            fkFilter={currentView.fkFilter}
+            navigationHistory={currentView.navigationHistory ?? []}
+            {...(currentView.fkFilter && { fkFilter: currentView.fkFilter })}
             onBack={() => {
               setCurrentView({
                 type: 'database',
@@ -840,8 +877,12 @@ export default function App() {
             }}
             onNavigateToRelatedTable={(refTable, refColumn, value) => {
               // Add current table to navigation history
-              const history = currentView.navigationHistory || [];
-              const newHistory = [...history, { tableName: currentView.tableName, fkFilter: currentView.fkFilter }];
+              const history = currentView.navigationHistory ?? [];
+              const currentFkFilter = currentView.fkFilter;
+              const newHistoryEntry = currentFkFilter 
+                ? { tableName: currentView.tableName, fkFilter: currentFkFilter }
+                : { tableName: currentView.tableName };
+              const newHistory = [...history, newHistoryEntry];
               
               // Navigate to the referenced table with FK filter
               setCurrentView({
@@ -855,9 +896,9 @@ export default function App() {
             }}
             onNavigateToHistoryTable={(index) => {
               // Navigate back to a table in the history
-              const history = currentView.navigationHistory || [];
-              if (index < history.length) {
-                const targetEntry = history[index];
+              const history = currentView.navigationHistory ?? [];
+              const targetEntry = history[index];
+              if (index < history.length && targetEntry) {
                 const newHistory = history.slice(0, index);
                 
                 setCurrentView({
@@ -866,7 +907,7 @@ export default function App() {
                   databaseName: currentView.databaseName,
                   tableName: targetEntry.tableName,
                   navigationHistory: newHistory,
-                  fkFilter: targetEntry.fkFilter
+                  ...(targetEntry.fkFilter && { fkFilter: targetEntry.fkFilter })
                 });
               }
             }}
@@ -908,6 +949,8 @@ export default function App() {
               <Label htmlFor="name">Database Name</Label>
               <Input
                 id="name"
+                name="database-name"
+                autoComplete="off"
                 placeholder="my-database"
                 value={newDbName}
                 onChange={(e) => setNewDbName(e.target.value)}
@@ -961,8 +1004,8 @@ export default function App() {
 
             {uploadFile && (
               <>
-                <div className="grid gap-2">
-                  <Label>Import Mode</Label>
+                <fieldset className="grid gap-2">
+                  <legend className="text-sm font-medium leading-none">Import Mode</legend>
                   <RadioGroup value={uploadMode} onValueChange={(v) => setUploadMode(v as 'create' | 'import')}>
                     <div className="flex items-center space-x-2">
                       <RadioGroupItem value="create" id="create" />
@@ -973,7 +1016,7 @@ export default function App() {
                       <Label htmlFor="import" className="font-normal">Import into existing database</Label>
                     </div>
                   </RadioGroup>
-                </div>
+                </fieldset>
 
                 {uploadMode === 'create' && (
                   <div className="grid gap-2">
@@ -1245,11 +1288,12 @@ export default function App() {
                   id="rename-db-name"
                   placeholder="my-database"
                   value={renameDialogState.newName}
-                  onChange={(e) => setRenameDialogState(prev => prev ? { 
-                    ...prev, 
-                    newName: e.target.value.toLowerCase(),
-                    error: undefined 
-                  } : null)}
+                  onChange={(e) => setRenameDialogState(prev => {
+                    if (!prev) return null
+                    const { error: _error, ...rest } = prev
+                    void _error
+                    return { ...rest, newName: e.target.value.toLowerCase() }
+                  })}
                   disabled={renameDialogState.isRenaming}
                 />
                 <p className="text-xs text-muted-foreground">
@@ -1262,11 +1306,12 @@ export default function App() {
                 <Checkbox
                   id="backup-confirmed"
                   checked={renameDialogState.backupConfirmed}
-                  onCheckedChange={(checked) => setRenameDialogState(prev => prev ? { 
-                    ...prev, 
-                    backupConfirmed: checked === true,
-                    error: undefined 
-                  } : null)}
+                  onCheckedChange={(checked) => setRenameDialogState(prev => {
+                    if (!prev) return null
+                    const { error: _error, ...rest } = prev
+                    void _error
+                    return { ...rest, backupConfirmed: checked === true }
+                  })}
                   disabled={renameDialogState.isRenaming}
                 />
                 <div className="grid gap-1.5 leading-none">

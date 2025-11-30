@@ -14,19 +14,17 @@ export function TokenizerPresetSelector({ value, onChange, disabled }: Tokenizer
     if (preset) {
       onChange({
         type: preset.type,
-        parameters: preset.defaultParameters,
+        ...(preset.defaultParameters && { parameters: preset.defaultParameters }),
       });
     }
   };
 
   return (
-    <div className="space-y-4">
-      <div>
-        <Label className="text-base font-semibold">Tokenizer</Label>
-        <p className="text-sm text-muted-foreground mt-1">
-          Choose how text is split into searchable tokens
-        </p>
-      </div>
+    <fieldset className="space-y-4">
+      <legend className="text-base font-semibold">Tokenizer</legend>
+      <p className="text-sm text-muted-foreground -mt-2">
+        Choose how text is split into searchable tokens
+      </p>
       
       <RadioGroup
         value={value.type}
@@ -51,7 +49,7 @@ export function TokenizerPresetSelector({ value, onChange, disabled }: Tokenizer
           </div>
         ))}
       </RadioGroup>
-    </div>
+    </fieldset>
   );
 }
 

@@ -99,7 +99,8 @@ function applyHierarchicalLayout(graphData: GraphData): { nodes: Node[]; edges: 
       id: edge.id,
       source: edge.source,
       target: edge.target,
-      type: 'fkEdge',
+      // Use default edge type (smoothstep) instead of custom fkEdge which returns null
+      type: 'smoothstep',
       animated: false,
       data: {
         sourceColumn: edge.sourceColumn,
@@ -108,9 +109,13 @@ function applyHierarchicalLayout(graphData: GraphData): { nodes: Node[]; edges: 
         onUpdate: edge.onUpdate
       },
       label: edge.onDelete !== 'NO ACTION' ? edge.onDelete : undefined,
+      labelStyle: { fill: '#fff', fontWeight: 500, fontSize: 10 },
+      labelBgStyle: { fill: getEdgeColor(edge.onDelete), fillOpacity: 0.8 },
+      labelBgPadding: [4, 2] as [number, number],
       style: {
         stroke: getEdgeColor(edge.onDelete),
-        strokeWidth: 2
+        strokeWidth: 2,
+        strokeDasharray: edge.onUpdate !== 'NO ACTION' ? '5,5' : undefined
       },
       markerEnd: {
         type: MarkerType.ArrowClosed,
@@ -160,7 +165,8 @@ function applyForceDirectedLayout(graphData: GraphData): { nodes: Node[]; edges:
       id: edge.id,
       source: edge.source,
       target: edge.target,
-      type: 'fkEdge',
+      // Use default edge type (smoothstep) instead of custom fkEdge which returns null
+      type: 'smoothstep',
       animated: false,
       data: {
         sourceColumn: edge.sourceColumn,
@@ -169,6 +175,9 @@ function applyForceDirectedLayout(graphData: GraphData): { nodes: Node[]; edges:
         onUpdate: edge.onUpdate
       },
       label: edge.onDelete !== 'NO ACTION' ? edge.onDelete : undefined,
+      labelStyle: { fill: '#fff', fontWeight: 500, fontSize: 10 },
+      labelBgStyle: { fill: getEdgeColor(edge.onDelete), fillOpacity: 0.8 },
+      labelBgPadding: [4, 2] as [number, number],
       style: {
         stroke: getEdgeColor(edge.onDelete),
         strokeWidth: 2,
@@ -180,7 +189,7 @@ function applyForceDirectedLayout(graphData: GraphData): { nodes: Node[]; edges:
       }
     };
   });
-  
+
   return { nodes, edges };
 }
 
@@ -232,11 +241,11 @@ function calculateForceDirectedPositions(graphData: GraphData): Record<string, {
     // Calculate repulsion forces (all pairs)
     for (let i = 0; i < graphData.nodes.length; i++) {
       for (let j = i + 1; j < graphData.nodes.length; j++) {
-        const node1 = graphData.nodes[i];
-        const node2 = graphData.nodes[j];
+        const node1 = graphData.nodes[i]!;
+        const node2 = graphData.nodes[j]!;
         
-        const pos1 = positions[node1.id];
-        const pos2 = positions[node2.id];
+        const pos1 = positions[node1.id]!;
+        const pos2 = positions[node2.id]!;
         
         const dx = pos2.x - pos1.x;
         const dy = pos2.y - pos1.y;
@@ -248,10 +257,10 @@ function calculateForceDirectedPositions(graphData: GraphData): Record<string, {
           const fx = (dx / dist) * force;
           const fy = (dy / dist) * force;
           
-          forces[node1.id].x -= fx;
-          forces[node1.id].y -= fy;
-          forces[node2.id].x += fx;
-          forces[node2.id].y += fy;
+          forces[node1.id]!.x -= fx;
+          forces[node1.id]!.y -= fy;
+          forces[node2.id]!.x += fx;
+          forces[node2.id]!.y += fy;
         }
       }
     }
@@ -260,8 +269,10 @@ function calculateForceDirectedPositions(graphData: GraphData): Record<string, {
     graphData.edges.forEach(edge => {
       const pos1 = positions[edge.source];
       const pos2 = positions[edge.target];
+      const force1 = forces[edge.source];
+      const force2 = forces[edge.target];
       
-      if (pos1 && pos2) {
+      if (pos1 && pos2 && force1 && force2) {
         const dx = pos2.x - pos1.x;
         const dy = pos2.y - pos1.y;
         const dist = Math.sqrt(dx * dx + dy * dy) || 1;
@@ -270,20 +281,24 @@ function calculateForceDirectedPositions(graphData: GraphData): Record<string, {
         const fx = (dx / dist) * force;
         const fy = (dy / dist) * force;
         
-        forces[edge.source].x += fx;
-        forces[edge.source].y += fy;
-        forces[edge.target].x -= fx;
-        forces[edge.target].y -= fy;
+        force1.x += fx;
+        force1.y += fy;
+        force2.x -= fx;
+        force2.y -= fy;
       }
     });
     
     // Apply forces to velocities and positions
     graphData.nodes.forEach(node => {
-      velocities[node.id].x = (velocities[node.id].x + forces[node.id].x) * damping;
-      velocities[node.id].y = (velocities[node.id].y + forces[node.id].y) * damping;
+      const vel = velocities[node.id]!;
+      const force = forces[node.id]!;
+      const pos = positions[node.id]!;
       
-      positions[node.id].x += velocities[node.id].x;
-      positions[node.id].y += velocities[node.id].y;
+      vel.x = (vel.x + force.x) * damping;
+      vel.y = (vel.y + force.y) * damping;
+      
+      pos.x += vel.x;
+      pos.y += vel.y;
     });
   }
   
@@ -292,8 +307,9 @@ function calculateForceDirectedPositions(graphData: GraphData): Record<string, {
   const minY = Math.min(...Object.values(positions).map(p => p.y));
   
   Object.keys(positions).forEach(nodeId => {
-    positions[nodeId].x -= minX - 50;
-    positions[nodeId].y -= minY - 50;
+    const pos = positions[nodeId]!;
+    pos.x -= minX - 50;
+    pos.y -= minY - 50;
   });
   
   return positions;

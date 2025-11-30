@@ -51,64 +51,6 @@ export async function exportERDiagramAsPNG(databaseName: string): Promise<void> 
 }
 
 /**
- * Export ER Diagram as SVG
- * Note: ReactFlow doesn't have built-in SVG export, so we convert the canvas to SVG
- */
-export async function exportERDiagramAsSVG(databaseName: string): Promise<void> {
-  // Find the ReactFlow viewport element
-  const reactFlowElement = document.querySelector('.react-flow__viewport');
-  
-  if (!reactFlowElement) {
-    throw new Error('ReactFlow viewport not found');
-  }
-  
-  const containerElement = reactFlowElement.parentElement;
-  
-  if (!containerElement) {
-    throw new Error('ReactFlow container not found');
-  }
-  
-  try {
-    // Dynamic import for code splitting
-    const { default: html2canvas } = await import('html2canvas');
-    
-    // First capture as canvas
-    const canvas = await html2canvas(containerElement, {
-      backgroundColor: '#ffffff',
-      scale: 2,
-      logging: false,
-      useCORS: true,
-      allowTaint: true
-    });
-    
-    // Convert canvas to data URL
-    const dataUrl = canvas.toDataURL('image/png');
-    
-    // Create SVG with embedded image
-    const svg = `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" 
-     width="${canvas.width}" height="${canvas.height}" viewBox="0 0 ${canvas.width} ${canvas.height}">
-  <title>${databaseName} ER Diagram</title>
-  <image width="${canvas.width}" height="${canvas.height}" xlink:href="${dataUrl}"/>
-</svg>`;
-    
-    // Download the SVG
-    const blob = new Blob([svg], { type: 'image/svg+xml' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${sanitizeFilename(databaseName)}-er-diagram.svg`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  } catch (error) {
-    console.error('Error exporting SVG:', error);
-    throw error;
-  }
-}
-
-/**
  * Export ER Diagram data as JSON
  */
 export function exportERDiagramAsJSON(data: ERDiagramExportData, databaseName: string): void {

@@ -217,9 +217,9 @@ export function FTS5SchemaDesigner({ open, onOpenChange, onCreateTable }: FTS5Sc
           </div>
 
           {/* Columns */}
-          <div className="space-y-2">
+          <fieldset className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label className="text-base font-semibold">Indexed Columns</Label>
+              <legend className="text-base font-semibold">Indexed Columns</legend>
               <Button
                 type="button"
                 variant="outline"
@@ -241,7 +241,10 @@ export function FTS5SchemaDesigner({ open, onOpenChange, onCreateTable }: FTS5Sc
                   <CardContent className="p-4">
                     <div className="flex items-center gap-4">
                       <div className="flex-1 space-y-2">
+                        <Label htmlFor={`column-name-${column.id}`} className="sr-only">Column name</Label>
                         <Input
+                          id={`column-name-${column.id}`}
+                          name={`column-name-${column.id}`}
                           placeholder="Column name"
                           value={column.name}
                           onChange={(e) => updateColumn(column.id, 'name', e.target.value)}
@@ -275,7 +278,7 @@ export function FTS5SchemaDesigner({ open, onOpenChange, onCreateTable }: FTS5Sc
                 </Card>
               ))}
             </div>
-          </div>
+          </fieldset>
 
           {/* Tokenizer */}
           <TokenizerPresetSelector
@@ -323,8 +326,8 @@ export function FTS5SchemaDesigner({ open, onOpenChange, onCreateTable }: FTS5Sc
 
           {/* SQL Preview */}
           <div className="space-y-2">
-            <Label className="text-base font-semibold">SQL Preview</Label>
-            <pre className="p-4 bg-muted rounded-lg text-sm overflow-x-auto">
+            <h4 className="text-base font-semibold">SQL Preview</h4>
+            <pre className="p-4 bg-muted rounded-lg text-sm overflow-x-auto" aria-label="SQL Preview">
               <code>{tableName ? generateSQL() : '-- Enter table name and columns to see SQL'}</code>
             </pre>
           </div>

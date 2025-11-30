@@ -213,8 +213,10 @@ export function DatabaseComparison({ databases }: DatabaseComparisonProps) {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Left Database</label>
+              <label htmlFor="left-database-select" className="text-sm font-medium">Left Database</label>
               <select
+                id="left-database-select"
+                name="left-database"
                 className="w-full h-10 px-3 rounded-md border border-input bg-background"
                 value={leftDb}
                 onChange={(e) => setLeftDb(e.target.value)}
@@ -227,8 +229,10 @@ export function DatabaseComparison({ databases }: DatabaseComparisonProps) {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Right Database</label>
+              <label htmlFor="right-database-select" className="text-sm font-medium">Right Database</label>
               <select
+                id="right-database-select"
+                name="right-database"
                 className="w-full h-10 px-3 rounded-md border border-input bg-background"
                 value={rightDb}
                 onChange={(e) => setRightDb(e.target.value)}

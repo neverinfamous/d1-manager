@@ -1,8 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import ReactFlow, {
-  Controls,
   Background,
-  MiniMap,
   useNodesState,
   useEdgesState,
   useReactFlow,
@@ -10,7 +8,7 @@ import ReactFlow, {
   Panel
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { Loader2, Download, LayoutGrid, Network as NetworkIcon, FileJson, FileImage } from 'lucide-react';
+import { Loader2, LayoutGrid, Network as NetworkIcon, FileJson, FileImage } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -22,7 +20,7 @@ import {
 } from '@/components/ui/select';
 import { getAllForeignKeys, getTableSchema, type ForeignKeyGraph, type ColumnInfo } from '@/services/api';
 import { applyLayout, type LayoutType, type GraphData } from '@/services/graphLayout';
-import { exportERDiagramAsPNG, exportERDiagramAsSVG, exportERDiagramAsJSON } from '@/services/erExport';
+import { exportERDiagramAsPNG, exportERDiagramAsJSON } from '@/services/erExport';
 
 interface ERDiagramProps {
   databaseId: string;
@@ -84,7 +82,7 @@ function ERDiagramContent({ databaseId, databaseName, onTableSelect }: ERDiagram
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [layoutType, setLayoutType] = useState<LayoutType>('hierarchical');
-  const [exporting, setExporting] = useState<'png' | 'svg' | 'json' | null>(null);
+  const [exporting, setExporting] = useState<'png' | 'json' | null>(null);
   
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -109,7 +107,7 @@ function ERDiagramContent({ databaseId, databaseName, onTableSelect }: ERDiagram
         if (!fkColumnsByTable[edge.source]) {
           fkColumnsByTable[edge.source] = new Set();
         }
-        fkColumnsByTable[edge.source].add(edge.sourceColumn);
+        fkColumnsByTable[edge.source]!.add(edge.sourceColumn);
       });
       
       // Fetch schema for each table and mark FK columns
@@ -205,18 +203,6 @@ function ERDiagramContent({ databaseId, databaseName, onTableSelect }: ERDiagram
     }
   };
   
-  const handleExportSVG = async () => {
-    setExporting('svg');
-    try {
-      await exportERDiagramAsSVG(databaseName);
-    } catch (err) {
-      console.error('Failed to export SVG:', err);
-      alert('Failed to export SVG. See console for details.');
-    } finally {
-      setExporting(null);
-    }
-  };
-  
   const handleExportJSON = () => {
     setExporting('json');
     try {
@@ -231,7 +217,7 @@ function ERDiagramContent({ databaseId, databaseName, onTableSelect }: ERDiagram
             notnull: Boolean(col.notnull),
             dflt_value: col.dflt_value,
             pk: Boolean(col.pk),
-            isForeignKey: col.isForeignKey
+            ...(col.isForeignKey !== undefined && { isForeignKey: col.isForeignKey })
           }))
         })) || [],
         relationships: graphData?.edges.map(edge => ({
@@ -244,7 +230,7 @@ function ERDiagramContent({ databaseId, databaseName, onTableSelect }: ERDiagram
         })) || [],
         metadata: {
           exportDate: new Date().toISOString(),
-          version: '1.1.0',
+          version: '1.1.1',
           layoutType: layoutType
         }
       };
@@ -312,13 +298,6 @@ function ERDiagramContent({ databaseId, databaseName, onTableSelect }: ERDiagram
         elementsSelectable={true}
       >
         <Background />
-        <Controls />
-        <MiniMap 
-          nodeColor={() => {
-            return 'hsl(var(--primary))';
-          }}
-          maskColor="rgba(0, 0, 0, 0.1)"
-        />
         
         {/* Control Panel */}
         <Panel position="top-left" className="bg-background/95 backdrop-blur-sm border rounded-lg p-3 shadow-lg space-y-2">
@@ -372,25 +351,6 @@ function ERDiagramContent({ databaseId, databaseName, onTableSelect }: ERDiagram
             <Button
               size="sm"
               variant="outline"
-              onClick={handleExportSVG}
-              disabled={exporting !== null}
-              className="justify-start"
-            >
-              {exporting === 'svg' ? (
-                <>
-                  <Loader2 className="h-3 w-3 mr-2 animate-spin" />
-                  Exporting...
-                </>
-              ) : (
-                <>
-                  <Download className="h-3 w-3 mr-2" />
-                  SVG Vector
-                </>
-              )}
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
               onClick={handleExportJSON}
               disabled={exporting !== null}
               className="justify-start"
@@ -410,10 +370,10 @@ function ERDiagramContent({ databaseId, databaseName, onTableSelect }: ERDiagram
           </div>
         </Panel>
         
-        {/* Legend */}
-        <Panel position="bottom-right" className="bg-background/95 backdrop-blur-sm border rounded-lg p-3 shadow-lg">
-          <p className="text-xs font-medium mb-2">Legend:</p>
-          <div className="space-y-1 text-xs">
+         {/* Legend */}
+         <Panel position="bottom-right" className="bg-background/95 backdrop-blur-sm border rounded-lg p-4 shadow-lg bottom-8">
+          <p className="text-sm font-semibold mb-3">Legend</p>
+          <div className="space-y-2 text-sm">
             <div className="flex items-center gap-2">
               <span className="text-yellow-500">🔑</span>
               <span>Primary Key</span>

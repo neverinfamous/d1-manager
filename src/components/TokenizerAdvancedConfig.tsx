@@ -35,6 +35,13 @@ export function TokenizerAdvancedConfig({ value, onChange, disabled }: Tokenizer
 
   const isUnicode61 = value.type === 'unicode61' || value.type === 'porter';
   const isTrigram = value.type === 'trigram';
+  
+  // Don't show the section at all if the tokenizer has no configurable parameters
+  const hasConfigurableOptions = isUnicode61 || isTrigram;
+  
+  if (!hasConfigurableOptions) {
+    return null;
+  }
 
   return (
     <div className="space-y-4">
@@ -141,14 +148,6 @@ export function TokenizerAdvancedConfig({ value, onChange, disabled }: Tokenizer
               </div>
               <p className="text-xs text-muted-foreground ml-6">
                 Makes searches case-sensitive
-              </p>
-            </div>
-          )}
-
-          {value.type === 'ascii' && (
-            <div className="p-3 bg-muted rounded-md">
-              <p className="text-sm text-muted-foreground">
-                ASCII tokenizer has no configurable parameters. It provides simple, fast tokenization for ASCII-only text.
               </p>
             </div>
           )}

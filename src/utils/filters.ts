@@ -48,13 +48,13 @@ export function deserializeFilters(searchParams: URLSearchParams): Record<string
       
       filters[columnName] = {
         type: value as FilterCondition['type'],
-        value: filterValue || undefined,
-        value2: filterValue2 || undefined,
-        values: filterValues ? filterValues.split(',').map(v => {
+        ...(filterValue && { value: filterValue }),
+        ...(filterValue2 && { value2: filterValue2 }),
+        ...(filterValues && { values: filterValues.split(',').map(v => {
           const num = Number(v);
           return isNaN(num) ? v : num;
-        }) : undefined,
-        logicOperator: (filterLogic as 'AND' | 'OR') || undefined
+        }) }),
+        ...((filterLogic === 'AND' || filterLogic === 'OR') && { logicOperator: filterLogic })
       };
     }
   }
