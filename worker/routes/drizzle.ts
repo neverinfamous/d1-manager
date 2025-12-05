@@ -186,8 +186,13 @@ export type NewUser = typeof users.$inferInsert;
         });
       }
       
+      // Return only safe fields, excluding any error information
       return new Response(JSON.stringify({
-        result: introspectionResult,
+        result: {
+          success: true,
+          schema: introspectionResult.schema,
+          tables: introspectionResult.tables
+        },
         success: true
       }), {
         headers: jsonHeaders(corsHeaders)
