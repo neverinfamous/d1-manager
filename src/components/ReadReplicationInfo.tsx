@@ -14,6 +14,7 @@ import {
   Zap,
   BookOpen
 } from 'lucide-react';
+import { ErrorMessage } from '@/components/ui/error-message';
 
 interface ReadReplicationInfoProps {
   databaseId: string;
@@ -36,19 +37,20 @@ export function ReadReplicationInfo({
   databaseId, 
   initialReplicationMode,
   onReplicationChange 
-}: ReadReplicationInfoProps) {
+}: ReadReplicationInfoProps): React.JSX.Element {
   const [replicationMode, setReplicationMode] = useState<ReadReplicationMode | undefined>(initialReplicationMode);
   const [loading, setLoading] = useState(!initialReplicationMode);
   const [error, setError] = useState<string | null>(null);
   const [updating, setUpdating] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (skipCache = false) => {
     try {
       setLoading(true);
       setError(null);
       
-      const dbInfo: D1Database = await api.getDatabaseInfo(databaseId);
+      // Use cache on initial load for instant tab switching
+      const dbInfo: D1Database = await api.getDatabaseInfo(databaseId, skipCache);
       setReplicationMode(dbInfo.read_replication?.mode || 'disabled');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load replication info');
@@ -59,7 +61,7 @@ export function ReadReplicationInfo({
 
   useEffect(() => {
     if (!initialReplicationMode) {
-      loadData();
+      void loadData();
     }
   }, [loadData, initialReplicationMode]);
 
@@ -69,16 +71,16 @@ export function ReadReplicationInfo({
     }
   }, [initialReplicationMode]);
 
-  const handleRefresh = async () => {
+  const handleRefresh = async (): Promise<void> => {
     try {
       setRefreshing(true);
-      await loadData();
+      await loadData(true); // Skip cache on manual refresh
     } finally {
       setRefreshing(false);
     }
   };
 
-  const handleToggleReplication = async () => {
+  const handleToggleReplication = async (): Promise<void> => {
     if (!replicationMode) return;
     
     const newMode: ReadReplicationMode = replicationMode === 'auto' ? 'disabled' : 'auto';
@@ -112,11 +114,8 @@ export function ReadReplicationInfo({
     return (
       <Card>
         <CardContent className="py-6">
-          <div className="flex items-center gap-2 text-destructive mb-4">
-            <AlertCircle className="h-5 w-5" />
-            <span>{error}</span>
-          </div>
-          <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
+          <ErrorMessage error={error} className="mb-4" />
+          <Button variant="outline" onClick={() => void handleRefresh()} disabled={refreshing}>
             {refreshing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
             Retry
           </Button>
@@ -140,7 +139,7 @@ export function ReadReplicationInfo({
             <Button
               variant="ghost"
               size="sm"
-              onClick={handleRefresh}
+              onClick={() => void handleRefresh()}
               disabled={refreshing}
             >
               {refreshing ? (
@@ -181,7 +180,7 @@ export function ReadReplicationInfo({
             <Button
               variant={isEnabled ? 'outline' : 'default'}
               size="sm"
-              onClick={handleToggleReplication}
+              onClick={() => void handleToggleReplication()}
               disabled={updating}
             >
               {updating ? (

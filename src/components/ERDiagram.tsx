@@ -8,7 +8,7 @@ import ReactFlow, {
   Panel
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { Loader2, LayoutGrid, Network as NetworkIcon, FileJson, FileImage } from 'lucide-react';
+import { Loader2, LayoutGrid, Network as NetworkIcon, FileJson, FileImage, Maximize2, Minimize2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -18,9 +18,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { getAllForeignKeys, getTableSchema, type ForeignKeyGraph, type ColumnInfo } from '@/services/api';
+import { getAllForeignKeys, type ForeignKeyGraphWithCycles, type ColumnInfo } from '@/services/api';
 import { applyLayout, type LayoutType, type GraphData } from '@/services/graphLayout';
 import { exportERDiagramAsPNG, exportERDiagramAsJSON } from '@/services/erExport';
+import { ErrorMessage } from '@/components/ui/error-message';
 
 interface ERDiagramProps {
   databaseId: string;
@@ -37,7 +38,7 @@ const ERTableNode = ({ data }: { data: {
   label: string; 
   columns: ExtendedColumnInfo[];
   onClick: () => void;
-}}) => {
+}}): React.JSX.Element => {
   return (
     <div 
       className="bg-card border-2 border-border rounded-lg shadow-lg min-w-[250px] cursor-pointer hover:shadow-xl transition-shadow"
@@ -76,53 +77,85 @@ const nodeTypes = {
   erNode: ERTableNode
 };
 
-function ERDiagramContent({ databaseId, databaseName, onTableSelect }: ERDiagramProps) {
-  const [graphData, setGraphData] = useState<ForeignKeyGraph | null>(null);
+function ERDiagramContent({ databaseId, databaseName, onTableSelect }: ERDiagramProps): React.JSX.Element {
+  const [graphData, setGraphData] = useState<ForeignKeyGraphWithCycles | null>(null);
   const [enrichedColumns, setEnrichedColumns] = useState<Record<string, ExtendedColumnInfo[]>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [layoutType, setLayoutType] = useState<LayoutType>('hierarchical');
   const [exporting, setExporting] = useState<'png' | 'json' | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   
   const { fitView } = useReactFlow();
   
-  // Load foreign keys and enrich with schema data
+  // Handle Escape key to exit fullscreen
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape' && isFullscreen) {
+        setIsFullscreen(false);
+      }
+    };
+    
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isFullscreen]);
+  
+  // Refit view when entering/exiting fullscreen
+  useEffect(() => {
+    if (nodes.length === 0) {
+      return;
+    }
+    
+    // Dispatch resize event to force ReactFlow to recalculate viewport
+    window.dispatchEvent(new Event('resize'));
+    
+    // Fit view after ReactFlow has had time to recalculate
+    const timer = setTimeout(() => {
+      fitView({ padding: 0.2, duration: 200 });
+    }, 150);
+    
+    return () => clearTimeout(timer);
+  }, [isFullscreen, fitView, nodes.length]);
+  
+  // Load foreign keys and schema data in a single optimized API call
+  // OPTIMIZED: Uses includeSchemas=true to get all data in one request (avoids N+1 queries)
   const loadDiagramData = useCallback(async () => {
     setLoading(true);
     setError(null);
     
     try {
-      const fkData = await getAllForeignKeys(databaseId);
+      // Single API call returns FK graph, cycles, and full column schemas
+      // Uses unified cache key (cycles+schemas) shared by all relationship tabs
+      const fkData = await getAllForeignKeys(databaseId, true, true);
       setGraphData(fkData);
       
-      // Enrich columns with schema data to identify foreign keys
-      const columnsMap: Record<string, ExtendedColumnInfo[]> = {};
-      
-      // Get foreign key column names for each table
+      // Get foreign key column names for each table (to mark FK indicators)
       const fkColumnsByTable: Record<string, Set<string>> = {};
       fkData.edges.forEach(edge => {
-        if (!fkColumnsByTable[edge.source]) {
-          fkColumnsByTable[edge.source] = new Set();
-        }
-        fkColumnsByTable[edge.source]!.add(edge.sourceColumn);
+        const sourceSet = fkColumnsByTable[edge.source] ?? new Set<string>();
+        sourceSet.add(edge.sourceColumn);
+        fkColumnsByTable[edge.source] = sourceSet;
       });
       
-      // Fetch schema for each table and mark FK columns
-      for (const node of fkData.nodes) {
-        try {
-          const schema = await getTableSchema(databaseId, node.label);
-          const fkColumns = fkColumnsByTable[node.label] || new Set();
-          
-          columnsMap[node.label] = schema.map(col => ({
+      // Build enriched columns from the schemas returned in the API response
+      const columnsMap: Record<string, ExtendedColumnInfo[]> = {};
+      
+      if (fkData.schemas) {
+        // Use schemas from API response (single call optimization)
+        for (const [tableName, schema] of Object.entries(fkData.schemas)) {
+          const fkColumns = fkColumnsByTable[tableName] ?? new Set();
+          columnsMap[tableName] = schema.map(col => ({
             ...col,
             isForeignKey: fkColumns.has(col.name)
           }));
-        } catch (err) {
-          console.error(`Failed to load schema for ${node.label}:`, err);
-          // Use basic column info from node if schema fetch fails
+        }
+      } else {
+        // Fallback to basic column info from nodes if schemas not available
+        for (const node of fkData.nodes) {
+          const fkColumns = fkColumnsByTable[node.label] ?? new Set();
           columnsMap[node.label] = node.columns.map(col => ({
             cid: 0,
             name: col.name,
@@ -130,7 +163,7 @@ function ERDiagramContent({ databaseId, databaseName, onTableSelect }: ERDiagram
             notnull: 0,
             dflt_value: null,
             pk: col.isPK ? 1 : 0,
-            isForeignKey: false
+            isForeignKey: fkColumns.has(col.name)
           }));
         }
       }
@@ -144,7 +177,7 @@ function ERDiagramContent({ databaseId, databaseName, onTableSelect }: ERDiagram
   }, [databaseId]);
   
   useEffect(() => {
-    loadDiagramData();
+    void loadDiagramData();
   }, [loadDiagramData]);
   
   // Apply layout when data or layout type changes
@@ -155,7 +188,7 @@ function ERDiagramContent({ databaseId, databaseName, onTableSelect }: ERDiagram
     const graphDataWithColumns: GraphData = {
       nodes: graphData.nodes.map(node => ({
         ...node,
-        columns: (enrichedColumns[node.label] || []).map(col => ({
+        columns: (enrichedColumns[node.label] ?? []).map(col => ({
           name: col.name,
           type: col.type,
           isPK: Boolean(col.pk)
@@ -170,8 +203,8 @@ function ERDiagramContent({ databaseId, databaseName, onTableSelect }: ERDiagram
     const nodesWithHandlers = layoutNodes.map(node => ({
       ...node,
       data: {
-        ...node.data,
-        columns: enrichedColumns[node.id] || [],
+        ...(node.data as Record<string, unknown>),
+        columns: enrichedColumns[node.id] ?? [],
         onClick: () => {
           if (onTableSelect) {
             onTableSelect(node.id);
@@ -191,19 +224,18 @@ function ERDiagramContent({ databaseId, databaseName, onTableSelect }: ERDiagram
   }, [graphData, enrichedColumns, layoutType, onTableSelect, setNodes, setEdges, fitView]);
   
   // Export handlers
-  const handleExportPNG = async () => {
+  const handleExportPNG = async (): Promise<void> => {
     setExporting('png');
     try {
       await exportERDiagramAsPNG(databaseName);
-    } catch (err) {
-      console.error('Failed to export PNG:', err);
-      alert('Failed to export PNG. See console for details.');
+    } catch {
+      alert('Failed to export PNG.');
     } finally {
       setExporting(null);
     }
   };
   
-  const handleExportJSON = () => {
+  const handleExportJSON = (): void => {
     setExporting('json');
     try {
       const exportData = {
@@ -211,7 +243,7 @@ function ERDiagramContent({ databaseId, databaseName, onTableSelect }: ERDiagram
         tables: graphData?.nodes.map(node => ({
           name: node.label,
           rowCount: node.rowCount,
-          columns: (enrichedColumns[node.label] || []).map(col => ({
+          columns: (enrichedColumns[node.label] ?? []).map(col => ({
             name: col.name,
             type: col.type,
             notnull: Boolean(col.notnull),
@@ -219,7 +251,7 @@ function ERDiagramContent({ databaseId, databaseName, onTableSelect }: ERDiagram
             pk: Boolean(col.pk),
             ...(col.isForeignKey !== undefined && { isForeignKey: col.isForeignKey })
           }))
-        })) || [],
+        })) ?? [],
         relationships: graphData?.edges.map(edge => ({
           sourceTable: edge.source,
           sourceColumn: edge.sourceColumn,
@@ -227,7 +259,7 @@ function ERDiagramContent({ databaseId, databaseName, onTableSelect }: ERDiagram
           targetColumn: edge.targetColumn,
           onDelete: edge.onDelete,
           onUpdate: edge.onUpdate
-        })) || [],
+        })) ?? [],
         metadata: {
           exportDate: new Date().toISOString(),
           version: '1.1.1',
@@ -236,9 +268,8 @@ function ERDiagramContent({ databaseId, databaseName, onTableSelect }: ERDiagram
       };
       
       exportERDiagramAsJSON(exportData, databaseName);
-    } catch (err) {
-      console.error('Failed to export JSON:', err);
-      alert('Failed to export JSON. See console for details.');
+    } catch {
+      alert('Failed to export JSON.');
     } finally {
       setExporting(null);
     }
@@ -260,9 +291,8 @@ function ERDiagramContent({ databaseId, databaseName, onTableSelect }: ERDiagram
       <Card>
         <CardContent className="flex items-center justify-center h-[600px]">
           <div className="text-center">
-            <p className="text-destructive mb-2">Failed to load ER diagram</p>
-            <p className="text-sm text-muted-foreground mb-4">{error}</p>
-            <Button onClick={loadDiagramData}>Retry</Button>
+            <ErrorMessage error={error} showTitle className="mb-4" />
+            <Button onClick={() => void loadDiagramData()}>Retry</Button>
           </div>
         </CardContent>
       </Card>
@@ -283,7 +313,7 @@ function ERDiagramContent({ databaseId, databaseName, onTableSelect }: ERDiagram
   }
   
   return (
-    <div className="h-[calc(100vh-220px)] relative">
+    <div className={`relative ${isFullscreen ? 'fixed inset-0 z-50 bg-background w-screen h-screen' : 'h-[calc(100vh-220px)]'}`}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -322,77 +352,88 @@ function ERDiagramContent({ databaseId, databaseName, onTableSelect }: ERDiagram
                 </SelectItem>
               </SelectContent>
             </Select>
-          </div>
-        </Panel>
-        
-        {/* Export Panel */}
-        <Panel position="top-right" className="bg-background/95 backdrop-blur-sm border rounded-lg p-3 shadow-lg">
-          <div className="flex flex-col gap-2">
-            <p className="text-xs font-medium text-muted-foreground mb-1">Export As:</p>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleExportPNG}
-              disabled={exporting !== null}
-              className="justify-start"
+            <Button 
+              size="sm" 
+              variant="outline" 
+              onClick={() => setIsFullscreen(!isFullscreen)} 
+              title={isFullscreen ? "Exit fullscreen (Esc)" : "View fullscreen"}
             >
-              {exporting === 'png' ? (
-                <>
-                  <Loader2 className="h-3 w-3 mr-2 animate-spin" />
-                  Exporting...
-                </>
-              ) : (
-                <>
-                  <FileImage className="h-3 w-3 mr-2" />
-                  PNG Image
-                </>
-              )}
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleExportJSON}
-              disabled={exporting !== null}
-              className="justify-start"
-            >
-              {exporting === 'json' ? (
-                <>
-                  <Loader2 className="h-3 w-3 mr-2 animate-spin" />
-                  Exporting...
-                </>
-              ) : (
-                <>
-                  <FileJson className="h-3 w-3 mr-2" />
-                  JSON Data
-                </>
-              )}
+              {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
             </Button>
           </div>
         </Panel>
         
-         {/* Legend */}
-         <Panel position="bottom-right" className="bg-background/95 backdrop-blur-sm border rounded-lg p-4 shadow-lg bottom-8">
-          <p className="text-sm font-semibold mb-3">Legend</p>
-          <div className="space-y-2 text-sm">
-            <div className="flex items-center gap-2">
-              <span className="text-yellow-500">🔑</span>
-              <span>Primary Key</span>
+        {/* Export Panel and Legend - combined at top-right */}
+        <Panel position="top-right" className="space-y-2">
+          {/* Export Panel */}
+          <div className="bg-background/95 backdrop-blur-sm border rounded-lg p-3 shadow-lg">
+            <div className="flex flex-col gap-2">
+              <p className="text-xs font-medium text-muted-foreground mb-1">Export As:</p>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => void handleExportPNG()}
+                disabled={exporting !== null}
+                className="justify-start"
+              >
+                {exporting === 'png' ? (
+                  <>
+                    <Loader2 className="h-3 w-3 mr-2 animate-spin" />
+                    Exporting...
+                  </>
+                ) : (
+                  <>
+                    <FileImage className="h-3 w-3 mr-2" />
+                    PNG Image
+                  </>
+                )}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleExportJSON}
+                disabled={exporting !== null}
+                className="justify-start"
+              >
+                {exporting === 'json' ? (
+                  <>
+                    <Loader2 className="h-3 w-3 mr-2 animate-spin" />
+                    Exporting...
+                  </>
+                ) : (
+                  <>
+                    <FileJson className="h-3 w-3 mr-2" />
+                    JSON Data
+                  </>
+                )}
+              </Button>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-blue-500">🔗</span>
-              <span>Foreign Key</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-0.5 bg-yellow-500"></div>
-              <span>CASCADE</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-0.5 bg-red-500"></div>
-              <span>RESTRICT</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-0.5 bg-blue-500"></div>
-              <span>SET NULL</span>
+          </div>
+          
+          {/* Legend */}
+          <div className="bg-background/95 backdrop-blur-sm border rounded-lg p-3 shadow-lg">
+            <p className="text-sm font-semibold mb-2">Legend</p>
+            <div className="space-y-1.5 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="text-yellow-500">🔑</span>
+                <span>Primary Key</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-blue-500">🔗</span>
+                <span>Foreign Key</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-0.5 bg-yellow-500"></div>
+                <span>CASCADE</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-0.5 bg-red-500"></div>
+                <span>RESTRICT</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-0.5 bg-blue-500"></div>
+                <span>SET NULL</span>
+              </div>
             </div>
           </div>
         </Panel>
@@ -402,7 +443,7 @@ function ERDiagramContent({ databaseId, databaseName, onTableSelect }: ERDiagram
 }
 
 // Wrapper component with ReactFlowProvider
-export function ERDiagram(props: ERDiagramProps) {
+export function ERDiagram(props: ERDiagramProps): React.JSX.Element {
   return (
     <ReactFlowProvider>
       <ERDiagramContent {...props} />

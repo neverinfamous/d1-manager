@@ -55,7 +55,7 @@ export interface SimulationStatistics {
  */
 export class CascadeSimulationEngine {
   private simulation: CascadeSimulationResult;
-  private nodes: Map<string, FlowNode> = new Map();
+  private nodes = new Map<string, FlowNode>();
   private edges: FlowEdge[] = [];
 
   constructor(simulation: CascadeSimulationResult) {
@@ -129,7 +129,7 @@ export class CascadeSimulationEngine {
         id: path.id,
         source: path.sourceTable,
         target: path.targetTable,
-        label: `${path.action} (${path.affectedRows} rows)`,
+        label: `${path.action} (${String(path.affectedRows)} rows)`,
         type: 'smoothstep',
         animated: path.action === 'CASCADE',
         style: edgeStyle,
@@ -251,7 +251,8 @@ export class CascadeSimulationEngine {
       if (!depthGroups.has(depth)) {
         depthGroups.set(depth, []);
       }
-      depthGroups.get(depth)!.push(node);
+      const group = depthGroups.get(depth);
+      if (group) group.push(node);
     }
 
     // Calculate positions
@@ -260,7 +261,7 @@ export class CascadeSimulationEngine {
     const maxDepth = Math.max(...Array.from(depthGroups.keys()));
 
     for (let depth = 0; depth <= maxDepth; depth++) {
-      const nodesAtDepth = depthGroups.get(depth) || [];
+      const nodesAtDepth = depthGroups.get(depth) ?? [];
       const totalWidth = (nodesAtDepth.length - 1) * horizontalSpacing;
       const startX = -totalWidth / 2;
 
@@ -337,7 +338,8 @@ export class CascadeSimulationEngine {
       if (!grouped.has(table.depth)) {
         grouped.set(table.depth, []);
       }
-      grouped.get(table.depth)!.push(table);
+      const depthGroup = grouped.get(table.depth);
+      if (depthGroup) depthGroup.push(table);
     }
 
     return grouped;
@@ -353,7 +355,8 @@ export class CascadeSimulationEngine {
       if (!grouped.has(path.sourceTable)) {
         grouped.set(path.sourceTable, []);
       }
-      grouped.get(path.sourceTable)!.push(path);
+      const sourceGroup = grouped.get(path.sourceTable);
+      if (sourceGroup) sourceGroup.push(path);
     }
 
     return grouped;

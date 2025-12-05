@@ -1,7 +1,6 @@
-import { useState, useEffect } from 'react';
-import { ArrowLeft, RefreshCw, Download, Trash2, Edit, Plus, Loader2, Columns, Settings, Filter, AlertTriangle } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { ArrowLeft, RefreshCw, Download, Trash2, Edit, Plus, Loader2, Columns, Settings, AlertTriangle, Search, Cloud, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -20,18 +19,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { getTableSchema, getTableData, getTableForeignKeys, executeQuery, type ColumnInfo, type FilterCondition, api } from '@/services/api';
-import { FilterBar } from '@/components/FilterBar';
-import { deserializeFilters, serializeFilters, getActiveFilterCount } from '@/utils/filters';
+import { getTableSchema, getTableForeignKeys, executeQuery, backupTableToR2, getR2BackupStatus, type ColumnInfo, type R2BackupStatus, api } from '@/services/api';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { BackupProgressDialog } from '@/components/BackupProgressDialog';
+import { validateIdentifier, validateNotNullConstraint, validateDefaultValue } from '@/lib/sqlValidator';
 import { CascadeImpactSimulator } from '@/components/CascadeImpactSimulator';
 import { BreadcrumbNavigation } from '@/components/BreadcrumbNavigation';
 import { ForeignKeyBadge } from '@/components/ForeignKeyBadge';
+import { ErrorMessage } from '@/components/ui/error-message';
 
 interface TableViewProps {
   databaseId: string;
   databaseName: string;
   tableName: string;
-  navigationHistory?: Array<{ tableName: string; fkFilter?: string }>;
+  navigationHistory?: { tableName: string; fkFilter?: string }[];
   fkFilter?: string;
   onBack: () => void;
   onNavigateToRelatedTable?: (refTable: string, refColumn: string, value: unknown) => void;
@@ -49,10 +50,12 @@ export function TableView({
   onNavigateToRelatedTable,
   onNavigateToHistoryTable,
   onUndoableOperation 
-}: TableViewProps) {
+}: TableViewProps): React.JSX.Element {
   const [schema, setSchema] = useState<ColumnInfo[]>([]);
   const [data, setData] = useState<Record<string, unknown>[]>([]);
+  const [totalCount, setTotalCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingRows, setLoadingRows] = useState(false); // For row-only refresh (schema cached)
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const rowsPerPage = 50;
@@ -68,9 +71,19 @@ export function TableView({
   const [deletingRow, setDeletingRow] = useState<Record<string, unknown> | null>(null);
   const [deleting, setDeleting] = useState(false);
   
-  // Filter state
-  const [filters, setFilters] = useState<Record<string, FilterCondition>>({});
-  const [showFilters, setShowFilters] = useState(false);
+  // Row search state (client-side text search across all visible columns)
+  const [rowSearchQuery, setRowSearchQuery] = useState('');
+  
+  // Row selection state (for bulk operations)
+  const [selectedRows, setSelectedRows] = useState<number[]>([]);
+  
+  // Data sorting state (for column header sorting)
+  const [dataSortColumn, setDataSortColumn] = useState<string | null>(null);
+  const [dataSortDirection, setDataSortDirection] = useState<'asc' | 'desc'>('asc');
+  
+  // Schema sorting state
+  const [schemaSortField, setSchemaSortField] = useState<'name' | 'type' | 'nullable'>('name');
+  const [schemaSortDirection, setSchemaSortDirection] = useState<'asc' | 'desc'>('asc');
   
   // Foreign key state
   const [foreignKeys, setForeignKeys] = useState<Record<string, { refTable: string; refColumn: string }>>({});
@@ -81,6 +94,7 @@ export function TableView({
     name: '',
     type: 'TEXT',
     notnull: false,
+    unique: false,
     defaultValue: ''
   });
   const [addingColumn, setAddingColumn] = useState(false);
@@ -96,6 +110,21 @@ export function TableView({
     defaultValue: ''
   });
   const [modifyingColumnInProgress, setModifyingColumnInProgress] = useState(false);
+  const [modifyColumnBackup, setModifyColumnBackup] = useState({
+    method: 'download' as 'r2' | 'download',
+    format: 'sql' as 'sql' | 'csv' | 'json',
+    completed: false,
+    isBackingUp: false
+  });
+  
+  // R2 Backup state
+  const [r2BackupStatus, setR2BackupStatus] = useState<R2BackupStatus | null>(null);
+  const [backupProgressDialog, setBackupProgressDialog] = useState<{
+    jobId: string;
+    operationName: string;
+    tableName: string;
+  } | null>(null);
+  
   const [showDeleteColumnDialog, setShowDeleteColumnDialog] = useState(false);
   const [deletingColumn, setDeletingColumn] = useState<ColumnInfo | null>(null);
   const [deletingColumnInProgress, setDeletingColumnInProgress] = useState(false);
@@ -104,36 +133,23 @@ export function TableView({
   const [showCascadeSimulator, setShowCascadeSimulator] = useState(false);
   const [cascadeSimulatorWhereClause, setCascadeSimulatorWhereClause] = useState<string | undefined>();
 
-  // Sync filters with URL on mount
+  // Load R2 backup status on mount
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const urlFilters = deserializeFilters(params);
-    
-    if (Object.keys(urlFilters).length > 0) {
-      setFilters(urlFilters);
-      setShowFilters(true);
-    }
-  }, []);
-  
-  // Apply FK filter from navigation
-  useEffect(() => {
-    if (fkFilter) {
-      const [column, value] = fkFilter.split(':');
-      if (column && value !== undefined) {
-        setFilters({
-          [column]: {
-            type: 'equals',
-            value: value
-          }
-        });
-        setShowFilters(true);
+    const loadR2Status = async (): Promise<void> => {
+      try {
+        const status = await getR2BackupStatus();
+        setR2BackupStatus(status);
+      } catch {
+        // R2 backup not available
+        setR2BackupStatus(null);
       }
-    }
-  }, [fkFilter]);
-  
+    };
+    void loadR2Status();
+  }, []);
+
   // Load foreign keys on mount
   useEffect(() => {
-    const loadForeignKeys = async () => {
+    const loadForeignKeys = async (): Promise<void> => {
       try {
         const fks = await getTableForeignKeys(databaseId, tableName);
         const fkMap: Record<string, { refTable: string; refColumn: string }> = {};
@@ -144,60 +160,225 @@ export function TableView({
           };
         }
         setForeignKeys(fkMap);
-      } catch (err) {
-        console.error('Failed to load foreign keys:', err);
-        // Non-fatal error, just log it
+      } catch {
+        // Non-fatal error, silently ignore
       }
     };
     
-    loadForeignKeys();
+    void loadForeignKeys();
   }, [databaseId, tableName]);
   
-  // Update URL when filters change
   useEffect(() => {
-    const params = serializeFilters(filters);
-    const newUrl = `${window.location.pathname}${params.toString() ? '?' + params.toString() : ''}`;
-    window.history.replaceState({}, '', newUrl);
-  }, [filters]);
-  
-  useEffect(() => {
-    loadTableData();
+    void loadTableData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [databaseId, tableName, page, filters]);
+  }, [databaseId, tableName, page, fkFilter]);
 
-  const loadTableData = async () => {
+  const loadTableData = async (skipSchemaCache = false): Promise<void> => {
     try {
-      setLoading(true);
       setError(null);
       
-      // Load schema and data in parallel
-      const [schemaResult, dataResult] = await Promise.all([
-        getTableSchema(databaseId, tableName),
-        getTableData(databaseId, tableName, rowsPerPage, (page - 1) * rowsPerPage, filters)
+      // Parse FK filter if present (format: "column:value")
+      let fkColumn: string | null = null;
+      let fkValue: string | null = null;
+      if (fkFilter) {
+        const colonIndex = fkFilter.indexOf(':');
+        if (colonIndex > 0) {
+          fkColumn = fkFilter.substring(0, colonIndex);
+          fkValue = fkFilter.substring(colonIndex + 1);
+        }
+      }
+      
+      // Build WHERE clause for FK filter
+      const buildWhereClause = (): string => {
+        if (fkColumn && fkValue !== null) {
+          const escapedValue = fkValue.replace(/'/g, "''");
+          return ` WHERE "${fkColumn}" = '${escapedValue}'`;
+        }
+        return '';
+      };
+      
+      // Build count query with FK filter
+      const buildCountQuery = (): string => {
+        return `SELECT COUNT(*) as count FROM "${tableName}"${buildWhereClause()}`;
+      };
+      
+      // Build data query with FK filter
+      const buildDataQuery = (): string => {
+        const offset = (page - 1) * rowsPerPage;
+        return `SELECT * FROM "${tableName}"${buildWhereClause()} LIMIT ${rowsPerPage} OFFSET ${offset}`;
+      };
+      
+      // Phase 1: Load schema first (instant if cached)
+      // This allows us to show the table structure immediately
+      const schemaResult = await getTableSchema(databaseId, tableName, skipSchemaCache);
+      setSchema(schemaResult);
+      
+      // If this is the first load, hide the full loading state now that we have schema
+      if (loading) {
+        setLoading(false);
+        setLoadingRows(true);
+      } else {
+        // Subsequent loads (refresh, pagination) - show row loading indicator
+        setLoadingRows(true);
+      }
+      
+      // Phase 2: Load rows and count (always fresh)
+      const [dataResult, countResult] = await Promise.all([
+        executeQuery(databaseId, buildDataQuery(), [], true),
+        executeQuery(databaseId, buildCountQuery(), [], true).catch(() => null) // Non-critical
       ]);
       
-      setSchema(schemaResult);
-      setData(dataResult.results || []);
+      setData(dataResult.results);
+      
+      // Extract count from result
+      if (countResult?.results[0]) {
+        const countRow = countResult.results[0];
+        setTotalCount(Number(countRow['count']) || null);
+      } else {
+        setTotalCount(null);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load table data');
     } finally {
       setLoading(false);
+      setLoadingRows(false);
     }
   };
-  
-  const handleFiltersChange = (newFilters: Record<string, FilterCondition>) => {
-    setFilters(newFilters);
-    setPage(1); // Reset to first page when filters change
-  };
 
-  const formatValue = (value: unknown): string => {
+  // Memoize formatValue to prevent recreation on each render
+  const formatValue = useCallback((value: unknown): string => {
     if (value === null) return 'NULL';
     if (value === undefined) return '';
     if (typeof value === 'object') return JSON.stringify(value);
-    return String(value);
-  };
+    return String(value as string | number | boolean);
+  }, []);
+  
+  // Calculate pagination info
+  const paginationInfo = useMemo(() => {
+    const start = (page - 1) * rowsPerPage + 1;
+    const end = start + data.length - 1;
+    const totalPages = totalCount ? Math.ceil(totalCount / rowsPerPage) : null;
+    const hasMore = data.length === rowsPerPage;
+    
+    return { start, end, totalPages, hasMore };
+  }, [page, rowsPerPage, data.length, totalCount]);
+  
+  // Sort schema columns
+  const sortedSchema = useMemo(() => {
+    return [...schema].sort((a, b) => {
+      let comparison = 0;
+      switch (schemaSortField) {
+        case 'name':
+          comparison = a.name.localeCompare(b.name);
+          break;
+        case 'type':
+          comparison = (a.type ?? '').localeCompare(b.type ?? '');
+          break;
+        case 'nullable':
+          comparison = (a.notnull ?? 0) - (b.notnull ?? 0);
+          break;
+      }
+      return schemaSortDirection === 'asc' ? comparison : -comparison;
+    });
+  }, [schema, schemaSortField, schemaSortDirection]);
 
-  const handleOpenInsertDialog = () => {
+  // Filter displayed rows by search query (client-side)
+  const filteredData = useMemo(() => {
+    let result = data;
+    
+    // Apply text search filter
+    if (rowSearchQuery.trim()) {
+      const query = rowSearchQuery.toLowerCase().trim();
+      result = result.filter(row => {
+        // Check if any column value contains the search query
+        return schema.some(col => {
+          const value = row[col.name];
+          if (value === null || value === undefined) return false;
+          // Convert value to string for searching - handle objects specially
+          let strValue: string;
+          if (typeof value === 'object') {
+            strValue = JSON.stringify(value);
+          } else if (typeof value === 'string') {
+            strValue = value;
+          } else {
+            strValue = String(value as string | number | boolean);
+          }
+          return strValue.toLowerCase().includes(query);
+        });
+      });
+    }
+    
+    // Apply column sorting
+    if (dataSortColumn) {
+      result = [...result].sort((a, b) => {
+        const aVal = a[dataSortColumn];
+        const bVal = b[dataSortColumn];
+        
+        // Handle null/undefined
+        if (aVal === null || aVal === undefined) return dataSortDirection === 'asc' ? -1 : 1;
+        if (bVal === null || bVal === undefined) return dataSortDirection === 'asc' ? 1 : -1;
+        
+        // Compare based on type
+        let comparison = 0;
+        if (typeof aVal === 'number' && typeof bVal === 'number') {
+          comparison = aVal - bVal;
+        } else {
+          // Convert to string safely, handling objects
+          const aStr = typeof aVal === 'object' ? JSON.stringify(aVal) : String(aVal as string | number | boolean);
+          const bStr = typeof bVal === 'object' ? JSON.stringify(bVal) : String(bVal as string | number | boolean);
+          comparison = aStr.localeCompare(bStr);
+        }
+        
+        return dataSortDirection === 'asc' ? comparison : -comparison;
+      });
+    }
+    
+    return result;
+  }, [data, rowSearchQuery, schema, dataSortColumn, dataSortDirection]);
+
+  // Clear row selection when data changes
+  useEffect(() => {
+    setSelectedRows([]);
+  }, [data]);
+
+  // Row selection handlers
+  const toggleRowSelection = useCallback((rowIndex: number) => {
+    setSelectedRows(prev => 
+      prev.includes(rowIndex) 
+        ? prev.filter(i => i !== rowIndex)
+        : [...prev, rowIndex]
+    );
+  }, []);
+
+  const selectAllRows = useCallback(() => {
+    setSelectedRows(filteredData.map((_, index) => index));
+  }, [filteredData]);
+
+  const clearRowSelection = useCallback(() => {
+    setSelectedRows([]);
+  }, []);
+
+  // Handle column header click for sorting
+  const handleDataSort = useCallback((columnName: string) => {
+    if (dataSortColumn === columnName) {
+      setDataSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setDataSortColumn(columnName);
+      setDataSortDirection('asc');
+    }
+  }, [dataSortColumn]);
+
+  // Handle schema sort
+  const handleSchemaSort = useCallback((field: 'name' | 'type' | 'nullable') => {
+    if (schemaSortField === field) {
+      setSchemaSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSchemaSortField(field);
+      setSchemaSortDirection('asc');
+    }
+  }, [schemaSortField]);
+
+  const handleOpenInsertDialog = (): void => {
     // Initialize insert values with empty strings for all columns
     const initialValues: Record<string, string> = {};
     schema.forEach(col => {
@@ -207,7 +388,7 @@ export function TableView({
     setShowInsertDialog(true);
   };
 
-  const handleInsertRow = async () => {
+  const handleInsertRow = async (): Promise<void> => {
     setInserting(true);
     setError(null);
     
@@ -216,19 +397,19 @@ export function TableView({
       // Filter columns to include based on whether they have values or need explicit insertion
       const columnsWithValues = schema.filter(col => {
         const value = insertValues[col.name];
-        const hasValue = value !== '' && value !== null && value !== undefined;
+        const hasValue = value !== '';
         
         // If column has a value, always include it
         if (hasValue) return true;
         
         // If it's a primary key with INTEGER type (auto-increment), skip it when empty
-        if (col.pk > 0 && col.type && col.type.toUpperCase().includes('INTEGER')) {
+        if (col.pk > 0 && col.type?.toUpperCase().includes('INTEGER')) {
           return false;
         }
         
         // If it's a NOT NULL column with a default value, skip it when empty
         // so SQLite will use the default value (SQLite only applies defaults when column is omitted)
-        if (col.notnull && col.dflt_value) {
+        if (col.notnull && col.dflt_value !== null) {
           return false;
         }
         
@@ -243,8 +424,8 @@ export function TableView({
       } else {
         const columnNames = columnsWithValues.map(col => col.name);
         const values = columnsWithValues.map(col => {
-          const value = insertValues[col.name];
-          if (value === '' || value === null || value === undefined) return 'NULL';
+          const value = insertValues[col.name] ?? '';
+          if (value === '') return 'NULL';
           // Try to determine if it's a number
           if (!isNaN(Number(value)) && value.trim() !== '') return value;
           // Otherwise treat as string
@@ -266,20 +447,22 @@ export function TableView({
     }
   };
 
-  const handleOpenEditDialog = (row: Record<string, unknown>) => {
+  const handleOpenEditDialog = (row: Record<string, unknown>): void => {
     setEditingRow(row);
     // Convert all values to strings for the form
     const stringValues: Record<string, string> = {};
     schema.forEach(col => {
       const value = row[col.name];
-      stringValues[col.name] = value !== null && value !== undefined ? String(value) : '';
+      stringValues[col.name] = value !== null && value !== undefined 
+        ? (typeof value === 'object' ? JSON.stringify(value) : String(value as string | number | boolean))
+        : '';
     });
     setEditValues(stringValues);
     setAllowEditPrimaryKey(false); // Reset checkbox when opening dialog
     setShowEditDialog(true);
   };
 
-  const handleUpdateRow = async () => {
+  const handleUpdateRow = async (): Promise<void> => {
     if (!editingRow) return;
     
     setUpdating(true);
@@ -298,8 +481,8 @@ export function TableView({
         : schema.filter(col => col.pk === 0); // Only non-PK columns otherwise
       
       const setClause = updateColumns.map(col => {
-        const value = editValues[col.name];
-        if (value === '' || value === null || value === undefined) return `"${col.name}" = NULL`;
+        const value = editValues[col.name] ?? '';
+        if (value === '') return `"${col.name}" = NULL`;
         if (!isNaN(Number(value)) && value.trim() !== '') return `"${col.name}" = ${value}`;
         return `"${col.name}" = '${value.replace(/'/g, "''")}'`;
       }).join(', ');
@@ -307,7 +490,7 @@ export function TableView({
       // Build WHERE clause based on ORIGINAL primary key values (from editingRow, not editValues)
       const whereClause = pkColumns.map(col => {
         const value = editingRow[col.name];
-        return `"${col.name}" = ${typeof value === 'number' ? value : `'${String(value).replace(/'/g, "''")}'`}`;
+        return `"${col.name}" = ${typeof value === 'number' ? String(value) : `'${String(value).replace(/'/g, "''")}'`}`;
       }).join(' AND ');
       
       const query = `UPDATE "${tableName}" SET ${setClause} WHERE ${whereClause}`;
@@ -325,12 +508,12 @@ export function TableView({
     }
   };
 
-  const handleOpenDeleteDialog = (row: Record<string, unknown>) => {
+  const handleOpenDeleteDialog = (row: Record<string, unknown>): void => {
     setDeletingRow(row);
     setShowDeleteDialog(true);
   };
 
-  const handleSimulateCascadeImpact = () => {
+  const handleSimulateCascadeImpact = (): void => {
     // Build WHERE clause from primary keys of the row being deleted
     if (!deletingRow) return;
     
@@ -339,14 +522,14 @@ export function TableView({
     
     const whereClause = pkColumns.map(col => {
       const value = deletingRow[col.name];
-      return `"${col.name}" = ${typeof value === 'number' ? value : `'${String(value).replace(/'/g, "''")}'`}`;
+      return `"${col.name}" = ${typeof value === 'number' ? String(value) : `'${String(value).replace(/'/g, "''")}'`}`;
     }).join(' AND ');
     
     setCascadeSimulatorWhereClause(whereClause);
     setShowCascadeSimulator(true);
   };
 
-  const handleDeleteRow = async () => {
+  const handleDeleteRow = async (): Promise<void> => {
     if (!deletingRow) return;
     
     setDeleting(true);
@@ -361,7 +544,7 @@ export function TableView({
       
       const whereClause = pkColumns.map(col => {
         const value = deletingRow[col.name];
-        return `"${col.name}" = ${typeof value === 'number' ? value : `'${String(value).replace(/'/g, "''")}'`}`;
+        return `"${col.name}" = ${typeof value === 'number' ? String(value) : `'${String(value).replace(/'/g, "''")}'`}`;
       }).join(' AND ');
       
       const query = `DELETE FROM "${tableName}" WHERE ${whereClause}`;
@@ -383,29 +566,105 @@ export function TableView({
     }
   };
 
-  const handleOpenAddColumnDialog = () => {
+  // Bulk delete selected rows
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
+
+  const handleBulkDeleteRows = async (): Promise<void> => {
+    if (selectedRows.length === 0) return;
+    
+    setBulkDeleting(true);
+    setError(null);
+    
+    try {
+      const pkColumns = schema.filter(col => col.pk > 0);
+      if (pkColumns.length === 0) {
+        throw new Error('Cannot delete rows: No primary key found');
+      }
+      
+      // Build individual DELETE statements for each selected row
+      const selectedRowData = selectedRows
+        .map(index => filteredData[index])
+        .filter((row): row is Record<string, unknown> => row !== undefined);
+      
+      for (const row of selectedRowData) {
+        const whereClause = pkColumns.map(col => {
+          const value = row[col.name];
+          return `"${col.name}" = ${typeof value === 'number' ? String(value) : `'${String(value).replace(/'/g, "''")}'`}`;
+        }).join(' AND ');
+        
+        const query = `DELETE FROM "${tableName}" WHERE ${whereClause}`;
+        await executeQuery(databaseId, query, [], true);
+      }
+      
+      setShowBulkDeleteDialog(false);
+      setSelectedRows([]);
+      await loadTableData();
+      
+      if (onUndoableOperation) {
+        onUndoableOperation();
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete rows');
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
+  const handleOpenAddColumnDialog = (): void => {
     setAddColumnValues({
       name: '',
       type: 'TEXT',
       notnull: false,
+      unique: false,
       defaultValue: ''
     });
     setShowAddColumnDialog(true);
   };
 
-  const handleAddColumn = async () => {
+  const handleAddColumn = async (): Promise<void> => {
     setAddingColumn(true);
     setError(null);
     
     try {
-      // Validate column name
-      if (!addColumnValues.name.trim()) {
-        throw new Error('Column name is required');
+      // Validate column name using comprehensive validator
+      const nameValidation = validateIdentifier(addColumnValues.name, 'column');
+      if (!nameValidation.isValid) {
+        const errorMsg = nameValidation.suggestion 
+          ? `${nameValidation.error}. ${nameValidation.suggestion}`
+          : nameValidation.error ?? 'Invalid column name';
+        throw new Error(errorMsg);
       }
       
       // Check for duplicate column name
       if (schema.some(col => col.name.toLowerCase() === addColumnValues.name.toLowerCase())) {
-        throw new Error('Column name already exists');
+        throw new Error(`Column "${addColumnValues.name}" already exists in this table`);
+      }
+      
+      // Validate NOT NULL constraint with default value
+      const hasExistingRows = data.length > 0 || (totalCount !== null && totalCount > 0);
+      const notNullValidation = validateNotNullConstraint(
+        addColumnValues.notnull,
+        addColumnValues.defaultValue,
+        hasExistingRows,
+        false // Not a generated column
+      );
+      if (!notNullValidation.isValid) {
+        const errorMsg = notNullValidation.suggestion 
+          ? `${notNullValidation.error}. ${notNullValidation.suggestion}`
+          : notNullValidation.error ?? 'Invalid constraint';
+        throw new Error(errorMsg);
+      }
+      
+      // Validate default value type compatibility
+      if (addColumnValues.defaultValue) {
+        const defaultValidation = validateDefaultValue(addColumnValues.defaultValue, addColumnValues.type);
+        if (!defaultValidation.isValid) {
+          const errorMsg = defaultValidation.suggestion 
+            ? `${defaultValidation.error}. ${defaultValidation.suggestion}`
+            : defaultValidation.error ?? 'Invalid default value';
+          throw new Error(errorMsg);
+        }
       }
       
       // Call API to add column
@@ -413,6 +672,7 @@ export function TableView({
         name: addColumnValues.name,
         type: addColumnValues.type,
         notnull: addColumnValues.notnull,
+        unique: addColumnValues.unique,
         ...(addColumnValues.defaultValue && { defaultValue: addColumnValues.defaultValue })
       });
       
@@ -421,9 +681,10 @@ export function TableView({
         name: '',
         type: 'TEXT',
         notnull: false,
+        unique: false,
         defaultValue: ''
       });
-      await loadTableData(); // Reload data to refresh schema
+      await loadTableData(true); // Reload with fresh schema
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add column');
     } finally {
@@ -431,16 +692,20 @@ export function TableView({
     }
   };
 
-  const handleRenameColumn = async () => {
+  const handleRenameColumn = async (): Promise<void> => {
     if (!renamingColumn) return;
     
     setRenamingColumnInProgress(true);
     setError(null);
     
     try {
-      // Validate column name
-      if (!renameColumnValue.trim()) {
-        throw new Error('Column name is required');
+      // Validate column name using comprehensive validator
+      const nameValidation = validateIdentifier(renameColumnValue, 'column');
+      if (!nameValidation.isValid) {
+        const errorMsg = nameValidation.suggestion 
+          ? `${nameValidation.error}. ${nameValidation.suggestion}`
+          : nameValidation.error ?? 'Invalid column name';
+        throw new Error(errorMsg);
       }
       
       // Check if name is different
@@ -450,7 +715,7 @@ export function TableView({
       
       // Check for duplicate column name
       if (schema.some(col => col.name.toLowerCase() === renameColumnValue.toLowerCase())) {
-        throw new Error('Column name already exists');
+        throw new Error(`Column "${renameColumnValue}" already exists in this table`);
       }
       
       // Call API to rename column
@@ -459,7 +724,7 @@ export function TableView({
       setShowRenameColumnDialog(false);
       setRenamingColumn(null);
       setRenameColumnValue('');
-      await loadTableData(); // Reload data to refresh schema
+      await loadTableData(true); // Reload with fresh schema
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to rename column');
     } finally {
@@ -467,7 +732,7 @@ export function TableView({
     }
   };
 
-  const handleModifyColumn = async () => {
+  const handleModifyColumn = async (): Promise<void> => {
     if (!modifyingColumn) return;
     
     setModifyingColumnInProgress(true);
@@ -488,7 +753,14 @@ export function TableView({
         notnull: false,
         defaultValue: ''
       });
-      await loadTableData(); // Reload data to refresh schema
+      setModifyColumnBackup({
+        method: 'download',
+        format: 'sql',
+        completed: false,
+        isBackingUp: false
+      });
+      onUndoableOperation?.();
+      await loadTableData(true); // Reload with fresh schema
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to modify column');
     } finally {
@@ -496,7 +768,7 @@ export function TableView({
     }
   };
 
-  const handleDeleteColumn = async () => {
+  const handleDeleteColumn = async (): Promise<void> => {
     if (!deletingColumn) return;
     
     setDeletingColumnInProgress(true);
@@ -508,7 +780,7 @@ export function TableView({
       
       setShowDeleteColumnDialog(false);
       setDeletingColumn(null);
-      await loadTableData(); // Reload data to refresh schema
+      await loadTableData(true); // Reload with fresh schema
       
       // Notify parent of undoable operation
       if (onUndoableOperation) {
@@ -521,7 +793,7 @@ export function TableView({
     }
   };
 
-  const handleExportCSV = () => {
+  const handleExportCSV = (): void => {
     if (data.length === 0) {
       alert('No data to export');
       return;
@@ -543,7 +815,7 @@ export function TableView({
           const cell = row[col];
           if (cell === null) return 'NULL';
           if (cell === undefined) return '';
-          const str = String(cell);
+          const str = typeof cell === 'object' ? JSON.stringify(cell) : String(cell as string | number | boolean);
           // Escape quotes and wrap in quotes if contains comma, quote, or newline
           if (str.includes(',') || str.includes('"') || str.includes('\n')) {
             return `"${str.replace(/"/g, '""')}"`;
@@ -560,7 +832,7 @@ export function TableView({
       const url = URL.createObjectURL(blob);
       
       link.href = url;
-      link.download = `${tableName}_${Date.now()}.csv`;
+      link.download = `${tableName}_${String(Date.now())}.csv`;
       
       document.body.appendChild(link);
       link.click();
@@ -571,7 +843,6 @@ export function TableView({
         URL.revokeObjectURL(url);
       }, 100);
     } catch (err) {
-      console.error('[TableView] Export CSV failed:', err);
       alert('Failed to export CSV: ' + (err instanceof Error ? err.message : 'Unknown error'));
     }
   };
@@ -607,31 +878,21 @@ export function TableView({
             <h2 className="text-3xl font-semibold">{tableName}</h2>
             <p className="text-sm text-muted-foreground">
               {databaseName} • {data.length} {data.length === 1 ? 'row' : 'rows'}
-              {getActiveFilterCount(filters) > 0 && ' (filtered)'}
-              {fkFilter && ' • Navigated from FK'}
+              {fkFilter && ` • Filtered: ${fkFilter.replace(':', ' = ')}`}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={loadTableData}>
-            <RefreshCw className="h-4 w-4" />
-          </Button>
-          <Button 
-            variant={showFilters ? "default" : "outline"} 
-            onClick={() => setShowFilters(!showFilters)}
-            className="relative"
-          >
-            <Filter className="h-4 w-4 mr-2" />
-            Filters
-            {getActiveFilterCount(filters) > 0 && (
-              <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center">
-                {getActiveFilterCount(filters)}
-              </span>
-            )}
+          <Button variant="outline" size="icon" onClick={() => void loadTableData(true)} disabled={loadingRows}>
+            <RefreshCw className={`h-4 w-4 ${loadingRows ? 'animate-spin' : ''}`} />
           </Button>
           <Button variant="outline" onClick={handleExportCSV} disabled={data.length === 0}>
             <Download className="h-4 w-4 mr-2" />
             Export CSV
+          </Button>
+          <Button variant="outline" onClick={handleOpenAddColumnDialog}>
+            <Columns className="h-4 w-4 mr-2" />
+            Add Column
           </Button>
           <Button onClick={handleOpenInsertDialog}>
             <Plus className="h-4 w-4 mr-2" />
@@ -640,105 +901,214 @@ export function TableView({
         </div>
       </div>
 
-      {/* Filter Bar */}
-      {!loading && showFilters && schema.length > 0 && (
-        <FilterBar
-          columns={schema}
-          filters={filters}
-          onFiltersChange={handleFiltersChange}
-        />
-      )}
-
       {/* Schema Info */}
       {!loading && schema.length > 0 && (
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold">Schema</h3>
-              <Button variant="outline" size="sm" onClick={handleOpenAddColumnDialog}>
-                <Columns className="h-4 w-4 mr-2" />
-                Add Column
-              </Button>
-            </div>
-            <div className="space-y-2">
-              {/* Column headers */}
-              <div className="flex items-center gap-4 text-xs font-medium text-muted-foreground uppercase tracking-wider pb-2 border-b">
-                <div className="min-w-[200px]">Column</div>
-                <div className="min-w-[100px]">Type</div>
-                <div className="min-w-[80px]">Nullable</div>
-                <div className="flex-1">Default</div>
-                <div className="w-[108px] text-right">Actions</div>
-              </div>
-              {schema.map((col) => (
-                <div key={col.cid} className="flex items-center gap-4 text-sm">
-                  <div className="flex items-center gap-2 min-w-[200px]">
-                    <span className="font-medium">{col.name}</span>
-                    {col.pk > 0 && (
-                      <span className="px-2 py-0.5 text-xs bg-primary/10 text-primary rounded">
-                        PK
-                      </span>
+        <div className="overflow-x-auto border rounded-lg bg-card">
+          <table className="w-full text-sm">
+            <thead className="border-b bg-muted/30">
+              <tr>
+                <th scope="col" className="px-4 py-3 text-left">
+                  <button
+                    onClick={() => handleSchemaSort('name')}
+                    className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors"
+                  >
+                    Column
+                    {schemaSortField === 'name' ? (
+                      schemaSortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                    ) : (
+                      <ArrowUpDown className="h-3 w-3 opacity-50" />
                     )}
-                  </div>
-                  <div className="text-muted-foreground min-w-[100px]">{col.type || 'ANY'}</div>
-                  <div className="text-muted-foreground min-w-[80px]">
-                    {col.notnull ? 'NOT NULL' : 'NULL'}
-                  </div>
-                  {col.dflt_value && (
-                    <div className="text-muted-foreground flex-1">
-                      Default: {col.dflt_value}
-                    </div>
-                  )}
-                  {!col.dflt_value && <div className="flex-1"></div>}
-                  <div className="flex items-center gap-2">
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-7 w-7"
-                      onClick={() => {
-                        setRenamingColumn(col);
-                        setRenameColumnValue(col.name);
-                        setShowRenameColumnDialog(true);
-                      }}
-                      title="Rename column"
-                    >
-                      <Edit className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-7 w-7"
-                      onClick={() => {
-                        setModifyingColumn(col);
-                        setModifyColumnValues({
-                          type: col.type || 'TEXT',
-                          notnull: col.notnull === 1,
-                          defaultValue: col.dflt_value || ''
-                        });
-                        setShowModifyColumnDialog(true);
-                      }}
-                      title="Modify column type/constraints"
-                    >
-                      <Settings className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-7 w-7"
-                      onClick={() => {
-                        setDeletingColumn(col);
-                        setShowDeleteColumnDialog(true);
-                      }}
-                      disabled={schema.length === 1}
-                      title={schema.length === 1 ? "Cannot delete the only column" : "Delete column"}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
+                  </button>
+                </th>
+                <th scope="col" className="px-4 py-3 text-left">
+                  <button
+                    onClick={() => handleSchemaSort('type')}
+                    className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors"
+                  >
+                    Type
+                    {schemaSortField === 'type' ? (
+                      schemaSortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                    ) : (
+                      <ArrowUpDown className="h-3 w-3 opacity-50" />
+                    )}
+                  </button>
+                </th>
+                <th scope="col" className="px-4 py-3 text-left">
+                  <button
+                    onClick={() => handleSchemaSort('nullable')}
+                    className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors"
+                  >
+                    Nullable
+                    {schemaSortField === 'nullable' ? (
+                      schemaSortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                    ) : (
+                      <ArrowUpDown className="h-3 w-3 opacity-50" />
+                    )}
+                  </button>
+                </th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  Default
+                </th>
+                <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {sortedSchema.map((col) => {
+                // Detect generated columns: hidden=2 (virtual) or hidden=3 (stored)
+                const isGenerated = col.hidden === 2 || col.hidden === 3;
+                const generatedType = col.hidden === 2 ? 'VIRTUAL' : col.hidden === 3 ? 'STORED' : null;
+                
+                return (
+                  <tr key={col.cid} className="hover:bg-muted/50">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium">{col.name}</span>
+                        {col.pk > 0 && (
+                          <span className="px-2 py-0.5 text-xs bg-primary/10 text-primary rounded" title="Primary Key">
+                            PK
+                          </span>
+                        )}
+                        {col.unique && (
+                          <span className="px-2 py-0.5 text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200 rounded" title="Unique constraint">
+                            UNIQUE
+                          </span>
+                        )}
+                        {isGenerated && (
+                          <span className="px-2 py-0.5 text-xs bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-200 rounded" title={`Generated column (${generatedType})`}>
+                            {generatedType}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">{col.type || 'ANY'}</td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {col.notnull ? 'NOT NULL' : 'NULL'}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {isGenerated && col.generatedExpression ? (
+                        <span className="text-xs font-mono">= {col.generatedExpression}</span>
+                      ) : col.dflt_value ? (
+                        <span>{col.dflt_value}</span>
+                      ) : null}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-7 w-7"
+                          onClick={() => {
+                            setRenamingColumn(col);
+                            setRenameColumnValue(col.name);
+                            setShowRenameColumnDialog(true);
+                          }}
+                          title="Rename column"
+                        >
+                          <Edit className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-7 w-7"
+                          onClick={() => {
+                            setModifyingColumn(col);
+                            setModifyColumnValues({
+                              type: col.type || 'TEXT',
+                              notnull: col.notnull === 1,
+                              defaultValue: col.dflt_value || ''
+                            });
+                            setModifyColumnBackup({
+                              method: r2BackupStatus?.configured ? 'r2' : 'download',
+                              format: 'sql',
+                              completed: false,
+                              isBackingUp: false
+                            });
+                            setShowModifyColumnDialog(true);
+                          }}
+                          title="Modify column type/constraints"
+                        >
+                          <Settings className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-7 w-7"
+                          onClick={() => {
+                            setDeletingColumn(col);
+                            setShowDeleteColumnDialog(true);
+                          }}
+                          disabled={schema.length === 1 || isGenerated}
+                          title={schema.length === 1 ? "Cannot delete the only column" : isGenerated ? "Cannot delete generated column directly" : "Delete column"}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Row Search Filter and Bulk Operations Toolbar */}
+      {!loading && data.length > 0 && (
+        <div className="flex items-center justify-between p-4 border rounded-lg bg-card">
+          <div className="flex items-center gap-4">
+            <div className="relative max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                id="row-search"
+                name="row-search"
+                autoComplete="off"
+                placeholder="Filter rows..."
+                value={rowSearchQuery}
+                onChange={(e) => setRowSearchQuery(e.target.value)}
+                className="pl-10 w-64"
+                aria-label="Search rows"
+              />
             </div>
-          </CardContent>
-        </Card>
+            <Button variant="outline" onClick={selectAllRows}>
+              Select All
+            </Button>
+            {selectedRows.length > 0 && (
+              <>
+                <Button variant="outline" onClick={clearRowSelection}>
+                  Clear Selection
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                  {selectedRows.length} row{selectedRows.length !== 1 ? 's' : ''} selected
+                </span>
+              </>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="text-sm text-muted-foreground mr-2">
+              {rowSearchQuery.trim() ? (
+                <>
+                  {filteredData.length} of {data.length} {data.length === 1 ? 'row' : 'rows'}
+                </>
+              ) : (
+                <>
+                  {data.length} {data.length === 1 ? 'row' : 'rows'}
+                </>
+              )}
+            </div>
+            {selectedRows.length > 0 && (
+              <Button 
+                variant="destructive" 
+                onClick={() => setShowBulkDeleteDialog(true)}
+                disabled={bulkDeleting}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete Selected
+              </Button>
+            )}
+          </div>
+        </div>
       )}
 
       {/* Loading State */}
@@ -749,115 +1119,148 @@ export function TableView({
       )}
 
       {/* Error State */}
-      {error && (
-        <Card className="border-destructive">
-          <CardContent className="pt-6">
-            <p className="text-sm text-destructive">{error}</p>
-          </CardContent>
-        </Card>
-      )}
+      <ErrorMessage error={error} variant="card" />
 
       {/* Data Table */}
       {!loading && !error && (
-        <Card>
-          <CardContent className="p-0">
-            {data.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12">
-                <p className="text-sm text-muted-foreground mb-4">
-                  {getActiveFilterCount(filters) > 0 ? 'No rows match your filters' : 'No rows in this table'}
-                </p>
-                {getActiveFilterCount(filters) > 0 ? (
-                  <Button variant="outline" onClick={() => setFilters({})}>
-                    Clear Filters
-                  </Button>
-                ) : (
-                  <Button onClick={handleOpenInsertDialog}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Insert First Row
-                  </Button>
-                )}
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-muted/50">
-                    <tr>
-                      {schema.map((col) => (
-                        <th
-                          key={col.cid}
-                          className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap"
-                        >
-                          {col.name}
-                        </th>
-                      ))}
-                      <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {data.map((row, rowIndex) => (
-                      <tr key={rowIndex} className="hover:bg-muted/50">
-                        {schema.map((col) => {
-                          const isFK = foreignKeys[col.name];
-                          const cellValue = row[col.name];
-                          
-                          return (
-                            <td
-                              key={`${rowIndex}-${col.cid}`}
-                              className="px-4 py-3 text-sm whitespace-nowrap"
-                            >
-                              {isFK && onNavigateToRelatedTable ? (
-                                <ForeignKeyBadge
-                                  value={cellValue}
-                                  refTable={isFK.refTable}
-                                  refColumn={isFK.refColumn}
-                                  onClick={() => {
-                                    if (cellValue !== null && cellValue !== undefined) {
-                                      onNavigateToRelatedTable(isFK.refTable, isFK.refColumn, cellValue);
-                                    }
-                                  }}
-                                />
-                              ) : (
-                                <span
-                                  className={
-                                    cellValue === null
-                                      ? 'italic text-muted-foreground'
-                                      : ''
+        <div className="overflow-x-auto border rounded-lg bg-card relative">
+          {/* Row loading overlay */}
+          {loadingRows && (
+            <div className="absolute inset-0 bg-background/50 flex items-center justify-center z-10">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          )}
+          {data.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12">
+              <p className="text-sm text-muted-foreground mb-4">
+                No rows in this table
+              </p>
+              <Button onClick={handleOpenInsertDialog}>
+                <Plus className="h-4 w-4 mr-2" />
+                Insert First Row
+              </Button>
+            </div>
+          ) : filteredData.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12">
+              <p className="text-sm text-muted-foreground mb-4">
+                No rows match your search
+              </p>
+              <Button variant="outline" onClick={() => setRowSearchQuery('')}>
+                Clear Search
+              </Button>
+            </div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="border-b bg-muted/30">
+                <tr>
+                  <th scope="col" className="px-3 py-3 w-10">
+                    <Checkbox
+                      checked={selectedRows.length === filteredData.length && filteredData.length > 0}
+                      onCheckedChange={(checked) => {
+                        if (checked === true) {
+                          selectAllRows();
+                        } else {
+                          clearRowSelection();
+                        }
+                      }}
+                      aria-label={selectedRows.length === filteredData.length ? 'Deselect all rows' : 'Select all rows'}
+                    />
+                  </th>
+                  {schema.map((col) => (
+                    <th
+                      key={col.cid}
+                      scope="col"
+                      className="px-4 py-3 text-left"
+                    >
+                      <button
+                        onClick={() => handleDataSort(col.name)}
+                        className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors whitespace-nowrap"
+                      >
+                        {col.name}
+                        {dataSortColumn === col.name ? (
+                          dataSortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                        ) : (
+                          <ArrowUpDown className="h-3 w-3 opacity-50" />
+                        )}
+                      </button>
+                    </th>
+                  ))}
+                  <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {filteredData.map((row, rowIndex) => {
+                  const isRowSelected = selectedRows.includes(rowIndex);
+                  return (
+                    <tr key={rowIndex} className={`hover:bg-muted/50 ${isRowSelected ? 'bg-primary/5' : ''}`}>
+                      <td className="px-3 py-3">
+                        <Checkbox
+                          checked={isRowSelected}
+                          onCheckedChange={() => toggleRowSelection(rowIndex)}
+                          aria-label={`Select row ${String(rowIndex + 1)}`}
+                        />
+                      </td>
+                      {schema.map((col) => {
+                        const isFK = foreignKeys[col.name];
+                        const cellValue = row[col.name];
+                        
+                        return (
+                          <td
+                            key={`${String(rowIndex)}-${String(col.cid)}`}
+                            className="px-4 py-3 whitespace-nowrap"
+                          >
+                            {isFK && onNavigateToRelatedTable ? (
+                              <ForeignKeyBadge
+                                value={cellValue}
+                                refTable={isFK.refTable}
+                                refColumn={isFK.refColumn}
+                                onClick={() => {
+                                  if (cellValue !== null && cellValue !== undefined) {
+                                    onNavigateToRelatedTable(isFK.refTable, isFK.refColumn, cellValue);
                                   }
-                                >
-                                  {formatValue(cellValue)}
-                                </span>
-                              )}
+                                }}
+                              />
+                            ) : (
+                              <span
+                                className={
+                                  cellValue === null
+                                    ? 'italic text-muted-foreground'
+                                    : ''
+                                }
+                              >
+                                {formatValue(cellValue)}
+                              </span>
+                            )}
                             </td>
                           );
                         })}
-                        <td className="px-4 py-3 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <Button variant="ghost" size="icon" onClick={() => handleOpenEditDialog(row)} title="Edit row">
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={() => handleOpenDeleteDialog(row)} title="Delete row">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleOpenEditDialog(row)} title="Edit row">
+                            <Edit className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleOpenDeleteDialog(row)} title="Delete row">
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
       )}
 
       {/* Pagination */}
       {!loading && !error && data.length > 0 && (
         <div className="flex items-center justify-between">
           <div className="text-sm text-muted-foreground">
-            Showing {(page - 1) * rowsPerPage + 1} to{' '}
-            {Math.min(page * rowsPerPage, (page - 1) * rowsPerPage + data.length)} rows
+            Showing {paginationInfo.start} to {paginationInfo.end}
+            {totalCount !== null && ` of ${totalCount.toLocaleString()}`} rows
           </div>
           <div className="flex items-center gap-2">
             <Button
@@ -868,12 +1271,15 @@ export function TableView({
             >
               Previous
             </Button>
-            <div className="text-sm">Page {page}</div>
+            <div className="text-sm">
+              Page {page}
+              {paginationInfo.totalPages && ` of ${String(paginationInfo.totalPages)}`}
+            </div>
             <Button
               variant="outline"
               size="sm"
               onClick={() => setPage(page + 1)}
-              disabled={data.length < rowsPerPage}
+              disabled={!paginationInfo.hasMore}
             >
               Next
             </Button>
@@ -902,7 +1308,7 @@ export function TableView({
                   <Input
                     id={`insert-${col.name}`}
                     name={`insert-${col.name}`}
-                    placeholder={col.dflt_value || (col.pk > 0 && col.type && col.type.toUpperCase().includes('INTEGER') ? 'Auto-increment (optional)' : 'NULL')}
+                    placeholder={col.dflt_value ?? (col.pk > 0 && col.type?.toUpperCase().includes('INTEGER') ? 'Auto-increment (optional)' : 'NULL')}
                     value={insertValues[col.name] || ''}
                     onChange={(e) => setInsertValues({...insertValues, [col.name]: e.target.value})}
                   />
@@ -913,14 +1319,12 @@ export function TableView({
               </div>
             ))}
           </div>
-          {error && (
-            <p className="text-sm text-destructive">{error}</p>
-          )}
+          <ErrorMessage error={error} variant="inline" />
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowInsertDialog(false)} disabled={inserting}>
               Cancel
             </Button>
-            <Button onClick={handleInsertRow} disabled={inserting}>
+            <Button onClick={() => void handleInsertRow()} disabled={inserting}>
               {inserting ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -987,14 +1391,12 @@ export function TableView({
               </div>
             ))}
           </div>
-          {error && (
-            <p className="text-sm text-destructive">{error}</p>
-          )}
+          <ErrorMessage error={error} variant="inline" />
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowEditDialog(false)} disabled={updating}>
               Cancel
             </Button>
-            <Button onClick={handleUpdateRow} disabled={updating}>
+            <Button onClick={() => void handleUpdateRow()} disabled={updating}>
               {updating ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -1044,14 +1446,12 @@ export function TableView({
               </div>
             </div>
           )}
-          {error && (
-            <p className="text-sm text-destructive">{error}</p>
-          )}
+          <ErrorMessage error={error} variant="inline" />
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDeleteDialog(false)} disabled={deleting}>
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleDeleteRow} disabled={deleting}>
+            <Button variant="destructive" onClick={() => void handleDeleteRow()} disabled={deleting}>
               {deleting ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -1059,6 +1459,39 @@ export function TableView({
                 </>
               ) : (
                 'Delete Row'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Delete Rows Dialog */}
+      <Dialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete {selectedRows.length} Row{selectedRows.length !== 1 ? 's' : ''}</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete the selected rows? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground">
+              {selectedRows.length} row{selectedRows.length !== 1 ? 's' : ''} will be permanently deleted from the table.
+            </p>
+          </div>
+          <ErrorMessage error={error} variant="inline" />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowBulkDeleteDialog(false)} disabled={bulkDeleting}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={() => void handleBulkDeleteRows()} disabled={bulkDeleting}>
+              {bulkDeleting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                `Delete ${selectedRows.length} Row${selectedRows.length !== 1 ? 's' : ''}`
               )}
             </Button>
           </DialogFooter>
@@ -1119,7 +1552,10 @@ export function TableView({
               </p>
             </div>
             
-            <div className="flex items-start space-x-3">
+            <div 
+              className="flex items-start space-x-3"
+              title="Prevents NULL values. Ensures this column always has a value."
+            >
               <Checkbox
                 id="add-column-notnull"
                 checked={addColumnValues.notnull}
@@ -1134,15 +1570,37 @@ export function TableView({
                 </p>
               </div>
             </div>
+            
+            <div 
+              className="flex items-start space-x-3"
+              title="Ensures all values in this column are distinct. Creates a unique index."
+            >
+              <Checkbox
+                id="add-column-unique"
+                checked={addColumnValues.unique}
+                onCheckedChange={(checked) => setAddColumnValues({...addColumnValues, unique: checked === true})}
+              />
+              <div className="space-y-1 leading-none">
+                <Label htmlFor="add-column-unique" className="text-sm font-medium cursor-pointer">
+                  UNIQUE constraint
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Ensures all values in this column are distinct
+                </p>
+              </div>
+            </div>
+            
+            {/* Info note about generated columns */}
+            <div className="text-xs text-muted-foreground bg-muted/50 p-3 rounded-md">
+              <strong>Note:</strong> Generated (computed) columns can only be defined when creating a new table using the Schema Designer. SQLite does not support adding generated columns to existing tables.
+            </div>
           </div>
-          {error && (
-            <p className="text-sm text-destructive">{error}</p>
-          )}
+          <ErrorMessage error={error} variant="inline" />
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAddColumnDialog(false)} disabled={addingColumn}>
               Cancel
             </Button>
-            <Button onClick={handleAddColumn} disabled={addingColumn}>
+            <Button onClick={() => void handleAddColumn()} disabled={addingColumn}>
               {addingColumn ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -1178,14 +1636,12 @@ export function TableView({
               />
             </div>
           </div>
-          {error && (
-            <p className="text-sm text-destructive">{error}</p>
-          )}
+          <ErrorMessage error={error} variant="inline" />
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowRenameColumnDialog(false)} disabled={renamingColumnInProgress}>
               Cancel
             </Button>
-            <Button onClick={handleRenameColumn} disabled={renamingColumnInProgress}>
+            <Button onClick={() => void handleRenameColumn()} disabled={renamingColumnInProgress}>
               {renamingColumnInProgress ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -1208,20 +1664,126 @@ export function TableView({
               Change the column type or constraints. This operation requires recreating the table.
             </DialogDescription>
           </DialogHeader>
-          <div className="rounded-md border border-yellow-200 dark:border-yellow-900 bg-yellow-50 dark:bg-yellow-950/30 p-4 mb-4">
-            <p className="text-sm font-medium mb-2">⚠️ Important: Table Recreation Required</p>
-            <p className="text-sm text-muted-foreground mb-2">
+          {/* Warning Box */}
+          <div className="rounded-lg border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-4 mb-4">
+            <p className="text-sm font-medium text-amber-800 dark:text-amber-200 mb-2">⚠️ Important: Table Recreation Required</p>
+            <p className="text-sm text-amber-700 dark:text-amber-300 mb-2">
               SQLite does not support modifying column types or constraints directly. This operation will:
             </p>
-            <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1">
+            <ul className="text-sm text-amber-700 dark:text-amber-300 list-disc list-inside space-y-1">
               <li>Create a temporary table with the new column definition</li>
               <li>Copy all data with appropriate type conversions</li>
               <li>Drop the original table</li>
               <li>Rename the temporary table</li>
             </ul>
-            <p className="text-sm text-muted-foreground mt-2 font-medium">
-              It's strongly recommended to backup your database before proceeding.
+          </div>
+          
+          {/* Backup Recommendation */}
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-900 rounded-lg p-4 mb-4">
+            <h4 className="text-sm font-semibold text-blue-800 dark:text-blue-200 mb-2">
+              💾 Strongly Recommended: Create a backup first
+            </h4>
+            <p className="text-xs text-blue-700 dark:text-blue-300 mb-3">
+              Before modifying this column, we highly recommend creating a backup of your table in case anything goes wrong.
             </p>
+            
+            {/* Backup Format Selection */}
+            <div className="flex items-center gap-3 mb-3">
+              <span className="text-xs font-medium text-blue-800 dark:text-blue-200">Format:</span>
+              <RadioGroup
+                value={modifyColumnBackup.format}
+                onValueChange={(value: 'sql' | 'csv' | 'json') => setModifyColumnBackup(prev => ({ ...prev, format: value }))}
+                disabled={modifyingColumnInProgress || modifyColumnBackup.isBackingUp}
+                className="flex gap-3"
+              >
+                <div className="flex items-center space-x-1">
+                  <RadioGroupItem value="sql" id="modify-backup-sql" className="h-3 w-3" />
+                  <Label htmlFor="modify-backup-sql" className="text-xs text-blue-700 dark:text-blue-300">SQL</Label>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <RadioGroupItem value="csv" id="modify-backup-csv" className="h-3 w-3" />
+                  <Label htmlFor="modify-backup-csv" className="text-xs text-blue-700 dark:text-blue-300">CSV</Label>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <RadioGroupItem value="json" id="modify-backup-json" className="h-3 w-3" />
+                  <Label htmlFor="modify-backup-json" className="text-xs text-blue-700 dark:text-blue-300">JSON</Label>
+                </div>
+              </RadioGroup>
+            </div>
+            
+            {/* Backup Buttons */}
+            <div className="flex gap-2">
+              {r2BackupStatus?.configured && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    // Capture format value before state update to avoid closure issues
+                    const formatToExport = modifyColumnBackup.format;
+                    setModifyColumnBackup(prev => ({ ...prev, isBackingUp: true, method: 'r2' }));
+                    try {
+                      const result = await backupTableToR2(
+                        databaseId,
+                        databaseName,
+                        tableName,
+                        formatToExport,
+                        'column_modify'
+                      );
+                      setModifyColumnBackup(prev => ({ ...prev, isBackingUp: false, completed: true }));
+                      setBackupProgressDialog({
+                        jobId: result.job_id,
+                        operationName: 'Table Backup to R2',
+                        tableName: tableName
+                      });
+                    } catch {
+                      setModifyColumnBackup(prev => ({ ...prev, isBackingUp: false }));
+                      setError('Failed to start R2 backup');
+                    }
+                  }}
+                  disabled={modifyingColumnInProgress || modifyColumnBackup.isBackingUp}
+                  className="flex-1 bg-blue-600 text-white hover:bg-blue-700 border-blue-600"
+                >
+                  {modifyColumnBackup.isBackingUp && modifyColumnBackup.method === 'r2' ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Cloud className="h-4 w-4 mr-2" />
+                  )}
+                  Backup to R2
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  // Capture format value before state update to avoid closure issues
+                  const formatToExport = modifyColumnBackup.format;
+                  setModifyColumnBackup(prev => ({ ...prev, isBackingUp: true, method: 'download' }));
+                  try {
+                    await api.exportTable(databaseId, tableName, formatToExport);
+                    setModifyColumnBackup(prev => ({ ...prev, isBackingUp: false, completed: true }));
+                  } catch {
+                    setModifyColumnBackup(prev => ({ ...prev, isBackingUp: false }));
+                    setError('Failed to download backup');
+                  }
+                }}
+                disabled={modifyingColumnInProgress || modifyColumnBackup.isBackingUp}
+                className={r2BackupStatus?.configured ? 'flex-1' : 'w-full'}
+              >
+                {modifyColumnBackup.isBackingUp && modifyColumnBackup.method === 'download' ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4 mr-2" />
+                )}
+                Download Backup
+              </Button>
+            </div>
+            
+            {/* Backup completed indicator */}
+            {modifyColumnBackup.completed && !modifyColumnBackup.isBackingUp && (
+              <p className="text-xs text-green-600 dark:text-green-400 mt-2 flex items-center gap-1">
+                ✓ Backup {modifyColumnBackup.method === 'r2' ? 'started' : 'downloaded'}
+              </p>
+            )}
           </div>
           <div className="grid gap-4 py-4">
             <div className="space-y-2">
@@ -1253,7 +1815,10 @@ export function TableView({
               />
             </div>
             
-            <div className="flex items-start space-x-3">
+            <div 
+              className="flex items-start space-x-3"
+              title="Prevents NULL values. Existing NULL values will be replaced with the default value."
+            >
               <Checkbox
                 id="modify-column-notnull"
                 checked={modifyColumnValues.notnull}
@@ -1269,14 +1834,12 @@ export function TableView({
               </div>
             </div>
           </div>
-          {error && (
-            <p className="text-sm text-destructive">{error}</p>
-          )}
+          <ErrorMessage error={error} variant="inline" />
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowModifyColumnDialog(false)} disabled={modifyingColumnInProgress}>
               Cancel
             </Button>
-            <Button onClick={handleModifyColumn} disabled={modifyingColumnInProgress}>
+            <Button onClick={() => void handleModifyColumn()} disabled={modifyingColumnInProgress}>
               {modifyingColumnInProgress ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -1309,14 +1872,12 @@ export function TableView({
               </div>
             </div>
           )}
-          {error && (
-            <p className="text-sm text-destructive">{error}</p>
-          )}
+          <ErrorMessage error={error} variant="inline" />
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDeleteColumnDialog(false)} disabled={deletingColumnInProgress}>
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleDeleteColumn} disabled={deletingColumnInProgress}>
+            <Button variant="destructive" onClick={() => void handleDeleteColumn()} disabled={deletingColumnInProgress}>
               {deletingColumnInProgress ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -1338,6 +1899,17 @@ export function TableView({
         open={showCascadeSimulator}
         onClose={() => setShowCascadeSimulator(false)}
       />
+
+      {/* Backup Progress Dialog */}
+      {backupProgressDialog && (
+        <BackupProgressDialog
+          open={true}
+          jobId={backupProgressDialog.jobId}
+          operationName={backupProgressDialog.operationName}
+          databaseName={`${databaseName} - ${backupProgressDialog.tableName}`}
+          onClose={() => setBackupProgressDialog(null)}
+        />
+      )}
     </div>
   );
 }

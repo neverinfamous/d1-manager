@@ -7,23 +7,23 @@ interface FTS5StatsProps {
   stats: FTS5Stats;
 }
 
-export function FTS5Stats({ stats }: FTS5StatsProps) {
+export function FTS5Stats({ stats }: FTS5StatsProps): React.JSX.Element {
   const formatBytes = (bytes: number): string => {
     if (bytes === 0) return '0 B';
     const k = 1024;
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
+    return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i] ?? ''}`;
   };
 
-  const getFragmentationColor = (fragmentation?: number) => {
+  const getFragmentationColor = (fragmentation?: number): string => {
     if (!fragmentation) return 'bg-green-500';
     if (fragmentation < 20) return 'bg-green-500';
     if (fragmentation < 50) return 'bg-yellow-500';
     return 'bg-red-500';
   };
 
-  const getFragmentationLabel = (fragmentation?: number) => {
+  const getFragmentationLabel = (fragmentation?: number): string => {
     if (!fragmentation) return 'Excellent';
     if (fragmentation < 20) return 'Good';
     if (fragmentation < 50) return 'Fair';

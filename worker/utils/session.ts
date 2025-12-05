@@ -18,7 +18,7 @@ import type { Env } from '../types';
  * - 'first-unconstrained': Start from any replica (faster, may be slightly stale)
  * - bookmark: Start from a specific state (sequential consistency)
  */
-export type SessionMode = 'first-primary' | 'first-unconstrained' | string;
+export type SessionMode = string;
 
 /**
  * Get a D1 session for metadata database operations.
@@ -27,11 +27,7 @@ export type SessionMode = 'first-primary' | 'first-unconstrained' | string;
  * @param env - Worker environment with METADATA binding
  * @returns D1DatabaseSession for executing queries with sequential consistency
  */
-export function getMetadataSession(env: Env) {
-  if (!env.METADATA) {
-    throw new Error('METADATA database binding not available');
-  }
-  
+export function getMetadataSession(env: Env): D1DatabaseSession {
   // Use 'first-primary' to ensure reads see the latest writes
   // This is important for operations like:
   // - Query history (see newly executed queries immediately)
@@ -47,11 +43,7 @@ export function getMetadataSession(env: Env) {
  * @param env - Worker environment with METADATA binding
  * @returns D1DatabaseSession for executing queries
  */
-export function getMetadataReadSession(env: Env) {
-  if (!env.METADATA) {
-    throw new Error('METADATA database binding not available');
-  }
-  
+export function getMetadataReadSession(env: Env): D1DatabaseSession {
   // Use 'first-unconstrained' for faster reads when latest data isn't critical
   return env.METADATA.withSession('first-unconstrained');
 }
@@ -64,11 +56,7 @@ export function getMetadataReadSession(env: Env) {
  * @param bookmark - Bookmark from a previous session
  * @returns D1DatabaseSession for executing queries
  */
-export function getMetadataSessionFromBookmark(env: Env, bookmark: string) {
-  if (!env.METADATA) {
-    throw new Error('METADATA database binding not available');
-  }
-  
+export function getMetadataSessionFromBookmark(env: Env, bookmark: string): D1DatabaseSession {
   return env.METADATA.withSession(bookmark);
 }
 

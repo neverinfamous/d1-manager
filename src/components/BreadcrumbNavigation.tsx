@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 
 interface BreadcrumbNavigationProps {
   databaseName: string;
-  navigationHistory: Array<{ tableName: string; displayName?: string }>;
+  navigationHistory: { tableName: string; displayName?: string }[];
   onNavigateToDatabase: () => void;
   onNavigateToTable: (index: number) => void;
   onGoBack?: () => void;
@@ -15,7 +15,7 @@ export function BreadcrumbNavigation({
   onNavigateToDatabase,
   onNavigateToTable,
   onGoBack
-}: BreadcrumbNavigationProps) {
+}: BreadcrumbNavigationProps): React.JSX.Element {
   // Limit to last 5 tables to prevent overflow
   const displayHistory = navigationHistory.slice(-5);
   const hasMore = navigationHistory.length > 5;

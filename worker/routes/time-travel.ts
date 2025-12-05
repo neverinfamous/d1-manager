@@ -8,6 +8,14 @@ import {
   generateRestoreCommand,
   type BookmarkHistoryEntry
 } from '../utils/time-travel';
+import { logError, logInfo, logWarning } from '../utils/error-logger';
+
+// Helper to create response headers with CORS
+function jsonHeaders(corsHeaders: HeadersInit): Headers {
+  const headers = new Headers(corsHeaders);
+  headers.set('Content-Type', 'application/json');
+  return headers;
+}
 
 /**
  * Time Travel routes for D1 databases
@@ -23,9 +31,9 @@ export async function handleTimeTravelRoutes(
   url: URL,
   corsHeaders: HeadersInit,
   isLocalDev: boolean,
-  userEmail: string = 'unknown'
+  userEmail = 'unknown'
 ): Promise<Response | null> {
-  console.log('[TimeTravel] Handling request:', request.method, url.pathname);
+  logInfo(`Handling request: ${request.method} ${url.pathname}`, { module: 'time_travel', operation: 'request' });
 
   const cfHeaders = {
     'Authorization': `Bearer ${env.API_KEY}`,
@@ -34,10 +42,10 @@ export async function handleTimeTravelRoutes(
 
   try {
     // GET /api/time-travel/:dbId/bookmark - Get current bookmark
-    const bookmarkMatch = url.pathname.match(/^\/api\/time-travel\/([^/]+)\/bookmark$/);
-    if (request.method === 'GET' && bookmarkMatch && bookmarkMatch[1]) {
+    const bookmarkMatch = /^\/api\/time-travel\/([^/]+)\/bookmark$/.exec(url.pathname);
+    if (request.method === 'GET' && bookmarkMatch?.[1]) {
       const dbId = bookmarkMatch[1];
-      console.log('[TimeTravel] Getting current bookmark for:', dbId);
+      logInfo(`Getting current bookmark for: ${dbId}`, { module: 'time_travel', operation: 'get_bookmark', databaseId: dbId });
 
       // Mock response for local development without API credentials
       if (isLocalDev) {
@@ -50,10 +58,7 @@ export async function handleTimeTravelRoutes(
           },
           success: true
         }), {
-          headers: {
-            'Content-Type': 'application/json',
-            ...corsHeaders
-          }
+          headers: jsonHeaders(corsHeaders)
         });
       }
 
@@ -65,11 +70,11 @@ export async function handleTimeTravelRoutes(
           { headers: cfHeaders }
         );
         if (dbInfoResponse.ok) {
-          const dbInfo = await dbInfoResponse.json() as { result: { name: string } };
+          const dbInfo: { result: { name: string } } = await dbInfoResponse.json();
           databaseName = dbInfo.result.name;
         }
       } catch (err) {
-        console.warn('[TimeTravel] Could not fetch database name:', err);
+        logWarning(`Could not fetch database name: ${err instanceof Error ? err.message : String(err)}`, { module: 'time_travel', operation: 'fetch_name', databaseId: dbId });
       }
 
       const bookmark = await getCurrentBookmark(dbId, env);
@@ -81,10 +86,7 @@ export async function handleTimeTravelRoutes(
           success: false
         }), {
           status: 500,
-          headers: {
-            'Content-Type': 'application/json',
-            ...corsHeaders
-          }
+          headers: jsonHeaders(corsHeaders)
         });
       }
 
@@ -98,19 +100,16 @@ export async function handleTimeTravelRoutes(
         },
         success: true
       }), {
-        headers: {
-          'Content-Type': 'application/json',
-          ...corsHeaders
-        }
+        headers: jsonHeaders(corsHeaders)
       });
     }
 
     // GET /api/time-travel/:dbId/history - Get bookmark history
-    const historyMatch = url.pathname.match(/^\/api\/time-travel\/([^/]+)\/history$/);
-    if (request.method === 'GET' && historyMatch && historyMatch[1]) {
+    const historyMatch = /^\/api\/time-travel\/([^/]+)\/history$/.exec(url.pathname);
+    if (request.method === 'GET' && historyMatch?.[1]) {
       const dbId = historyMatch[1];
-      const limit = parseInt(url.searchParams.get('limit') || '20', 10);
-      console.log('[TimeTravel] Getting bookmark history for:', dbId);
+      const limit = parseInt(url.searchParams.get('limit') ?? '20', 10);
+      logInfo(`Getting bookmark history for: ${dbId}`, { module: 'time_travel', operation: 'history', databaseId: dbId });
 
       // Mock response for local development
       if (isLocalDev) {
@@ -141,10 +140,7 @@ export async function handleTimeTravelRoutes(
           result: mockHistory,
           success: true
         }), {
-          headers: {
-            'Content-Type': 'application/json',
-            ...corsHeaders
-          }
+          headers: jsonHeaders(corsHeaders)
         });
       }
 
@@ -158,11 +154,11 @@ export async function handleTimeTravelRoutes(
           { headers: cfHeaders }
         );
         if (dbInfoResponse.ok) {
-          const dbInfo = await dbInfoResponse.json() as { result: { name: string } };
+          const dbInfo: { result: { name: string } } = await dbInfoResponse.json();
           databaseName = dbInfo.result.name;
         }
       } catch (err) {
-        console.warn('[TimeTravel] Could not fetch database name:', err);
+        logWarning(`Could not fetch database name: ${err instanceof Error ? err.message : String(err)}`, { module: 'time_travel', operation: 'fetch_name', databaseId: dbId });
       }
 
       // Add restore commands to history entries
@@ -176,20 +172,17 @@ export async function handleTimeTravelRoutes(
         databaseName,
         success: true
       }), {
-        headers: {
-          'Content-Type': 'application/json',
-          ...corsHeaders
-        }
+        headers: jsonHeaders(corsHeaders)
       });
     }
 
     // POST /api/time-travel/:dbId/capture - Manually capture a bookmark
-    const captureMatch = url.pathname.match(/^\/api\/time-travel\/([^/]+)\/capture$/);
-    if (request.method === 'POST' && captureMatch && captureMatch[1]) {
+    const captureMatch = /^\/api\/time-travel\/([^/]+)\/capture$/.exec(url.pathname);
+    if (request.method === 'POST' && captureMatch?.[1]) {
       const dbId = captureMatch[1];
-      console.log('[TimeTravel] Manually capturing bookmark for:', dbId);
+      logInfo(`Manually capturing bookmark for: ${dbId}`, { module: 'time_travel', operation: 'capture', databaseId: dbId });
 
-      const body = await request.json() as { description?: string };
+      const body: { description?: string } = await request.json();
 
       // Mock response for local development
       if (isLocalDev) {
@@ -198,14 +191,11 @@ export async function handleTimeTravelRoutes(
             bookmark: '00000000-00000000-00000000-mocknew1234567890abcdef12345678',
             capturedAt: new Date().toISOString(),
             operationType: 'manual',
-            description: body.description || 'Manual checkpoint'
+            description: body.description ?? 'Manual checkpoint'
           },
           success: true
         }), {
-          headers: {
-            'Content-Type': 'application/json',
-            ...corsHeaders
-          }
+          headers: jsonHeaders(corsHeaders)
         });
       }
 
@@ -217,11 +207,11 @@ export async function handleTimeTravelRoutes(
           { headers: cfHeaders }
         );
         if (dbInfoResponse.ok) {
-          const dbInfo = await dbInfoResponse.json() as { result: { name: string } };
+          const dbInfo: { result: { name: string } } = await dbInfoResponse.json();
           databaseName = dbInfo.result.name;
         }
       } catch (err) {
-        console.warn('[TimeTravel] Could not fetch database name:', err);
+        logWarning(`Could not fetch database name: ${err instanceof Error ? err.message : String(err)}`, { module: 'time_travel', operation: 'fetch_name', databaseId: dbId });
       }
 
       const bookmark = await captureBookmark(
@@ -229,7 +219,7 @@ export async function handleTimeTravelRoutes(
         databaseName,
         env,
         'manual',
-        body.description || 'Manual checkpoint',
+        body.description ?? 'Manual checkpoint',
         userEmail
       );
 
@@ -240,10 +230,7 @@ export async function handleTimeTravelRoutes(
           success: false
         }), {
           status: 500,
-          headers: {
-            'Content-Type': 'application/json',
-            ...corsHeaders
-          }
+          headers: jsonHeaders(corsHeaders)
         });
       }
 
@@ -252,23 +239,20 @@ export async function handleTimeTravelRoutes(
           bookmark,
           capturedAt: new Date().toISOString(),
           operationType: 'manual',
-          description: body.description || 'Manual checkpoint',
+          description: body.description ?? 'Manual checkpoint',
           restoreCommand: databaseName ? generateRestoreCommand(databaseName, bookmark) : null
         },
         success: true
       }), {
-        headers: {
-          'Content-Type': 'application/json',
-          ...corsHeaders
-        }
+        headers: jsonHeaders(corsHeaders)
       });
     }
 
     // DELETE /api/time-travel/:dbId/history/:id - Delete a bookmark entry
-    const deleteMatch = url.pathname.match(/^\/api\/time-travel\/([^/]+)\/history\/(\d+)$/);
-    if (request.method === 'DELETE' && deleteMatch && deleteMatch[1] && deleteMatch[2]) {
+    const deleteMatch = /^\/api\/time-travel\/([^/]+)\/history\/(\d+)$/.exec(url.pathname);
+    if (request.method === 'DELETE' && deleteMatch?.[1] && deleteMatch[2]) {
       const bookmarkId = parseInt(deleteMatch[2], 10);
-      console.log('[TimeTravel] Deleting bookmark entry:', bookmarkId);
+      logInfo(`Deleting bookmark entry: ${bookmarkId}`, { module: 'time_travel', operation: 'delete', metadata: { bookmarkId } });
 
       // Mock response for local development
       if (isLocalDev) {
@@ -276,10 +260,7 @@ export async function handleTimeTravelRoutes(
           result: { deleted: true },
           success: true
         }), {
-          headers: {
-            'Content-Type': 'application/json',
-            ...corsHeaders
-          }
+          headers: jsonHeaders(corsHeaders)
         });
       }
 
@@ -289,10 +270,7 @@ export async function handleTimeTravelRoutes(
         result: { deleted },
         success: true
       }), {
-        headers: {
-          'Content-Type': 'application/json',
-          ...corsHeaders
-        }
+        headers: jsonHeaders(corsHeaders)
       });
     }
 
@@ -300,16 +278,13 @@ export async function handleTimeTravelRoutes(
     return null;
 
   } catch (err) {
-    console.error('[TimeTravel] Error:', err);
+    void logError(env, err instanceof Error ? err : String(err), { module: 'time_travel', operation: 'request' }, isLocalDev);
     return new Response(JSON.stringify({
       error: 'Time Travel operation failed',
       message: err instanceof Error ? err.message : 'Unknown error'
     }), {
       status: 500,
-      headers: {
-        'Content-Type': 'application/json',
-        ...corsHeaders
-      }
+      headers: jsonHeaders(corsHeaders)
     });
   }
 }

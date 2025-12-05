@@ -1,4 +1,19 @@
 import type { Env } from '../types';
+import { logInfo, logWarning } from '../utils/error-logger';
+
+// Helper to create response headers with CORS
+function jsonHeaders(corsHeaders: HeadersInit): Headers {
+  const headers = new Headers(corsHeaders);
+  headers.set('Content-Type', 'application/json');
+  return headers;
+}
+
+interface SavedQueryBody {
+  name?: string;
+  description?: string;
+  database_id?: string;
+  query?: string;
+}
 
 export async function handleSavedQueriesRoutes(
   request: Request,
@@ -8,17 +23,14 @@ export async function handleSavedQueriesRoutes(
   isLocalDev: boolean,
   userEmail: string | null
 ): Promise<Response> {
-  console.log('[SavedQueries] Handling saved queries operation');
+  logInfo('Handling saved queries operation', { module: 'saved_queries', operation: 'request' });
 
   if (!userEmail && !isLocalDev) {
     return new Response(JSON.stringify({ 
       error: 'User email required' 
     }), { 
       status: 401,
-      headers: {
-        'Content-Type': 'application/json',
-        ...corsHeaders
-      }
+      headers: jsonHeaders(corsHeaders)
     });
   }
 
@@ -35,7 +47,7 @@ export async function handleSavedQueriesRoutes(
               id: 1,
               name: 'Mock Query 1',
               description: 'Sample saved query',
-              database_id: databaseId || 'mock-db',
+              database_id: databaseId ?? 'mock-db',
               query: 'SELECT * FROM users LIMIT 10',
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
@@ -44,10 +56,7 @@ export async function handleSavedQueriesRoutes(
           ],
           success: true
         }), {
-          headers: {
-            'Content-Type': 'application/json',
-            ...corsHeaders
-          }
+          headers: jsonHeaders(corsHeaders)
         });
       }
 
@@ -69,32 +78,21 @@ export async function handleSavedQueriesRoutes(
         result: result.results,
         success: true
       }), {
-        headers: {
-          'Content-Type': 'application/json',
-          ...corsHeaders
-        }
+        headers: jsonHeaders(corsHeaders)
       });
     }
 
     // Create a new saved query
     if (request.method === 'POST' && url.pathname === '/api/saved-queries') {
-      const body = await request.json() as {
-        name: string;
-        description?: string;
-        database_id?: string;
-        query: string;
-      };
+      const body: SavedQueryBody = await request.json();
 
       if (!body.name || !body.query) {
         return new Response(JSON.stringify({ 
           error: 'Name and query are required' 
-        }), { 
-          status: 400,
-          headers: {
-            'Content-Type': 'application/json',
-            ...corsHeaders
-          }
-        });
+    }), { 
+      status: 400,
+      headers: jsonHeaders(corsHeaders)
+    });
       }
 
       // Mock response for local development
@@ -102,17 +100,17 @@ export async function handleSavedQueriesRoutes(
         return new Response(JSON.stringify({
           result: {
             id: Date.now(),
-            ...body,
+            name: body.name,
+            description: body.description,
+            database_id: body.database_id,
+            query: body.query,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
             user_email: 'dev@localhost'
           },
           success: true
         }), {
-          headers: {
-            'Content-Type': 'application/json',
-            ...corsHeaders
-          }
+          headers: jsonHeaders(corsHeaders)
         });
       }
 
@@ -123,8 +121,8 @@ export async function handleSavedQueriesRoutes(
          VALUES (?, ?, ?, ?, ?)`
       ).bind(
         body.name,
-        body.description || null,
-        body.database_id || null,
+        body.description ?? null,
+        body.database_id ?? null,
         body.query,
         userEmail
       );
@@ -141,13 +139,10 @@ export async function handleSavedQueriesRoutes(
       return new Response(JSON.stringify({
         result: savedQuery,
         success: true
-      }), {
-        status: 201,
-        headers: {
-          'Content-Type': 'application/json',
-          ...corsHeaders
-        }
-      });
+    }), { 
+      status: 201,
+      headers: jsonHeaders(corsHeaders)
+    });
     }
 
     // Update a saved query
@@ -157,37 +152,27 @@ export async function handleSavedQueriesRoutes(
       if (!queryId) {
         return new Response(JSON.stringify({ 
           error: 'Query ID required' 
-        }), { 
-          status: 400,
-          headers: {
-            'Content-Type': 'application/json',
-            ...corsHeaders
-          }
-        });
+    }), { 
+      status: 400,
+      headers: jsonHeaders(corsHeaders)
+    });
       }
 
-      const body = await request.json() as {
-        name?: string;
-        description?: string;
-        query?: string;
-      };
+      const body: SavedQueryBody = await request.json();
 
       // Mock response for local development
       if (isLocalDev) {
         return new Response(JSON.stringify({
-          result: { id: queryId, ...body, updated_at: new Date().toISOString() },
+          result: { id: queryId, name: body.name, description: body.description, query: body.query, updated_at: new Date().toISOString() },
           success: true
         }), {
-          headers: {
-            'Content-Type': 'application/json',
-            ...corsHeaders
-          }
+          headers: jsonHeaders(corsHeaders)
         });
       }
 
       // Build update query dynamically
       const updates: string[] = [];
-      const params: (string | number)[] = [];
+      const params: (string | number | null)[] = [];
       
       if (body.name !== undefined) {
         updates.push('name = ?');
@@ -195,7 +180,7 @@ export async function handleSavedQueriesRoutes(
       }
       if (body.description !== undefined) {
         updates.push('description = ?');
-        params.push(body.description);
+        params.push(body.description ?? null);
       }
       if (body.query !== undefined) {
         updates.push('query = ?');
@@ -207,16 +192,13 @@ export async function handleSavedQueriesRoutes(
       if (updates.length === 1) { // Only updated_at
         return new Response(JSON.stringify({ 
           error: 'No fields to update' 
-        }), { 
-          status: 400,
-          headers: {
-            'Content-Type': 'application/json',
-            ...corsHeaders
-          }
-        });
+    }), { 
+      status: 400,
+      headers: jsonHeaders(corsHeaders)
+    });
       }
 
-      params.push(parseInt(queryId), userEmail!);
+      params.push(parseInt(queryId), userEmail ?? '');
       
       const stmt = env.METADATA.prepare(
         `UPDATE saved_queries SET ${updates.join(', ')} 
@@ -235,23 +217,17 @@ export async function handleSavedQueriesRoutes(
       if (!updatedQuery) {
         return new Response(JSON.stringify({ 
           error: 'Query not found or access denied' 
-        }), { 
-          status: 404,
-          headers: {
-            'Content-Type': 'application/json',
-            ...corsHeaders
-          }
-        });
+    }), { 
+      status: 404,
+      headers: jsonHeaders(corsHeaders)
+    });
       }
       
       return new Response(JSON.stringify({
         result: updatedQuery,
         success: true
       }), {
-        headers: {
-          'Content-Type': 'application/json',
-          ...corsHeaders
-        }
+        headers: jsonHeaders(corsHeaders)
       });
     }
 
@@ -262,13 +238,10 @@ export async function handleSavedQueriesRoutes(
       if (!queryId) {
         return new Response(JSON.stringify({ 
           error: 'Query ID required' 
-        }), { 
-          status: 400,
-          headers: {
-            'Content-Type': 'application/json',
-            ...corsHeaders
-          }
-        });
+    }), { 
+      status: 400,
+      headers: jsonHeaders(corsHeaders)
+    });
       }
 
       // Mock response for local development
@@ -276,10 +249,7 @@ export async function handleSavedQueriesRoutes(
         return new Response(JSON.stringify({
           success: true
         }), {
-          headers: {
-            'Content-Type': 'application/json',
-            ...corsHeaders
-          }
+          headers: jsonHeaders(corsHeaders)
         });
       }
 
@@ -293,22 +263,16 @@ export async function handleSavedQueriesRoutes(
       if (result.meta.changes === 0) {
         return new Response(JSON.stringify({ 
           error: 'Query not found or access denied' 
-        }), { 
-          status: 404,
-          headers: {
-            'Content-Type': 'application/json',
-            ...corsHeaders
-          }
-        });
+    }), { 
+      status: 404,
+      headers: jsonHeaders(corsHeaders)
+    });
       }
       
       return new Response(JSON.stringify({
         success: true
       }), {
-        headers: {
-          'Content-Type': 'application/json',
-          ...corsHeaders
-        }
+        headers: jsonHeaders(corsHeaders)
       });
     }
 
@@ -317,15 +281,26 @@ export async function handleSavedQueriesRoutes(
       error: 'Route not found' 
     }), { 
       status: 404,
-      headers: {
-        'Content-Type': 'application/json',
-        ...corsHeaders
-      }
+      headers: jsonHeaders(corsHeaders)
     });
 
   } catch (err) {
     // Log full error details on server only - do not expose to client
-    console.error('[SavedQueries] Error:', err);
+    logWarning(`Error: ${err instanceof Error ? err.message : String(err)}`, { module: 'saved_queries', operation: 'request' });
+    
+    // Check for specific constraint errors
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    
+    // Handle UNIQUE constraint violation for duplicate query names
+    if (errorMessage.includes('UNIQUE constraint failed') && errorMessage.includes('saved_queries.name')) {
+      return new Response(JSON.stringify({ 
+        error: 'Duplicate query name',
+        message: 'A query with this name already exists. Please choose a different name.'
+    }), { 
+      status: 409, // Conflict
+      headers: jsonHeaders(corsHeaders)
+    });
+    }
     
     // Return generic error to client (security: don't expose stack traces or internal details)
     return new Response(JSON.stringify({ 
@@ -333,10 +308,7 @@ export async function handleSavedQueriesRoutes(
       message: 'Unable to complete saved queries operation. Please try again.'
     }), { 
       status: 500,
-      headers: {
-        'Content-Type': 'application/json',
-        ...corsHeaders
-      }
+      headers: jsonHeaders(corsHeaders)
     });
   }
 }

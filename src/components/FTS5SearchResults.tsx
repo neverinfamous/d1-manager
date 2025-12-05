@@ -1,18 +1,25 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronUp, TrendingDown } from 'lucide-react';
+import DOMPurify from 'dompurify';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import type { FTS5SearchResult } from '@/services/fts5-types';
+
+// Configure DOMPurify to only allow <mark> tags (used for search highlighting)
+const ALLOWED_TAGS = ['mark'];
+const sanitizeSnippet = (html: string): string => {
+  return DOMPurify.sanitize(html, { ALLOWED_TAGS });
+};
 
 interface FTS5SearchResultsProps {
   results: FTS5SearchResult[];
   viewMode?: 'card' | 'table';
 }
 
-export function FTS5SearchResults({ results, viewMode = 'card' }: FTS5SearchResultsProps) {
+export function FTS5SearchResults({ results, viewMode = 'card' }: FTS5SearchResultsProps): React.JSX.Element {
   const [expandedResults, setExpandedResults] = useState<Set<number>>(new Set());
 
-  const toggleExpand = (index: number) => {
+  const toggleExpand = (index: number): void => {
     setExpandedResults(prev => {
       const next = new Set(prev);
       if (next.has(index)) {
@@ -60,7 +67,9 @@ export function FTS5SearchResults({ results, viewMode = 'card' }: FTS5SearchResu
                   {Object.entries(result.row).map(([key, value]) => (
                     key !== 'rank' && key !== 'snippet' && (
                       <td key={key} className="px-4 py-2 text-sm">
-                        {value !== null && value !== undefined ? String(value) : '-'}
+                        {value !== null && value !== undefined 
+                          ? (typeof value === 'object' ? JSON.stringify(value) : String(value as string | number | boolean))
+                          : '-'}
                       </td>
                     )
                   ))}
@@ -87,7 +96,7 @@ export function FTS5SearchResults({ results, viewMode = 'card' }: FTS5SearchResu
                   {result.snippet ? (
                     <div 
                       className="text-sm leading-relaxed"
-                      dangerouslySetInnerHTML={{ __html: result.snippet }}
+                      dangerouslySetInnerHTML={{ __html: sanitizeSnippet(result.snippet) }}
                     />
                   ) : (
                     <CardTitle className="text-base">
@@ -125,7 +134,9 @@ export function FTS5SearchResults({ results, viewMode = 'card' }: FTS5SearchResu
                       <div key={key} className="flex gap-2 text-sm">
                         <span className="font-medium text-muted-foreground min-w-32">{key}:</span>
                         <span className="flex-1 break-words">
-                          {value !== null && value !== undefined ? String(value) : '-'}
+                          {value !== null && value !== undefined 
+                            ? (typeof value === 'object' ? JSON.stringify(value) : String(value as string | number | boolean))
+                            : '-'}
                         </span>
                       </div>
                     )

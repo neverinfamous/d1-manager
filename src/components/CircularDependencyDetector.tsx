@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import ReactFlow, {
-  Node,
-  Edge,
+  type Node,
+  type Edge,
   Background,
   useNodesState,
   useEdgesState,
@@ -11,7 +11,7 @@ import ReactFlow, {
   MarkerType
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { Loader2, AlertTriangle, Info, ExternalLink, CheckCircle, XCircle } from 'lucide-react';
+import { Loader2, AlertTriangle, Info, ArrowRight, CheckCircle, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -20,8 +20,15 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
-import { getCircularDependencies, getAllForeignKeys, type CircularDependencyCycle } from '@/services/api';
+import { getAllForeignKeys, type CircularDependencyCycle, type ForeignKeyGraphWithCycles } from '@/services/api';
 import { applyLayout } from '@/services/graphLayout';
+import { ErrorMessage } from '@/components/ui/error-message';
+
+interface CycleNodeData {
+  label: string;
+  inCycle: boolean;
+  isHighlighted: boolean;
+}
 
 interface CircularDependencyDetectorProps {
   databaseId: string;
@@ -29,7 +36,7 @@ interface CircularDependencyDetectorProps {
 }
 
 // Custom node component for cycle visualization
-const CycleNode = ({ data }: { data: { label: string; inCycle: boolean; isHighlighted: boolean } }) => {
+const CycleNode = ({ data }: { data: { label: string; inCycle: boolean; isHighlighted: boolean } }): React.JSX.Element => {
   return (
     <div 
       className={`px-4 py-3 rounded-lg shadow-lg min-w-[150px] border-2 ${
@@ -50,8 +57,9 @@ const nodeTypes = {
   cycleNode: CycleNode
 };
 
-function CircularDependencyDetectorContent({ databaseId, onNavigateToRelationships }: CircularDependencyDetectorProps) {
+function CircularDependencyDetectorContent({ databaseId, onNavigateToRelationships }: CircularDependencyDetectorProps): React.JSX.Element {
   const [cycles, setCycles] = useState<CircularDependencyCycle[]>([]);
+  const [fkGraph, setFkGraph] = useState<ForeignKeyGraphWithCycles | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedCycle, setSelectedCycle] = useState<CircularDependencyCycle | null>(null);
@@ -59,126 +67,124 @@ function CircularDependencyDetectorContent({ databaseId, onNavigateToRelationshi
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const { zoomIn, zoomOut, fitView } = useReactFlow();
+  
+  // Ref for scrolling to graph visualization
+  const graphCardRef = useRef<HTMLDivElement>(null);
 
-  // Fetch circular dependencies
+  // OPTIMIZED: Single API call returns both FK graph and cycles
   useEffect(() => {
-    const fetchCycles = async () => {
+    const fetchData = async (): Promise<void> => {
       try {
         setLoading(true);
         setError(null);
-        const detectedCycles = await getCircularDependencies(databaseId);
+        
+        // Single API call gets FK data, cycles, and schemas (uses unified cache key)
+        // Shares cache with ForeignKeyVisualizer and ERDiagram
+        const fkData = await getAllForeignKeys(databaseId, true, true);
+        const detectedCycles = fkData.cycles ?? [];
+        
         setCycles(detectedCycles);
+        setFkGraph(fkData);
         
         // Auto-select first cycle if exists
         if (detectedCycles.length > 0) {
           setSelectedCycle(detectedCycles[0] ?? null);
         }
       } catch (err) {
-        console.error('[CircularDependencyDetector] Error fetching cycles:', err);
         setError(err instanceof Error ? err.message : 'Failed to detect circular dependencies');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchCycles();
+    void fetchData();
   }, [databaseId]);
 
-  // Build graph visualization when a cycle is selected
+  // Build graph visualization when a cycle is selected (uses cached FK data)
   useEffect(() => {
-    if (!selectedCycle) {
+    if (!selectedCycle || !fkGraph) {
       setNodes([]);
       setEdges([]);
       return;
     }
 
-    const buildCycleGraph = async () => {
-      try {
-        // Get full FK graph to extract edge details
-        const fkGraph = await getAllForeignKeys(databaseId);
-        
-        // Create nodes for tables in the cycle
-        const cycleNodes: Node[] = selectedCycle.tables.map((table) => ({
-          id: table,
-          type: 'cycleNode',
-          data: {
-            label: table,
-            inCycle: true,
-            isHighlighted: true
-          },
-          position: { x: 0, y: 0 } // Will be recalculated by layout
-        }));
+    // Create nodes for tables in the cycle
+    const cycleNodes: Node<CycleNodeData>[] = selectedCycle.tables.map((table) => ({
+      id: table,
+      type: 'cycleNode',
+      data: {
+        label: table,
+        inCycle: true,
+        isHighlighted: true
+      },
+      position: { x: 0, y: 0 } // Will be recalculated by layout
+    }));
 
-        // Create edges for the cycle
-        const cycleEdges: Edge[] = [];
-        for (let i = 0; i < selectedCycle.tables.length; i++) {
-          const source = selectedCycle.tables[i]!;
-          const target = selectedCycle.tables[(i + 1) % selectedCycle.tables.length]!;
-          
-          // Find the FK edge in the graph
-          const fkEdge = fkGraph.edges.find(e => e.source === source && e.target === target);
-          
-          cycleEdges.push({
-            id: `cycle-edge-${i}`,
-            source,
-            target,
-            label: fkEdge?.onDelete || 'FK',
-            type: 'smoothstep',
-            animated: true,
-            style: {
-              stroke: selectedCycle.severity === 'high' ? '#dc2626' : 
-                      selectedCycle.severity === 'medium' ? '#f59e0b' : '#9ca3af',
-              strokeWidth: 3
-            },
-            markerEnd: {
-              type: MarkerType.ArrowClosed,
-              color: selectedCycle.severity === 'high' ? '#dc2626' : 
-                     selectedCycle.severity === 'medium' ? '#f59e0b' : '#9ca3af'
-            }
-          });
+    // Create edges for the cycle
+    const cycleEdges: Edge[] = [];
+    for (let i = 0; i < selectedCycle.tables.length; i++) {
+      const source = selectedCycle.tables[i];
+      const target = selectedCycle.tables[(i + 1) % selectedCycle.tables.length];
+      if (!source || !target) continue;
+      
+      // Find the FK edge in the cached graph
+      const fkEdge = fkGraph.edges.find(e => e.source === source && e.target === target);
+      
+      cycleEdges.push({
+        id: `cycle-edge-${String(i)}`,
+        source,
+        target,
+        label: fkEdge?.onDelete || 'FK',
+        type: 'smoothstep',
+        animated: true,
+        style: {
+          stroke: selectedCycle.severity === 'high' ? '#dc2626' : 
+                  selectedCycle.severity === 'medium' ? '#f59e0b' : '#9ca3af',
+          strokeWidth: 3
+        },
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          color: selectedCycle.severity === 'high' ? '#dc2626' : 
+                 selectedCycle.severity === 'medium' ? '#f59e0b' : '#9ca3af'
         }
+      });
+    }
 
-        // Apply layout
-        const graphData = {
-          nodes: cycleNodes.map(n => ({
-            id: n.id,
-            label: n.data.label,
-            columns: [],
-            rowCount: 0
-          })),
-          edges: cycleEdges.map(e => ({
-            id: e.id,
-            source: e.source!,
-            target: e.target!,
-            sourceColumn: '',
-            targetColumn: '',
-            onDelete: '',
-            onUpdate: ''
-          }))
-        };
-
-        const { nodes: layoutNodes } = applyLayout(graphData, 'hierarchical');
-        
-        // Merge layout positions with our styled nodes
-        const finalNodes = cycleNodes.map(node => {
-          const layoutNode = layoutNodes.find(n => n.id === node.id);
-          return {
-            ...node,
-            position: layoutNode?.position || node.position
-          };
-        });
-
-        setNodes(finalNodes);
-        setEdges(cycleEdges);
-      } catch (err) {
-        console.error('[CircularDependencyDetector] Error building graph:', err);
-      }
+    // Apply layout
+    const graphData = {
+      nodes: cycleNodes.map(n => ({
+        id: n.id,
+        label: n.data.label,
+        columns: [],
+        rowCount: 0
+      })),
+      edges: cycleEdges.map(e => ({
+        id: e.id,
+        source: e.source,
+        target: e.target,
+        sourceColumn: '',
+        targetColumn: '',
+        onDelete: '',
+        onUpdate: ''
+      }))
     };
 
-    buildCycleGraph();
-  }, [selectedCycle, databaseId, setNodes, setEdges]);
+    const { nodes: layoutNodes } = applyLayout(graphData, 'hierarchical');
+    
+    // Merge layout positions with our styled nodes
+    const finalNodes = cycleNodes.map(node => {
+      const layoutNode = layoutNodes.find(n => n.id === node.id);
+      return {
+        ...node,
+        position: layoutNode?.position ?? node.position
+      };
+    });
 
-  const getSeverityColor = (severity: 'low' | 'medium' | 'high') => {
+    setNodes(finalNodes);
+    setEdges(cycleEdges);
+  }, [selectedCycle, fkGraph, setNodes, setEdges]);
+
+  const getSeverityColor = (severity: 'low' | 'medium' | 'high'): string => {
     switch (severity) {
       case 'high':
         return 'text-red-600 dark:text-red-400';
@@ -189,7 +195,7 @@ function CircularDependencyDetectorContent({ databaseId, onNavigateToRelationshi
     }
   };
 
-  const getSeverityBadge = (severity: 'low' | 'medium' | 'high') => {
+  const getSeverityBadge = (severity: 'low' | 'medium' | 'high'): React.JSX.Element => {
     const colors = {
       high: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
       medium: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
@@ -217,11 +223,7 @@ function CircularDependencyDetectorContent({ databaseId, onNavigateToRelationshi
       <div className="flex items-center justify-center h-96">
         <Card className="w-full max-w-md">
           <CardContent className="pt-6">
-            <div className="flex items-center text-destructive mb-2">
-              <XCircle className="h-5 w-5 mr-2" />
-              <span className="font-semibold">Error</span>
-            </div>
-            <p className="text-sm text-muted-foreground">{error}</p>
+            <ErrorMessage error={error} showTitle />
           </CardContent>
         </Card>
       </div>
@@ -246,7 +248,7 @@ function CircularDependencyDetectorContent({ databaseId, onNavigateToRelationshi
                 onClick={onNavigateToRelationships}
                 className="w-full"
               >
-                <ExternalLink className="h-4 w-4 mr-2" />
+                <ArrowRight className="h-4 w-4 mr-2" />
                 View All Relationships
               </Button>
             )}
@@ -291,7 +293,7 @@ function CircularDependencyDetectorContent({ databaseId, onNavigateToRelationshi
           <CardContent>
             <Accordion type="single" collapsible className="w-full">
               {cycles.map((cycle, index) => (
-                <AccordionItem key={index} value={`cycle-${index}`}>
+                <AccordionItem key={index} value={`cycle-${String(index)}`}>
                   <AccordionTrigger 
                     className="hover:no-underline"
                     onClick={() => setSelectedCycle(cycle)}
@@ -356,7 +358,13 @@ function CircularDependencyDetectorContent({ databaseId, onNavigateToRelationshi
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => setSelectedCycle(cycle)}
+                          onClick={() => {
+                            setSelectedCycle(cycle);
+                            // Scroll to graph visualization on mobile/small screens
+                            setTimeout(() => {
+                              graphCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            }, 100);
+                          }}
                           className="flex-1"
                         >
                           View Graph
@@ -366,8 +374,10 @@ function CircularDependencyDetectorContent({ databaseId, onNavigateToRelationshi
                             size="sm"
                             variant="outline"
                             onClick={onNavigateToRelationships}
+                            title="Go to Foreign Key Editor"
+                            aria-label="Go to Foreign Key Editor"
                           >
-                            <ExternalLink className="h-3 w-3" />
+                            <ArrowRight className="h-3 w-3" />
                           </Button>
                         )}
                       </div>
@@ -380,7 +390,7 @@ function CircularDependencyDetectorContent({ databaseId, onNavigateToRelationshi
         </Card>
 
         {/* Graph Visualization */}
-        <Card>
+        <Card ref={graphCardRef}>
           <CardHeader>
             <CardTitle className="text-lg">
               {selectedCycle ? `Cycle Visualization` : 'Select a Cycle'}
@@ -493,7 +503,7 @@ function CircularDependencyDetectorContent({ databaseId, onNavigateToRelationshi
                   onClick={onNavigateToRelationships}
                   className="w-full mt-4"
                 >
-                  <ExternalLink className="h-4 w-4 mr-2" />
+                  <ArrowRight className="h-4 w-4 mr-2" />
                   Open Foreign Key Editor
                 </Button>
               )}
@@ -505,7 +515,7 @@ function CircularDependencyDetectorContent({ databaseId, onNavigateToRelationshi
   );
 }
 
-export function CircularDependencyDetector(props: CircularDependencyDetectorProps) {
+export function CircularDependencyDetector(props: CircularDependencyDetectorProps): React.JSX.Element {
   return (
     <ReactFlowProvider>
       <CircularDependencyDetectorContent {...props} />

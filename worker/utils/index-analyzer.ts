@@ -7,6 +7,7 @@
 import type { Env, IndexRecommendation, IndexAnalysisResult, ColumnInfo, TableInfo, QueryHistoryEntry } from '../types';
 import { analyzeQueryPatterns, type ColumnUsageFrequency } from './query-parser';
 import { sanitizeIdentifier } from './helpers';
+import { logWarning } from './error-logger';
 
 interface ForeignKeyInfo {
   table: string;
@@ -31,6 +32,8 @@ interface IndexColumn {
 
 /**
  * Analyze database and generate index recommendations
+ * OPTIMIZED: Processes tables in parallel batches to reduce total API call time
+ * while avoiding rate limits.
  */
 export async function analyzeIndexes(
   dbId: string,
@@ -38,78 +41,111 @@ export async function analyzeIndexes(
   isLocalDev: boolean
 ): Promise<IndexAnalysisResult> {
   const recommendations: IndexRecommendation[] = [];
-  const existingIndexes: Array<{
+  const existingIndexes: {
     tableName: string;
-    indexes: Array<{ name: string; columns: string[]; unique: boolean }>;
-  }> = [];
+    indexes: { name: string; columns: string[]; unique: boolean }[];
+  }[] = [];
 
-  // Get all tables in the database
-  const tables = await getTables(dbId, env, isLocalDev);
-  
-  // Get query history for pattern analysis
-  const queryFrequency = await getQueryPatterns(dbId, env, isLocalDev);
+  // Get all tables and query patterns in parallel (2 calls)
+  const [tables, queryFrequency] = await Promise.all([
+    getTables(dbId, env, isLocalDev),
+    getQueryPatterns(dbId, env, isLocalDev)
+  ]);
 
   let tablesWithoutIndexes = 0;
-
-  for (const table of tables) {
-    // Get existing indexes for this table
-    const tableIndexes = await getTableIndexes(dbId, table.name, env, isLocalDev);
-    const indexedColumns = new Set<string>();
+  
+  // OPTIMIZED: Process tables in parallel batches
+  // Batch size of 5 provides good balance between speed and API pressure
+  const BATCH_SIZE = 5;
+  
+  for (let i = 0; i < tables.length; i += BATCH_SIZE) {
+    const batch = tables.slice(i, i + BATCH_SIZE);
     
-    // Store existing indexes
-    const indexList: Array<{ name: string; columns: string[]; unique: boolean }> = [];
-    for (const idx of tableIndexes) {
-      const indexColumns = await getIndexColumns(dbId, table.name, idx.name, env, isLocalDev);
-      indexList.push({
-        name: idx.name,
-        columns: indexColumns,
-        unique: idx.unique === 1,
-      });
+    // Process each table's metadata in parallel within the batch
+    const batchResults = await Promise.all(
+      batch.map(async (table) => {
+        try {
+          // Fetch columns, FKs, and indexes for this table in parallel
+          const [columns, foreignKeys, tableIndexes] = await Promise.all([
+            getTableColumns(dbId, table.name, env, isLocalDev),
+            getForeignKeys(dbId, table.name, env, isLocalDev),
+            getTableIndexes(dbId, table.name, env, isLocalDev)
+          ]);
+          
+          // Fetch index columns in parallel for all indexes
+          const indexColumnsPromises = tableIndexes.map(async (idx) => ({
+            name: idx.name,
+            columns: await getIndexColumns(dbId, table.name, idx.name, env, isLocalDev),
+            unique: idx.unique === 1
+          }));
+          const indexList = await Promise.all(indexColumnsPromises);
+          
+          return {
+            tableName: table.name,
+            columns,
+            foreignKeys,
+            indexList
+          };
+        } catch (err) {
+          // Skip tables that can't be analyzed (e.g., FTS5 virtual tables)
+          logWarning(`Skipping table "${table.name}" in index analysis: ${err instanceof Error ? err.message : 'Unknown error'}`, {
+            module: 'index_analyzer',
+            operation: 'analyze_table',
+            databaseId: dbId,
+            metadata: { tableName: table.name }
+          });
+          return null;
+        }
+      })
+    );
+    
+    // Process batch results
+    for (const result of batchResults) {
+      if (!result) continue;
       
-      // Track which columns are already indexed
-      indexColumns.forEach(col => indexedColumns.add(col));
+      const { tableName, columns, foreignKeys, indexList } = result;
+      
+      // Track indexed columns
+      const indexedColumns = new Set<string>();
+      for (const idx of indexList) {
+        idx.columns.forEach(col => indexedColumns.add(col));
+      }
+      
+      existingIndexes.push({
+        tableName,
+        indexes: indexList
+      });
+
+      if (indexList.length === 0) {
+        tablesWithoutIndexes++;
+      }
+
+      // Analyze schema for recommendations
+      const schemaRecommendations = analyzeSchemaForIndexes(
+        tableName,
+        columns,
+        foreignKeys,
+        indexedColumns
+      );
+
+      // Analyze query patterns for recommendations
+      const queryRecommendations = analyzeQueryPatternsForIndexes(
+        tableName,
+        columns,
+        queryFrequency,
+        indexedColumns
+      );
+
+      // Combine and deduplicate recommendations
+      const allRecommendations = [...schemaRecommendations, ...queryRecommendations];
+      const uniqueRecommendations = deduplicateRecommendations(allRecommendations);
+
+      recommendations.push(...uniqueRecommendations);
     }
-    
-    existingIndexes.push({
-      tableName: table.name,
-      indexes: indexList,
-    });
-
-    if (indexList.length === 0) {
-      tablesWithoutIndexes++;
-    }
-
-    // Get table schema (columns)
-    const columns = await getTableColumns(dbId, table.name, env, isLocalDev);
-    
-    // Get foreign key relationships
-    const foreignKeys = await getForeignKeys(dbId, table.name, env, isLocalDev);
-
-    // Analyze schema for recommendations
-    const schemaRecommendations = analyzeSchemaForIndexes(
-      table.name,
-      columns,
-      foreignKeys,
-      indexedColumns
-    );
-
-    // Analyze query patterns for recommendations
-    const queryRecommendations = analyzeQueryPatternsForIndexes(
-      table.name,
-      columns,
-      queryFrequency,
-      indexedColumns
-    );
-
-    // Combine and deduplicate recommendations
-    const allRecommendations = [...schemaRecommendations, ...queryRecommendations];
-    const uniqueRecommendations = deduplicateRecommendations(allRecommendations);
-
-    recommendations.push(...uniqueRecommendations);
   }
 
   // Calculate statistics
-  const avgQueryEfficiency = await calculateAverageQueryEfficiency(dbId, env, isLocalDev);
+  const avgQueryEfficiency = calculateAverageQueryEfficiency(dbId, env, isLocalDev);
   const statistics: IndexAnalysisResult['statistics'] = {
     totalRecommendations: recommendations.length,
     tablesWithoutIndexes,
@@ -303,7 +339,7 @@ function analyzeQueryPatternsForIndexes(
         columnName,
         indexType: 'single',
         priority: 'high',
-        rationale: `Used in WHERE clause ${usage.whereCount} times in recent queries. High filter frequency indicates strong indexing candidate.`,
+        rationale: `Used in WHERE clause ${String(usage.whereCount)} times in recent queries. High filter frequency indicates strong indexing candidate.`,
         estimatedImpact: 'High - Will significantly speed up filtered queries',
         suggestedSQL: `CREATE INDEX idx_${tableName}_${columnName} ON ${tableName}(${columnName});`,
       });
@@ -313,7 +349,7 @@ function analyzeQueryPatternsForIndexes(
         columnName,
         indexType: 'single',
         priority: 'medium',
-        rationale: `Used in WHERE clause ${usage.whereCount} time(s) in recent queries.`,
+        rationale: `Used in WHERE clause ${String(usage.whereCount)} time(s) in recent queries.`,
         estimatedImpact: 'Medium - Will improve filtered query performance',
         suggestedSQL: `CREATE INDEX idx_${tableName}_${columnName} ON ${tableName}(${columnName});`,
       });
@@ -326,7 +362,7 @@ function analyzeQueryPatternsForIndexes(
         columnName,
         indexType: 'single',
         priority: 'high',
-        rationale: `Used in JOIN conditions ${usage.joinCount} times. Indexes on join columns are critical for performance.`,
+        rationale: `Used in JOIN conditions ${String(usage.joinCount)} times. Indexes on join columns are critical for performance.`,
         estimatedImpact: 'High - Dramatically improves JOIN performance',
         suggestedSQL: `CREATE INDEX idx_${tableName}_${columnName} ON ${tableName}(${columnName});`,
       });
@@ -339,7 +375,7 @@ function analyzeQueryPatternsForIndexes(
         columnName,
         indexType: 'single',
         priority: 'medium',
-        rationale: `Used in ORDER BY clause ${usage.orderByCount} times. Indexes can avoid full table sorts.`,
+        rationale: `Used in ORDER BY clause ${String(usage.orderByCount)} times. Indexes can avoid full table sorts.`,
         estimatedImpact: 'Medium - Speeds up sorted result retrieval',
         suggestedSQL: `CREATE INDEX idx_${tableName}_${columnName} ON ${tableName}(${columnName});`,
       });
@@ -378,7 +414,12 @@ async function getQueryPatterns(dbId: string, env: Env, isLocalDev: boolean): Pr
 
     return analyzeQueryPatterns(queries);
   } catch (err) {
-    console.error('[IndexAnalyzer] Failed to fetch query history:', err);
+    logWarning(`Failed to fetch query history: ${err instanceof Error ? err.message : String(err)}`, {
+      module: 'index_analyzer',
+      operation: 'get_query_patterns',
+      databaseId: dbId,
+      metadata: { error: err instanceof Error ? err.message : String(err) }
+    });
     return {};
   }
 }
@@ -386,7 +427,7 @@ async function getQueryPatterns(dbId: string, env: Env, isLocalDev: boolean): Pr
 /**
  * Calculate average query efficiency from history
  */
-async function calculateAverageQueryEfficiency(_dbId: string, _env: Env, isLocalDev: boolean): Promise<number | undefined> {
+function calculateAverageQueryEfficiency(_dbId: string, _env: Env, isLocalDev: boolean): number | undefined {
   if (isLocalDev) {
     return 0.65;
   }
@@ -442,7 +483,7 @@ async function executeQueryViaAPI(
         'Authorization': `Bearer ${env.API_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ sql: query }),
+      body: JSON.stringify({ sql: query, params: [] }),
     }
   );
 
@@ -450,12 +491,9 @@ async function executeQueryViaAPI(
     throw new Error(`D1 API error: ${response.statusText}`);
   }
 
-  const data = await response.json() as {
-    success: boolean;
-    result: Array<{ results: unknown[]; meta?: Record<string, unknown> }>;
-  };
+  const data: { success: boolean; result: { results: unknown[] }[] } = await response.json();
 
-  const firstResult = data.result?.[0];
+  const firstResult = data.result[0];
   if (!data.success || !firstResult) {
     throw new Error('Invalid D1 API response');
   }

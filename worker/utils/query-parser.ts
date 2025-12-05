@@ -5,6 +5,8 @@
  * from SQL query strings to identify indexing opportunities.
  */
 
+import { logWarning } from './error-logger';
+
 export interface ParsedQuery {
   whereColumns: string[];
   joinColumns: string[];
@@ -13,17 +15,13 @@ export interface ParsedQuery {
   tables: string[];
 }
 
-export interface ColumnUsageFrequency {
-  [tableName: string]: {
-    [columnName: string]: {
-      whereCount: number;
-      joinCount: number;
-      orderByCount: number;
-      groupByCount: number;
-      totalCount: number;
-    };
-  };
-}
+export type ColumnUsageFrequency = Record<string, Record<string, {
+  whereCount: number;
+  joinCount: number;
+  orderByCount: number;
+  groupByCount: number;
+  totalCount: number;
+}>>;
 
 /**
  * Parse a SQL query to extract column references
@@ -69,8 +67,8 @@ function extractTables(sql: string): string[] {
   const tables: string[] = [];
   
   // Match FROM clause: FROM table_name or FROM table_name AS alias
-  const fromMatch = sql.match(/\bFROM\s+([a-zA-Z_][a-zA-Z0-9_]*)/i);
-  if (fromMatch && fromMatch[1]) {
+  const fromMatch = /\bFROM\s+([a-zA-Z_][a-zA-Z0-9_]*)/i.exec(sql);
+  if (fromMatch?.[1]) {
     tables.push(fromMatch[1]);
   }
 
@@ -92,7 +90,7 @@ function extractWhereColumns(sql: string): string[] {
   const columns: string[] = [];
   
   // Find WHERE clause
-  const whereMatch = sql.match(/\bWHERE\s+(.*?)(?:\bGROUP\s+BY|\bORDER\s+BY|\bLIMIT|\bOFFSET|$)/is);
+  const whereMatch = /\bWHERE\s+(.*?)(?:\bGROUP\s+BY|\bORDER\s+BY|\bLIMIT|\bOFFSET|$)/is.exec(sql);
   if (!whereMatch?.[1]) return columns;
 
   const whereClause = whereMatch[1];
@@ -157,7 +155,7 @@ function extractOrderByColumns(sql: string): string[] {
   const columns: string[] = [];
   
   // Find ORDER BY clause
-  const orderByMatch = sql.match(/\bORDER\s+BY\s+(.*?)(?:\bLIMIT|\bOFFSET|$)/is);
+  const orderByMatch = /\bORDER\s+BY\s+(.*?)(?:\bLIMIT|\bOFFSET|$)/is.exec(sql);
   if (!orderByMatch?.[1]) return columns;
 
   const orderByClause = orderByMatch[1];
@@ -191,7 +189,7 @@ function extractGroupByColumns(sql: string): string[] {
   const columns: string[] = [];
   
   // Find GROUP BY clause
-  const groupByMatch = sql.match(/\bGROUP\s+BY\s+(.*?)(?:\bHAVING|\bORDER\s+BY|\bLIMIT|\bOFFSET|$)/is);
+  const groupByMatch = /\bGROUP\s+BY\s+(.*?)(?:\bHAVING|\bORDER\s+BY|\bLIMIT|\bOFFSET|$)/is.exec(sql);
   if (!groupByMatch?.[1]) return columns;
 
   const groupByClause = groupByMatch[1];
@@ -244,17 +242,13 @@ export function analyzeQueryPatterns(queries: { query: string; table?: string }[
       
       // For each table mentioned in the query
       for (const table of parsed.tables) {
-        if (!frequency[table]) {
-          frequency[table] = {};
-        }
+        frequency[table] ??= {};
 
         // Count WHERE columns
         for (const col of parsed.whereColumns) {
           const { table: colTable, column } = parseColumnReference(col, table);
           if (colTable === table) {
-            if (!frequency[table][column]) {
-              frequency[table][column] = { whereCount: 0, joinCount: 0, orderByCount: 0, groupByCount: 0, totalCount: 0 };
-            }
+            frequency[table][column] ??= { whereCount: 0, joinCount: 0, orderByCount: 0, groupByCount: 0, totalCount: 0 };
             frequency[table][column].whereCount++;
             frequency[table][column].totalCount++;
           }
@@ -264,9 +258,7 @@ export function analyzeQueryPatterns(queries: { query: string; table?: string }[
         for (const col of parsed.joinColumns) {
           const { table: colTable, column } = parseColumnReference(col, table);
           if (colTable === table) {
-            if (!frequency[table][column]) {
-              frequency[table][column] = { whereCount: 0, joinCount: 0, orderByCount: 0, groupByCount: 0, totalCount: 0 };
-            }
+            frequency[table][column] ??= { whereCount: 0, joinCount: 0, orderByCount: 0, groupByCount: 0, totalCount: 0 };
             frequency[table][column].joinCount++;
             frequency[table][column].totalCount++;
           }
@@ -276,9 +268,7 @@ export function analyzeQueryPatterns(queries: { query: string; table?: string }[
         for (const col of parsed.orderByColumns) {
           const { table: colTable, column } = parseColumnReference(col, table);
           if (colTable === table) {
-            if (!frequency[table][column]) {
-              frequency[table][column] = { whereCount: 0, joinCount: 0, orderByCount: 0, groupByCount: 0, totalCount: 0 };
-            }
+            frequency[table][column] ??= { whereCount: 0, joinCount: 0, orderByCount: 0, groupByCount: 0, totalCount: 0 };
             frequency[table][column].orderByCount++;
             frequency[table][column].totalCount++;
           }
@@ -288,9 +278,7 @@ export function analyzeQueryPatterns(queries: { query: string; table?: string }[
         for (const col of parsed.groupByColumns) {
           const { table: colTable, column } = parseColumnReference(col, table);
           if (colTable === table) {
-            if (!frequency[table][column]) {
-              frequency[table][column] = { whereCount: 0, joinCount: 0, orderByCount: 0, groupByCount: 0, totalCount: 0 };
-            }
+            frequency[table][column] ??= { whereCount: 0, joinCount: 0, orderByCount: 0, groupByCount: 0, totalCount: 0 };
             frequency[table][column].groupByCount++;
             frequency[table][column].totalCount++;
           }
@@ -298,7 +286,11 @@ export function analyzeQueryPatterns(queries: { query: string; table?: string }[
       }
     } catch (error) {
       // Skip queries that fail to parse
-      console.warn('Failed to parse query:', error);
+      logWarning(`Failed to parse query: ${error instanceof Error ? error.message : String(error)}`, {
+        module: 'query_parser',
+        operation: 'analyze_patterns',
+        metadata: { error: error instanceof Error ? error.message : String(error) }
+      });
     }
   }
 

@@ -1,6 +1,24 @@
 import type { Env } from '../types';
 import { analyzeIndexes } from '../utils/index-analyzer';
 import { isProtectedDatabase, createProtectedDatabaseResponse, getDatabaseInfo } from '../utils/database-protection';
+import { OperationType, trackOperation } from '../utils/job-tracking';
+import { logError, logInfo, logWarning } from '../utils/error-logger';
+
+const CF_API = 'https://api.cloudflare.com/client/v4';
+
+// Helper to create response headers with CORS
+function jsonHeaders(corsHeaders: HeadersInit): Headers {
+  const headers = new Headers(corsHeaders);
+  headers.set('Content-Type', 'application/json');
+  return headers;
+}
+
+interface IndexCreateBody {
+  sql: string;
+  tableName?: string;
+  indexName?: string;
+  columns?: string[];
+}
 
 /**
  * Handle Index Analyzer routes
@@ -10,9 +28,10 @@ export async function handleIndexRoutes(
   env: Env,
   url: URL,
   corsHeaders: HeadersInit,
-  isLocalDev: boolean
+  isLocalDev: boolean,
+  userEmail: string | null
 ): Promise<Response> {
-  console.log('[Indexes] Handling index analyzer operation');
+  logInfo('Handling index analyzer operation', { module: 'indexes', operation: 'request' });
   
   // Extract database ID from URL (format: /api/indexes/:dbId/...)
   const pathParts = url.pathname.split('/');
@@ -23,10 +42,7 @@ export async function handleIndexRoutes(
       error: 'Database ID required' 
     }), { 
       status: 400,
-      headers: {
-        'Content-Type': 'application/json',
-        ...corsHeaders
-      }
+      headers: jsonHeaders(corsHeaders)
     });
   }
 
@@ -34,7 +50,7 @@ export async function handleIndexRoutes(
   if (!isLocalDev) {
     const dbInfo = await getDatabaseInfo(dbId, env);
     if (dbInfo && isProtectedDatabase(dbInfo.name)) {
-      console.warn('[Indexes] Attempted to access protected database:', dbInfo.name);
+      logWarning(`Attempted to access protected database: ${dbInfo.name}`, { module: 'indexes', operation: 'access_check', databaseId: dbId, databaseName: dbInfo.name });
       return createProtectedDatabaseResponse(corsHeaders);
     }
   }
@@ -42,7 +58,7 @@ export async function handleIndexRoutes(
   try {
     // Analyze indexes
     if (request.method === 'GET' && url.pathname === `/api/indexes/${dbId}/analyze`) {
-      console.log('[Indexes] Analyzing indexes for database:', dbId);
+      logInfo(`Analyzing indexes for database: ${dbId}`, { module: 'indexes', operation: 'analyze', databaseId: dbId });
       
       // Mock response for local development
       if (isLocalDev) {
@@ -112,10 +128,7 @@ export async function handleIndexRoutes(
           },
           success: true,
         }), {
-          headers: {
-            'Content-Type': 'application/json',
-            ...corsHeaders
-          }
+          headers: jsonHeaders(corsHeaders)
         });
       }
       
@@ -126,11 +139,93 @@ export async function handleIndexRoutes(
         ...analysis,
         success: true,
       }), {
-        headers: {
-          'Content-Type': 'application/json',
-          ...corsHeaders
-        }
+        headers: jsonHeaders(corsHeaders)
       });
+    }
+
+    // Create index
+    if (request.method === 'POST' && url.pathname === `/api/indexes/${dbId}/create`) {
+      logInfo(`Creating index for database: ${dbId}`, { module: 'indexes', operation: 'create', databaseId: dbId });
+      
+      const body: IndexCreateBody = await request.json();
+      
+      if (!body.sql) {
+        return new Response(JSON.stringify({ 
+          error: 'SQL statement required' 
+        }), { 
+          status: 400,
+          headers: jsonHeaders(corsHeaders)
+        });
+      }
+
+      // Mock response for local development
+      if (isLocalDev) {
+        return new Response(JSON.stringify({
+          result: { success: true, message: 'Index created successfully (mock)' },
+          success: true,
+        }), {
+          headers: jsonHeaders(corsHeaders)
+        });
+      }
+      
+      // Track index creation with job history
+      try {
+        const { result, jobId } = await trackOperation({
+          env,
+          operationType: OperationType.INDEX_CREATE,
+          databaseId: dbId,
+          userEmail: userEmail ?? 'unknown',
+          isLocalDev,
+          metadata: { 
+            sql: body.sql,
+            tableName: body.tableName,
+            indexName: body.indexName,
+            columns: body.columns
+          },
+          totalItems: 1,
+          operation: async () => {
+            // Execute the CREATE INDEX statement via Cloudflare API
+            const response = await fetch(
+              `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database/${dbId}/query`,
+              {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${env.API_KEY}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ sql: body.sql })
+              }
+            );
+            
+            if (!response.ok) {
+              const errorData = await response.json().catch(() => ({})) as { errors?: { message: string }[] };
+              const errorMessage = errorData.errors?.[0]?.message ?? `API error: ${String(response.status)}`;
+              throw new Error(errorMessage);
+            }
+            
+            return { success: true, message: 'Index created successfully' };
+          }
+        });
+        
+        return new Response(JSON.stringify({
+          result,
+          jobId,
+          success: true
+        }), {
+          headers: jsonHeaders(corsHeaders)
+        });
+      } catch (err) {
+        void logError(env, err instanceof Error ? err : String(err), { module: 'indexes', operation: 'create', databaseId: dbId }, isLocalDev);
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+        return new Response(JSON.stringify({
+          error: 'Failed to create index',
+          message: errorMessage,
+          success: false
+        }), {
+          status: 500,
+          headers: jsonHeaders(corsHeaders)
+        });
+      }
     }
 
     // Route not found
@@ -138,23 +233,17 @@ export async function handleIndexRoutes(
       error: 'Route not found' 
     }), { 
       status: 404,
-      headers: {
-        'Content-Type': 'application/json',
-        ...corsHeaders
-      }
+      headers: jsonHeaders(corsHeaders)
     });
 
   } catch (error) {
-    console.error('[Indexes] Error:', error);
+    void logError(env, error instanceof Error ? error : String(error), { module: 'indexes', operation: 'request', databaseId: dbId }, isLocalDev);
     return new Response(JSON.stringify({ 
       error: 'Failed to analyze indexes',
       details: error instanceof Error ? error.message : 'Unknown error'
     }), { 
       status: 500,
-      headers: {
-        'Content-Type': 'application/json',
-        ...corsHeaders
-      }
+      headers: jsonHeaders(corsHeaders)
     });
   }
 }

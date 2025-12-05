@@ -26,6 +26,21 @@ database_name = "d1-manager-metadata-dev"
 database_id = "dev-metadata-id"
 preview_database_id = "dev-metadata-id"
 
+# R2 bucket for backups (local dev uses mock)
+[[r2_buckets]]
+binding = "BACKUP_BUCKET"
+bucket_name = "d1-manager-backups-dev"
+
+# Durable Objects for async backup operations
+[[durable_objects.bindings]]
+name = "BACKUP_DO"
+class_name = "BackupDO"
+script_name = "d1-manager"
+
+[[migrations]]
+tag = "v2_backup_do"
+new_classes = ["BackupDO"]
+
 [observability.logs]
 enabled = true
 

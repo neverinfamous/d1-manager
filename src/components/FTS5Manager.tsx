@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, RefreshCw, Loader2, Search, Sparkles, Trash2, RotateCcw, Zap } from 'lucide-react';
+import { Plus, RefreshCw, Loader2, Search, Sparkles, Trash2, RotateCcw, Zap, Info, Table, ArrowRightLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FTS5SchemaDesigner } from './FTS5SchemaDesigner';
@@ -25,13 +25,18 @@ import {
   listTables,
 } from '@/services/api';
 import type { FTS5TableInfo, FTS5TableConfig, FTS5CreateFromTableParams, FTS5Stats as FTS5StatsType } from '@/services/fts5-types';
+import { ErrorMessage } from '@/components/ui/error-message';
 
 interface FTS5ManagerProps {
   databaseId: string;
   databaseName: string;
+  onNavigateToTables?: () => void;
+  onConvertFTS5ToTable?: (tableName: string) => void;
+  onUndoableOperation?: (() => void) | undefined;
 }
 
-export function FTS5Manager({ databaseId }: FTS5ManagerProps) {
+export function FTS5Manager({ databaseId, databaseName: _databaseName, onNavigateToTables, onConvertFTS5ToTable, onUndoableOperation }: FTS5ManagerProps): React.JSX.Element {
+  void _databaseName; // Passed to parent callback via onConvertFTS5ToTable
   const [fts5Tables, setFts5Tables] = useState<FTS5TableInfo[]>([]);
   const [canConvertTables, setCanConvertTables] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -51,41 +56,51 @@ export function FTS5Manager({ databaseId }: FTS5ManagerProps) {
   // Rebuild/Optimize state
   const [rebuildingTable, setRebuildingTable] = useState<string | null>(null);
   const [optimizingTable, setOptimizingTable] = useState<string | null>(null);
-
+  
   useEffect(() => {
-    loadFTS5Tables();
+    void loadFTS5Tables();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [databaseId]);
 
-  const loadFTS5Tables = async () => {
+  const loadFTS5Tables = async (skipCache = false): Promise<void> => {
     try {
       setLoading(true);
       setError(null);
-      const tables = await listFTS5Tables(databaseId);
+      
+      // Load FTS5 tables and regular tables in parallel (use cache on initial load)
+      const [tables, allTables] = await Promise.all([
+        listFTS5Tables(databaseId, skipCache),
+        listTables(databaseId, skipCache).catch(() => []) // Non-critical, default to empty
+      ]);
+      
       setFts5Tables(tables);
       
-      // Only show "Convert Table" button when there are regular tables AND no FTS5 tables yet
-      // (as a "get started" action - once you have FTS5 tables, use "Create FTS5 Table" instead)
-      try {
-        const allTables = await listTables(databaseId);
-        const regularTables = allTables.filter(t => t.type === 'table');
-        setCanConvertTables(regularTables.length > 0 && tables.length === 0);
-      } catch {
-        // If we can't check, default to not showing
-        setCanConvertTables(false);
-      }
+      // Show "Convert to FTS5" button when there are regular tables available to convert
+      const regularTables = allTables.filter(t => t.type === 'table');
+      setCanConvertTables(regularTables.length > 0);
       
-      // Load stats for each table
-      const stats: Record<string, FTS5StatsType> = {};
-      for (const table of tables) {
-        try {
-          const tableStat = await getFTS5Stats(databaseId, table.name);
-          stats[table.name] = tableStat;
-        } catch (err) {
-          console.error(`Failed to load stats for ${table.name}:`, err);
+      // Load stats for all tables in parallel (much faster)
+      if (tables.length > 0) {
+        const statsPromises = tables.map(async (table) => {
+          try {
+            const stat = await getFTS5Stats(databaseId, table.name);
+            return { name: table.name, stat };
+          } catch {
+            return { name: table.name, stat: null };
+          }
+        });
+        
+        const statsResults = await Promise.all(statsPromises);
+        const stats: Record<string, FTS5StatsType> = {};
+        for (const result of statsResults) {
+          if (result.stat) {
+            stats[result.name] = result.stat;
+          }
         }
+        setTableStats(stats);
+      } else {
+        setTableStats({});
       }
-      setTableStats(stats);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load FTS5 tables');
     } finally {
@@ -93,24 +108,24 @@ export function FTS5Manager({ databaseId }: FTS5ManagerProps) {
     }
   };
 
-  const handleCreateFTS5Table = async (config: FTS5TableConfig) => {
+  const handleCreateFTS5Table = async (config: FTS5TableConfig): Promise<void> => {
     await createFTS5Table(databaseId, config);
     await loadFTS5Tables();
   };
 
-  const handleConvertTable = async (params: FTS5CreateFromTableParams) => {
+  const handleConvertTable = async (params: FTS5CreateFromTableParams): Promise<void> => {
     await createFTS5FromTable(databaseId, params);
     await loadFTS5Tables();
   };
 
-  const handleDeleteClick = (tableName: string) => {
+  const handleDeleteClick = (tableName: string): void => {
     setDeleteDialogState({
       tableName,
       isDeleting: false,
     });
   };
 
-  const handleDeleteTable = async () => {
+  const handleDeleteTable = async (): Promise<void> => {
     if (!deleteDialogState) return;
 
     try {
@@ -118,13 +133,16 @@ export function FTS5Manager({ databaseId }: FTS5ManagerProps) {
       await deleteFTS5Table(databaseId, deleteDialogState.tableName);
       await loadFTS5Tables();
       setDeleteDialogState(null);
+      
+      // Notify parent of undoable operation
+      onUndoableOperation?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete FTS5 table');
       setDeleteDialogState(prev => prev ? { ...prev, isDeleting: false } : null);
     }
   };
 
-  const handleRebuild = async (tableName: string) => {
+  const handleRebuild = async (tableName: string): Promise<void> => {
     try {
       setRebuildingTable(tableName);
       await rebuildFTS5Index(databaseId, tableName);
@@ -136,7 +154,7 @@ export function FTS5Manager({ databaseId }: FTS5ManagerProps) {
     }
   };
 
-  const handleOptimize = async (tableName: string) => {
+  const handleOptimize = async (tableName: string): Promise<void> => {
     try {
       setOptimizingTable(tableName);
       await optimizeFTS5(databaseId, tableName);
@@ -148,9 +166,14 @@ export function FTS5Manager({ databaseId }: FTS5ManagerProps) {
     }
   };
 
-  const handleSearchClick = (table: FTS5TableInfo) => {
+  const handleSearchClick = (table: FTS5TableInfo): void => {
     setSelectedTable(table);
     setShowSearchDialog(true);
+  };
+  
+  const handleConvertToTableClick = (tableName: string): void => {
+    // Delegate to parent component's dialog
+    onConvertFTS5ToTable?.(tableName);
   };
 
   const formatBytes = (bytes: number): string => {
@@ -158,7 +181,7 @@ export function FTS5Manager({ databaseId }: FTS5ManagerProps) {
     const k = 1024;
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
+    return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i] ?? ''}`;
   };
 
   return (
@@ -168,19 +191,19 @@ export function FTS5Manager({ databaseId }: FTS5ManagerProps) {
         <div>
           <h3 className="text-2xl font-semibold flex items-center gap-2">
             <Sparkles className="h-6 w-6 text-purple-500" />
-            Full-Text Search (FTS5)
+            FTS5 Search
           </h3>
           <p className="text-sm text-muted-foreground mt-1">
             Manage FTS5 virtual tables for advanced full-text search capabilities
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={loadFTS5Tables} disabled={loading}>
+          <Button variant="outline" size="icon" onClick={() => void loadFTS5Tables(true)} disabled={loading} title="Refresh FTS5 tables">
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           </Button>
           {canConvertTables && (
             <Button variant="outline" onClick={() => setShowConverter(true)}>
-              Convert Table
+              Convert to FTS5
             </Button>
           )}
           <Button onClick={() => setShowSchemaDesigner(true)}>
@@ -191,13 +214,7 @@ export function FTS5Manager({ databaseId }: FTS5ManagerProps) {
       </div>
 
       {/* Error Display */}
-      {error && (
-        <Card className="border-destructive">
-          <CardContent className="pt-6">
-            <p className="text-sm text-destructive">{error}</p>
-          </CardContent>
-        </Card>
-      )}
+      <ErrorMessage error={error} variant="card" />
 
       {/* Loading State */}
       {loading && (
@@ -223,7 +240,7 @@ export function FTS5Manager({ databaseId }: FTS5ManagerProps) {
                     Create FTS5 Table
                   </Button>
                   <Button variant="outline" onClick={() => setShowConverter(true)}>
-                    Convert Existing Table
+                    Convert Table to FTS5
                   </Button>
                 </div>
               </CardContent>
@@ -268,6 +285,32 @@ export function FTS5Manager({ databaseId }: FTS5ManagerProps) {
                   </div>
                 </div>
               )}
+
+              {/* Edit Notice */}
+              <Card className="bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900">
+                <CardContent className="pt-4 pb-4">
+                  <div className="flex items-start gap-3">
+                    <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-sm text-blue-800 dark:text-blue-200">
+                        <span className="font-medium">Need to edit data?</span> FTS5 tables support INSERT, UPDATE, and DELETE operations just like regular tables.
+                        To browse or edit rows, use the Tables view.
+                      </p>
+                      {onNavigateToTables && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="mt-2 border-blue-300 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/50"
+                          onClick={onNavigateToTables}
+                        >
+                          <Table className="h-3.5 w-3.5 mr-1.5" />
+                          Go to Tables View
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
               {/* FTS5 Tables List */}
               <div>
@@ -328,7 +371,7 @@ export function FTS5Manager({ databaseId }: FTS5ManagerProps) {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleOptimize(table.name)}
+                            onClick={() => void handleOptimize(table.name)}
                             disabled={optimizingTable === table.name}
                           >
                             {optimizingTable === table.name ? (
@@ -341,7 +384,7 @@ export function FTS5Manager({ databaseId }: FTS5ManagerProps) {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleRebuild(table.name)}
+                            onClick={() => void handleRebuild(table.name)}
                             disabled={rebuildingTable === table.name}
                           >
                             {rebuildingTable === table.name ? (
@@ -354,8 +397,17 @@ export function FTS5Manager({ databaseId }: FTS5ManagerProps) {
                           <Button
                             variant="outline"
                             size="sm"
+                            onClick={() => handleConvertToTableClick(table.name)}
+                            title="Convert FTS5 to regular table"
+                          >
+                            <ArrowRightLeft className="h-3.5 w-3.5 mr-1.5" />
+                            Convert
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
                             onClick={() => handleDeleteClick(table.name)}
-                            className="text-destructive hover:text-destructive"
+                            className="text-destructive hover:text-destructive col-span-2"
                           >
                             <Trash2 className="h-3.5 w-3.5 mr-1.5" />
                             Delete
@@ -363,13 +415,13 @@ export function FTS5Manager({ databaseId }: FTS5ManagerProps) {
                         </div>
 
                         {/* Stats for this table */}
-                        {tableStats[table.name] && (() => {
-                          const stats = tableStats[table.name]!;
-                          return (
+                        {(() => {
+                          const stats = tableStats[table.name];
+                          return stats ? (
                             <div className="pt-2 border-t">
                               <FTS5Stats stats={stats} />
                             </div>
-                          );
+                          ) : null;
                         })()}
                       </CardContent>
                     </Card>
@@ -433,7 +485,7 @@ export function FTS5Manager({ databaseId }: FTS5ManagerProps) {
               </Button>
               <Button
                 variant="destructive"
-                onClick={handleDeleteTable}
+                onClick={() => void handleDeleteTable()}
                 disabled={deleteDialogState.isDeleting}
               >
                 {deleteDialogState.isDeleting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}

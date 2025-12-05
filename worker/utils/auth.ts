@@ -1,11 +1,15 @@
 import type { Env } from '../types';
+import { logInfo, logWarning } from './error-logger';
 
 // JWT validation for Cloudflare Access
 export async function validateAccessJWT(request: Request, env: Env): Promise<string | null> {
   const token = request.headers.get('cf-access-jwt-assertion');
   
   if (!token) {
-    console.log('[Auth] No JWT token found in request headers');
+    logInfo('No JWT token found in request headers', {
+      module: 'auth',
+      operation: 'validate_jwt'
+    });
     return null;
   }
 
@@ -23,14 +27,25 @@ export async function validateAccessJWT(request: Request, env: Env): Promise<str
     // Extract email from JWT payload
     const email = payload['email'] as string;
     if (!email) {
-      console.log('[Auth] JWT payload missing email');
+      logWarning('JWT payload missing email', {
+        module: 'auth',
+        operation: 'validate_jwt'
+      });
       return null;
     }
     
-    console.log('[Auth] JWT validated for user:', email);
+    logInfo(`JWT validated for user: ${email}`, {
+      module: 'auth',
+      operation: 'validate_jwt',
+      userId: email
+    });
     return email;
   } catch (error) {
-    console.error('[Auth] JWT validation failed:', error instanceof Error ? error.message : String(error));
+    logWarning(`JWT validation failed: ${error instanceof Error ? error.message : String(error)}`, {
+      module: 'auth',
+      operation: 'validate_jwt',
+      metadata: { error: error instanceof Error ? error.message : String(error) }
+    });
     return null;
   }
 }

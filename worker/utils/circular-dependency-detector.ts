@@ -30,7 +30,7 @@ interface FKGraphEdge {
 interface FKGraphNode {
   id: string;
   label: string;
-  columns: Array<{name: string; type: string; isPK: boolean}>;
+  columns: {name: string; type: string; isPK: boolean}[];
   rowCount: number;
 }
 
@@ -47,18 +47,17 @@ export interface ForeignKeyGraph {
  * Uses depth-first search (DFS) with path tracking
  */
 export function detectCircularDependencies(graph: ForeignKeyGraph): CircularDependencyCycle[] {
-  if (!graph.edges || graph.edges.length === 0) {
+  if (graph.edges.length === 0) {
     return [];
   }
 
   // Build adjacency list from edges
-  const adjacencyList = new Map<string, Array<{target: string; edge: FKGraphEdge}>>();
+  const adjacencyList = new Map<string, {target: string; edge: FKGraphEdge}[]>();
   
   for (const edge of graph.edges) {
-    if (!adjacencyList.has(edge.source)) {
-      adjacencyList.set(edge.source, []);
-    }
-    adjacencyList.get(edge.source)!.push({ target: edge.target, edge });
+    const existing = adjacencyList.get(edge.source) ?? [];
+    existing.push({ target: edge.target, edge });
+    adjacencyList.set(edge.source, existing);
   }
 
   // Track visited nodes globally
@@ -66,7 +65,7 @@ export function detectCircularDependencies(graph: ForeignKeyGraph): CircularDepe
   // Track nodes in current recursion stack
   const recursionStack = new Set<string>();
   // Track current path for cycle extraction
-  const currentPath: Array<{table: string; edge?: FKGraphEdge}> = [];
+  const currentPath: {table: string; edge?: FKGraphEdge}[] = [];
   // Store detected cycles
   const cycles: CircularDependencyCycle[] = [];
   // Track seen cycles to avoid duplicates
@@ -75,12 +74,12 @@ export function detectCircularDependencies(graph: ForeignKeyGraph): CircularDepe
   /**
    * Depth-first search to detect cycles
    */
-  function dfs(node: string) {
+  function dfs(node: string): void {
     visited.add(node);
     recursionStack.add(node);
     currentPath.push({ table: node });
 
-    const neighbors = adjacencyList.get(node) || [];
+    const neighbors = adjacencyList.get(node) ?? [];
     
     for (const { target, edge } of neighbors) {
       if (!visited.has(target)) {
@@ -127,7 +126,7 @@ export function detectCircularDependencies(graph: ForeignKeyGraph): CircularDepe
 /**
  * Build cycle metadata from a path
  */
-function buildCycleMetadata(cyclePath: Array<{table: string; edge?: FKGraphEdge}>): CircularDependencyCycle {
+function buildCycleMetadata(cyclePath: {table: string; edge?: FKGraphEdge}[]): CircularDependencyCycle {
   const tables: string[] = [];
   const constraintNames: string[] = [];
   let hasCascade = false;
@@ -140,7 +139,7 @@ function buildCycleMetadata(cyclePath: Array<{table: string; edge?: FKGraphEdge}
     tables.push(pathNode.table);
     
     if (pathNode.edge) {
-      const onDelete = pathNode.edge.onDelete?.toUpperCase() || 'NO ACTION';
+      const onDelete = pathNode.edge.onDelete.toUpperCase();
       constraintNames.push(pathNode.edge.id);
       
       if (onDelete === 'CASCADE') {
@@ -271,29 +270,29 @@ export function wouldCreateCycle(
 export function getBreakingSuggestions(
   cycle: CircularDependencyCycle,
   graph: ForeignKeyGraph
-): Array<{
+): {
   constraintName: string;
   sourceTable: string;
   targetTable: string;
   currentAction: string;
   suggestion: string;
   reason: string;
-}> {
-  const suggestions: Array<{
+}[] {
+  const suggestions: {
     constraintName: string;
     sourceTable: string;
     targetTable: string;
     currentAction: string;
     suggestion: string;
     reason: string;
-  }> = [];
+  }[] = [];
 
   // Find edges involved in the cycle
   for (const constraintName of cycle.constraintNames) {
     const edge = graph.edges.find(e => e.id === constraintName);
     if (!edge) continue;
 
-    const onDelete = edge.onDelete?.toUpperCase() || 'NO ACTION';
+    const onDelete = edge.onDelete.toUpperCase();
 
     // Prioritize CASCADE constraints as candidates for modification
     if (onDelete === 'CASCADE') {

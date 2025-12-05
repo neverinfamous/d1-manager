@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import ReactFlow, {
-  Node,
-  Edge,
+  type Node,
+  type Edge,
   Background,
   useNodesState,
   useEdgesState,
@@ -13,7 +13,8 @@ import ReactFlow, {
   Position
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { Loader2, Plus, RefreshCw, LayoutGrid, Network as NetworkIcon, Trash2, Edit, Info, AlertTriangle } from 'lucide-react';
+import { Loader2, Plus, RefreshCw, LayoutGrid, Network as NetworkIcon, Trash2, Edit, Info, AlertTriangle, Maximize2, Minimize2 } from 'lucide-react';
+import { ErrorMessage } from '@/components/ui/error-message';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -31,7 +32,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { getAllForeignKeys, addForeignKey, modifyForeignKey, deleteForeignKey, getCircularDependencies, type ForeignKeyGraph, type ForeignKeyGraphEdge, type CircularDependencyCycle } from '@/services/api';
+import { getAllForeignKeys, addForeignKey, modifyForeignKey, deleteForeignKey, type ForeignKeyGraphWithCycles, type ForeignKeyGraphEdge, type CircularDependencyCycle } from '@/services/api';
 import { applyLayout, type LayoutType, type GraphData } from '@/services/graphLayout';
 import { ForeignKeyEditor } from './ForeignKeyEditor';
 
@@ -42,7 +43,7 @@ interface ForeignKeyVisualizerProps {
 }
 
 // Custom node component for table visualization
-const TableNode = ({ data }: { data: { label: string; columns: Array<{name: string; type: string; isPK: boolean}>; rowCount: number } }) => {
+const TableNode = ({ data }: { data: { label: string; columns: {name: string; type: string; isPK: boolean}[]; rowCount: number } }): React.JSX.Element => {
   return (
     <div className="bg-card border-2 border-border rounded-lg shadow-lg min-w-[250px] relative">
       {/* Connection handles for edges */}
@@ -80,8 +81,8 @@ const nodeTypes = {
   fkNode: TableNode
 };
 
-function ForeignKeyVisualizerContent({ databaseId, focusTable, onTableSelect }: ForeignKeyVisualizerProps) {
-  const [graphData, setGraphData] = useState<ForeignKeyGraph | null>(null);
+function ForeignKeyVisualizerContent({ databaseId, focusTable, onTableSelect }: ForeignKeyVisualizerProps): React.JSX.Element {
+  const [graphData, setGraphData] = useState<ForeignKeyGraphWithCycles | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [layoutType, setLayoutType] = useState<LayoutType>('hierarchical');
@@ -93,24 +94,54 @@ function ForeignKeyVisualizerContent({ databaseId, focusTable, onTableSelect }: 
   const [filterTable, setFilterTable] = useState<string>('all');
   const [highlightCycles, setHighlightCycles] = useState(false);
   const [cycles, setCycles] = useState<CircularDependencyCycle[]>([]);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   
   const { fitView } = useReactFlow();
   
-  // Load foreign keys
+  // Handle Escape key to exit fullscreen
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape' && isFullscreen) {
+        setIsFullscreen(false);
+      }
+    };
+    
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isFullscreen]);
+  
+  // Refit view when entering/exiting fullscreen
+  useEffect(() => {
+    if (nodes.length === 0) {
+      return;
+    }
+    
+    // Dispatch resize event to force ReactFlow to recalculate viewport
+    window.dispatchEvent(new Event('resize'));
+    
+    // Fit view after ReactFlow has had time to recalculate
+    const timer = setTimeout(() => {
+      fitView({ padding: 0.1, duration: 300 });
+    }, 150);
+    
+    return () => clearTimeout(timer);
+  }, [isFullscreen, fitView, nodes.length]);
+  
+  // Load foreign keys with circular dependency detection in a single optimized API call
   const loadForeignKeys = useCallback(async () => {
     setLoading(true);
     setError(null);
     
     try {
-      const data = await getAllForeignKeys(databaseId);
-      setGraphData(data);
+      // OPTIMIZED: Single API call returns FK graph, cycles, and schemas
+      // Uses unified cache key (cycles+schemas) shared by all relationship tabs
+      const data = await getAllForeignKeys(databaseId, true, true);
       
-      // Load circular dependencies
-      const detectedCycles = await getCircularDependencies(databaseId);
-      setCycles(detectedCycles);
+      setGraphData(data);
+      setCycles(data.cycles ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load foreign keys');
     } finally {
@@ -119,7 +150,7 @@ function ForeignKeyVisualizerContent({ databaseId, focusTable, onTableSelect }: 
   }, [databaseId]);
   
   useEffect(() => {
-    loadForeignKeys();
+    void loadForeignKeys();
   }, [loadForeignKeys]);
   
   // Apply layout when data or layout type changes
@@ -186,7 +217,7 @@ function ForeignKeyVisualizerContent({ databaseId, focusTable, onTableSelect }: 
           animated: isInCycle,
           style: {
             ...edge.style,
-            stroke: isInCycle ? '#ef4444' : (edge.style?.stroke || '#999'),
+            stroke: isInCycle ? '#ef4444' : (edge.style?.stroke ?? '#999'),
             strokeWidth: isInCycle ? 3 : 2,
             opacity: isInCycle ? 1 : 0.3
           }
@@ -229,7 +260,7 @@ function ForeignKeyVisualizerContent({ databaseId, focusTable, onTableSelect }: 
     onDelete: string;
     onUpdate: string;
     constraintName?: string;
-  }) => {
+  }): Promise<void> => {
     await addForeignKey(databaseId, params);
     await loadForeignKeys();
   };
@@ -238,7 +269,7 @@ function ForeignKeyVisualizerContent({ databaseId, focusTable, onTableSelect }: 
   const handleEditForeignKey = async (params: {
     onDelete?: string;
     onUpdate?: string;
-  }) => {
+  }): Promise<void> => {
     if (!selectedEdge) return;
     
     await modifyForeignKey(databaseId, selectedEdge.id, params);
@@ -247,7 +278,7 @@ function ForeignKeyVisualizerContent({ databaseId, focusTable, onTableSelect }: 
   };
   
   // Handle delete foreign key
-  const handleDeleteForeignKey = async () => {
+  const handleDeleteForeignKey = async (): Promise<void> => {
     if (!selectedEdge) return;
     
     await deleteForeignKey(databaseId, selectedEdge.id);
@@ -280,13 +311,23 @@ function ForeignKeyVisualizerContent({ databaseId, focusTable, onTableSelect }: 
   }
   
   if (error) {
+    const isRateLimited = error.includes('429') || error.toLowerCase().includes('rate limit');
     return (
       <Card className="border-destructive">
         <CardContent className="pt-6">
-          <p className="text-sm text-destructive">{error}</p>
-          <Button className="mt-4" onClick={loadForeignKeys}>
+          <ErrorMessage error={error} showTitle />
+          {isRateLimited && (
+            <p className="text-xs text-muted-foreground mt-2">
+              Too many requests. Please wait a moment before retrying.
+            </p>
+          )}
+          <Button 
+            className="mt-4" 
+            onClick={() => void loadForeignKeys()}
+            variant={isRateLimited ? "outline" : "default"}
+          >
             <RefreshCw className="h-4 w-4 mr-2" />
-            Retry
+            {isRateLimited ? 'Retry (wait a moment)' : 'Retry'}
           </Button>
         </CardContent>
       </Card>
@@ -308,7 +349,7 @@ function ForeignKeyVisualizerContent({ databaseId, focusTable, onTableSelect }: 
   }
   
   return (
-    <div className="relative h-[calc(100vh-200px)] border rounded-lg">
+    <div className={`relative ${isFullscreen ? 'fixed inset-0 z-50 bg-background w-screen h-screen' : 'h-[calc(100vh-200px)] border rounded-lg'}`}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -341,17 +382,25 @@ function ForeignKeyVisualizerContent({ databaseId, focusTable, onTableSelect }: 
                 variant={highlightCycles ? "default" : "outline"}
                 onClick={() => setHighlightCycles(!highlightCycles)}
                 disabled={cycles.length === 0}
-                title={cycles.length > 0 ? `Highlight ${cycles.length} circular ${cycles.length === 1 ? 'dependency' : 'dependencies'}` : 'No circular dependencies detected'}
+                title={cycles.length > 0 ? `Highlight ${String(cycles.length)} circular ${cycles.length === 1 ? 'dependency' : 'dependencies'}` : 'No circular dependencies detected'}
               >
                 <AlertTriangle className="h-4 w-4 mr-2" />
                 {cycles.length > 0 && <span className="text-xs">{cycles.length}</span>}
               </Button>
             )}
-            <Button size="sm" variant="outline" onClick={loadForeignKeys} title="Refresh">
+            <Button size="sm" variant="outline" onClick={() => void loadForeignKeys()} title="Refresh">
               <RefreshCw className="h-4 w-4" />
             </Button>
             <Button size="sm" variant="outline" onClick={() => setShowLegend(!showLegend)} title="Toggle legend">
               <Info className="h-4 w-4" />
+            </Button>
+            <Button 
+              size="sm" 
+              variant="outline" 
+              onClick={() => setIsFullscreen(!isFullscreen)} 
+              title={isFullscreen ? "Exit fullscreen (Esc)" : "View fullscreen"}
+            >
+              {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
             </Button>
           </div>
           
@@ -373,7 +422,7 @@ function ForeignKeyVisualizerContent({ databaseId, focusTable, onTableSelect }: 
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Tables</SelectItem>
-                {graphData.nodes.map(node => (
+                {[...graphData.nodes].sort((a, b) => a.label.localeCompare(b.label)).map(node => (
                   <SelectItem key={node.id} value={node.id}>
                     {node.label}
                   </SelectItem>
@@ -393,59 +442,71 @@ function ForeignKeyVisualizerContent({ databaseId, focusTable, onTableSelect }: 
           )}
         </Panel>
         
-        {/* Legend */}
-        {showLegend && (
-          <Panel position="top-right" className="bg-card border rounded-lg p-3 shadow-lg">
-            <h4 className="text-sm font-semibold mb-2">Legend</h4>
-            <div className="space-y-2 text-xs">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-0.5 bg-yellow-500"></div>
-                <span>CASCADE</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-0.5 bg-red-500"></div>
-                <span>RESTRICT</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-0.5 bg-blue-500"></div>
-                <span>SET NULL/DEFAULT</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-0.5 bg-gray-500"></div>
-                <span>NO ACTION</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-0.5 bg-gray-500" style={{ strokeDasharray: '5,5', borderTop: '2px dashed' }}></div>
-                <span className="text-[10px]">Dashed = ON UPDATE</span>
-              </div>
-            </div>
-          </Panel>
-        )}
-        
-        {/* Selected Edge Info - positioned in bottom-right but with offset to stay visible */}
-        {selectedEdge && (
-          <div className="absolute bottom-24 right-4 bg-card border rounded-lg p-3 shadow-lg min-w-[250px] z-10">
-            <div className="space-y-2">
-              <h4 className="text-sm font-semibold">Foreign Key Constraint</h4>
-              <div className="text-xs space-y-1">
-                <p><strong>From:</strong> {selectedEdge.source}.{selectedEdge.sourceColumn}</p>
-                <p><strong>To:</strong> {selectedEdge.target}.{selectedEdge.targetColumn}</p>
-                <p><strong>ON DELETE:</strong> {selectedEdge.onDelete}</p>
-                <p><strong>ON UPDATE:</strong> {selectedEdge.onUpdate}</p>
-              </div>
-              <div className="flex gap-2 pt-2">
-                <Button size="sm" variant="outline" onClick={() => setShowEditDialog(true)}>
-                  <Edit className="h-3 w-3 mr-1" />
-                  Edit
-                </Button>
-                <Button size="sm" variant="destructive" onClick={() => setShowDeleteDialog(true)}>
-                  <Trash2 className="h-3 w-3 mr-1" />
-                  Delete
-                </Button>
+        {/* Legend and Selected Edge Info Panel - positioned at top-right */}
+        <Panel position="top-right" className="space-y-2">
+          {/* Legend */}
+          {showLegend && (
+            <div className="bg-card border rounded-lg p-3 shadow-lg">
+              <h4 className="text-sm font-semibold mb-2">Legend</h4>
+              <div className="space-y-2 text-xs">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-0.5 bg-yellow-500"></div>
+                  <span>CASCADE</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-0.5 bg-red-500"></div>
+                  <span>RESTRICT</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-0.5 bg-blue-500"></div>
+                  <span>SET NULL/DEFAULT</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-0.5 bg-gray-500"></div>
+                  <span>NO ACTION</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-0.5 bg-gray-500" style={{ strokeDasharray: '5,5', borderTop: '2px dashed' }}></div>
+                  <span className="text-[10px]">Dashed = ON UPDATE</span>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
+          
+          {/* Selected Edge Info - positioned next to legend at top-right */}
+          {selectedEdge && (
+            <div className="bg-card border rounded-lg p-3 shadow-lg min-w-[250px]">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-semibold">Foreign Key Constraint</h4>
+                  <button
+                    onClick={() => setSelectedEdge(null)}
+                    className="text-muted-foreground hover:text-foreground text-xs"
+                    aria-label="Close"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="text-xs space-y-1">
+                  <p><strong>From:</strong> {selectedEdge.source}.{selectedEdge.sourceColumn}</p>
+                  <p><strong>To:</strong> {selectedEdge.target}.{selectedEdge.targetColumn}</p>
+                  <p><strong>ON DELETE:</strong> {selectedEdge.onDelete}</p>
+                  <p><strong>ON UPDATE:</strong> {selectedEdge.onUpdate}</p>
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <Button size="sm" variant="outline" onClick={() => setShowEditDialog(true)}>
+                    <Edit className="h-3 w-3 mr-1" />
+                    Edit
+                  </Button>
+                  <Button size="sm" variant="destructive" onClick={() => setShowDeleteDialog(true)}>
+                    <Trash2 className="h-3 w-3 mr-1" />
+                    Delete
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </Panel>
       </ReactFlow>
       
       {/* Add Foreign Key Dialog */}
@@ -493,7 +554,7 @@ function ForeignKeyVisualizerContent({ databaseId, focusTable, onTableSelect }: 
             <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleDeleteForeignKey}>
+            <Button variant="destructive" onClick={() => void handleDeleteForeignKey()}>
               Delete Constraint
             </Button>
           </DialogFooter>
@@ -503,7 +564,7 @@ function ForeignKeyVisualizerContent({ databaseId, focusTable, onTableSelect }: 
   );
 }
 
-export function ForeignKeyVisualizer(props: ForeignKeyVisualizerProps) {
+export function ForeignKeyVisualizer(props: ForeignKeyVisualizerProps): React.JSX.Element {
   return (
     <ReactFlowProvider>
       <ForeignKeyVisualizerContent {...props} />

@@ -16,38 +16,33 @@ export async function exportERDiagramAsPNG(databaseName: string): Promise<void> 
     throw new Error('ReactFlow container not found');
   }
   
-  try {
-    // Dynamic import for code splitting
-    const { default: html2canvas } = await import('html2canvas');
+  // Dynamic import for code splitting
+  const { default: html2canvas } = await import('html2canvas');
+  
+  // Capture the canvas
+  const canvas = await html2canvas(containerElement, {
+    backgroundColor: '#ffffff',
+    scale: 2, // Higher quality
+    logging: false,
+    useCORS: true,
+    allowTaint: true
+  });
+  
+  // Convert to blob and download
+  canvas.toBlob((blob) => {
+    if (!blob) {
+      throw new Error('Failed to create image blob');
+    }
     
-    // Capture the canvas
-    const canvas = await html2canvas(containerElement, {
-      backgroundColor: '#ffffff',
-      scale: 2, // Higher quality
-      logging: false,
-      useCORS: true,
-      allowTaint: true
-    });
-    
-    // Convert to blob and download
-    canvas.toBlob((blob) => {
-      if (!blob) {
-        throw new Error('Failed to create image blob');
-      }
-      
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${sanitizeFilename(databaseName)}-er-diagram.png`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    }, 'image/png');
-  } catch (error) {
-    console.error('Error exporting PNG:', error);
-    throw error;
-  }
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${sanitizeFilename(databaseName)}-er-diagram.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, 'image/png');
 }
 
 /**
@@ -81,26 +76,26 @@ function sanitizeFilename(filename: string): string {
  */
 export interface ERDiagramExportData {
   database: string;
-  tables: Array<{
+  tables: {
     name: string;
     rowCount: number;
-    columns: Array<{
+    columns: {
       name: string;
       type: string;
       notnull: boolean;
       dflt_value: string | null;
       pk: boolean;
       isForeignKey?: boolean;
-    }>;
-  }>;
-  relationships: Array<{
+    }[];
+  }[];
+  relationships: {
     sourceTable: string;
     sourceColumn: string;
     targetTable: string;
     targetColumn: string;
     onDelete: string;
     onUpdate: string;
-  }>;
+  }[];
   metadata: {
     exportDate: string;
     version: string;

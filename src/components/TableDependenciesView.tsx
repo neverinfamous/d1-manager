@@ -6,7 +6,7 @@ interface TableDependenciesViewProps {
   dependencies: TableDependencies;
 }
 
-export function TableDependenciesView({ tableName, dependencies }: TableDependenciesViewProps) {
+export function TableDependenciesView({ tableName, dependencies }: TableDependenciesViewProps): React.JSX.Element | null {
   const hasOutbound = dependencies.outbound.length > 0;
   const hasInbound = dependencies.inbound.length > 0;
   const hasDependencies = hasOutbound || hasInbound;
@@ -42,7 +42,7 @@ export function TableDependenciesView({ tableName, dependencies }: TableDependen
           <div className="space-y-2 ml-6">
             {dependencies.outbound.map((dep, idx) => (
               <div
-                key={`outbound-${idx}`}
+                key={`outbound-${String(idx)}`}
                 className="flex items-start gap-2 text-sm p-2 rounded-md bg-muted/50"
               >
                 <AlertTriangle className={`h-4 w-4 mt-0.5 flex-shrink-0 ${getCascadeColor(dep.onDelete)}`} />
@@ -73,7 +73,7 @@ export function TableDependenciesView({ tableName, dependencies }: TableDependen
           <div className="space-y-2 ml-6">
             {dependencies.inbound.map((dep, idx) => (
               <div
-                key={`inbound-${idx}`}
+                key={`inbound-${String(idx)}`}
                 className="flex items-start gap-2 text-sm p-2 rounded-md bg-muted/50"
               >
                 <AlertTriangle className={`h-4 w-4 mt-0.5 flex-shrink-0 ${getCascadeColor(dep.onDelete)}`} />

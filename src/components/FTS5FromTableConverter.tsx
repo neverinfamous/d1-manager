@@ -24,6 +24,7 @@ import { TokenizerAdvancedConfig } from './TokenizerAdvancedConfig';
 import { listTables, getTableSchema } from '@/services/api';
 import type { FTS5CreateFromTableParams, TokenizerConfig } from '@/services/fts5-types';
 import type { TableInfo, ColumnInfo } from '@/services/api';
+import { ErrorMessage } from '@/components/ui/error-message';
 
 interface FTS5FromTableConverterProps {
   open: boolean;
@@ -37,7 +38,7 @@ export function FTS5FromTableConverter({
   onOpenChange,
   databaseId,
   onConvert,
-}: FTS5FromTableConverterProps) {
+}: FTS5FromTableConverterProps): React.JSX.Element {
   const [tables, setTables] = useState<TableInfo[]>([]);
   const [loadingTables, setLoadingTables] = useState(false);
   const [sourceTable, setSourceTable] = useState('');
@@ -57,14 +58,14 @@ export function FTS5FromTableConverter({
 
   useEffect(() => {
     if (open) {
-      loadTables();
+      void loadTables();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, databaseId]);
 
   useEffect(() => {
     if (sourceTable) {
-      loadColumns(sourceTable);
+      void loadColumns(sourceTable);
       // Auto-generate FTS table name
       const ftsName = sourceTable.endsWith('_fts') ? sourceTable : `${sourceTable}_fts`;
       setFtsTableName(ftsName);
@@ -72,21 +73,21 @@ export function FTS5FromTableConverter({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sourceTable]);
 
-  const loadTables = async () => {
+  const loadTables = async (): Promise<void> => {
     try {
       setLoadingTables(true);
       const result = await listTables(databaseId);
       // Filter out FTS5 tables and virtual tables
       const regularTables = result.filter(t => t.type === 'table');
       setTables(regularTables);
-    } catch (err) {
-      console.error('Failed to load tables:', err);
+    } catch {
+      // Silently ignore failures
     } finally {
       setLoadingTables(false);
     }
   };
 
-  const loadColumns = async (tableName: string) => {
+  const loadColumns = async (tableName: string): Promise<void> => {
     try {
       const schema = await getTableSchema(databaseId, tableName);
       setColumns(schema);
@@ -96,14 +97,13 @@ export function FTS5FromTableConverter({
         .map(col => col.name);
       const fallbackColumn = schema[0]?.name;
       setSelectedColumns(textColumns.length > 0 ? textColumns : fallbackColumn ? [fallbackColumn] : []);
-    } catch (err) {
-      console.error('Failed to load columns:', err);
+    } catch {
       setColumns([]);
       setSelectedColumns([]);
     }
   };
 
-  const toggleColumn = (columnName: string) => {
+  const toggleColumn = (columnName: string): void => {
     setSelectedColumns(prev =>
       prev.includes(columnName)
         ? prev.filter(c => c !== columnName)
@@ -111,7 +111,7 @@ export function FTS5FromTableConverter({
     );
   };
 
-  const validateAndConvert = async () => {
+  const validateAndConvert = async (): Promise<void> => {
     setError('');
 
     if (!sourceTable) {
@@ -183,7 +183,7 @@ export function FTS5FromTableConverter({
     }
   };
 
-  const generateSQL = () => {
+  const generateSQL = (): string => {
     if (!sourceTable || !ftsTableName || selectedColumns.length === 0) {
       return '-- Select source table and columns to see SQL';
     }
@@ -196,7 +196,7 @@ export function FTS5FromTableConverter({
     if (tokenizer.parameters) {
       const params: string[] = [];
       if (tokenizer.parameters.remove_diacritics !== undefined) {
-        params.push(`remove_diacritics ${tokenizer.parameters.remove_diacritics}`);
+        params.push(`remove_diacritics ${String(tokenizer.parameters.remove_diacritics)}`);
       }
       if (params.length > 0) {
         tokenizerStr += ' ' + params.join(' ');
@@ -238,7 +238,7 @@ export function FTS5FromTableConverter({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-h-[90vh] overflow-hidden w-[95vw] max-w-[1100px]">
         <DialogHeader>
           <DialogTitle>Convert Table to FTS5</DialogTitle>
           <DialogDescription>
@@ -246,7 +246,7 @@ export function FTS5FromTableConverter({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
+        <div className="space-y-6 py-4 overflow-y-auto max-h-[calc(90vh-180px)]">
           {/* Source Table Selection */}
           <div className="space-y-2">
             <Label htmlFor="source-table">Source Table</Label>
@@ -392,17 +392,15 @@ export function FTS5FromTableConverter({
               <FileText className="h-4 w-4" aria-hidden="true" />
               SQL Preview
             </h4>
-            <pre className="p-4 bg-muted rounded-lg text-xs overflow-x-auto max-h-64" aria-label="SQL Preview">
-              <code>{generateSQL()}</code>
-            </pre>
+            <div className="bg-muted rounded-lg p-4 overflow-hidden">
+              <pre className="text-xs overflow-x-auto max-h-64 whitespace-pre-wrap break-words" aria-label="SQL Preview">
+                <code>{generateSQL()}</code>
+              </pre>
+            </div>
           </div>
 
           {/* Error Display */}
-          {error && (
-            <div className="bg-destructive/10 border border-destructive text-destructive px-3 py-2 rounded-lg text-sm">
-              {error}
-            </div>
-          )}
+          <ErrorMessage error={error} variant="inline" />
         </div>
 
         <DialogFooter>
@@ -414,7 +412,7 @@ export function FTS5FromTableConverter({
             Cancel
           </Button>
           <Button
-            onClick={validateAndConvert}
+            onClick={() => void validateAndConvert()}
             disabled={converting || !sourceTable || selectedColumns.length === 0}
           >
             {converting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}

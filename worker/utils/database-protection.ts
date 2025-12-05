@@ -1,4 +1,5 @@
 import type { Env } from '../types';
+import { logWarning } from './error-logger';
 
 // Pattern-based protection for system databases
 const PROTECTED_PATTERNS = [
@@ -27,15 +28,14 @@ export function isProtectedDatabase(dbName: string): boolean {
  * Create a standardized 403 response for protected database access
  */
 export function createProtectedDatabaseResponse(corsHeaders: HeadersInit): Response {
+  const headers = new Headers(corsHeaders);
+  headers.set('Content-Type', 'application/json');
   return new Response(JSON.stringify({
     error: 'Protected system database',
     message: 'This database is used by system applications and cannot be accessed.'
   }), {
     status: 403,
-    headers: {
-      'Content-Type': 'application/json',
-      ...corsHeaders
-    }
+    headers
   });
 }
 
@@ -57,10 +57,15 @@ export async function getDatabaseInfo(dbId: string, env: Env): Promise<{ name: s
     
     if (!response.ok) return null;
     
-    const data = await response.json() as { result: { name: string } };
+    const data: { result: { name: string } } = await response.json();
     return data.result;
   } catch (err) {
-    console.error('[Protection] Failed to get database info:', err);
+    logWarning(`Failed to get database info: ${err instanceof Error ? err.message : String(err)}`, {
+      module: 'protection',
+      operation: 'get_database_info',
+      databaseId: dbId,
+      metadata: { error: err instanceof Error ? err.message : String(err) }
+    });
     return null;
   }
 }

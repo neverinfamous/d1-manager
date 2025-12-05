@@ -16,19 +16,19 @@ interface JobHistoryDialogProps {
   onClose: () => void;
 }
 
-export function JobHistoryDialog({ open, jobId, onClose }: JobHistoryDialogProps) {
+export function JobHistoryDialog({ open, jobId, onClose }: JobHistoryDialogProps): React.JSX.Element {
   const [events, setEvents] = useState<JobEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (open && jobId) {
-      loadEvents();
+      void loadEvents();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, jobId]);
 
-  const loadEvents = async () => {
+  const loadEvents = async (): Promise<void> => {
     try {
       setLoading(true);
       setError(null);
@@ -41,7 +41,7 @@ export function JobHistoryDialog({ open, jobId, onClose }: JobHistoryDialogProps
     }
   };
 
-  const getEventIcon = (eventType: string) => {
+  const getEventIcon = (eventType: string): React.JSX.Element => {
     switch (eventType) {
       case 'started':
         return <Play className="h-4 w-4 text-blue-500 fill-blue-500" />;
@@ -58,7 +58,7 @@ export function JobHistoryDialog({ open, jobId, onClose }: JobHistoryDialogProps
     }
   };
 
-  const getEventLabel = (eventType: string) => {
+  const getEventLabel = (eventType: string): string => {
     switch (eventType) {
       case 'started':
         return 'Started';
@@ -75,7 +75,7 @@ export function JobHistoryDialog({ open, jobId, onClose }: JobHistoryDialogProps
     }
   };
 
-  const formatTimestamp = (timestamp: string) => {
+  const formatTimestamp = (timestamp: string): { relative: string; absolute: string } => {
     const date = new Date(timestamp);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
@@ -85,9 +85,9 @@ export function JobHistoryDialog({ open, jobId, onClose }: JobHistoryDialogProps
 
     let relative = '';
     if (diffMins < 1) relative = 'just now';
-    else if (diffMins < 60) relative = `${diffMins}m ago`;
-    else if (diffHours < 24) relative = `${diffHours}h ago`;
-    else if (diffDays < 7) relative = `${diffDays}d ago`;
+    else if (diffMins < 60) relative = `${String(diffMins)}m ago`;
+    else if (diffHours < 24) relative = `${String(diffHours)}h ago`;
+    else if (diffDays < 7) relative = `${String(diffDays)}d ago`;
     else relative = date.toLocaleDateString();
 
     const absolute = date.toLocaleString();
@@ -97,13 +97,13 @@ export function JobHistoryDialog({ open, jobId, onClose }: JobHistoryDialogProps
   const parseDetails = (details: string | null): JobEventDetails => {
     if (!details) return {};
     try {
-      return JSON.parse(details);
+      return JSON.parse(details) as JobEventDetails;
     } catch {
       return {};
     }
   };
 
-  const renderEventDetails = (event: JobEvent) => {
+  const renderEventDetails = (event: JobEvent): string | null => {
     const details = parseDetails(event.details);
     const items: string[] = [];
 

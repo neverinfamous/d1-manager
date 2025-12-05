@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -16,6 +17,7 @@ import { FTS5PerformanceMetrics } from './FTS5PerformanceMetrics';
 import { searchFTS5 } from '@/services/api';
 import type { FTS5SearchResponse, FTS5SearchParams } from '@/services/fts5-types';
 import { SEARCH_OPERATORS as OPERATORS } from '@/services/fts5-types';
+import { ErrorMessage } from '@/components/ui/error-message';
 
 interface FTS5SearchDialogProps {
   open: boolean;
@@ -31,7 +33,7 @@ export function FTS5SearchDialog({
   databaseId,
   tableName,
   columns,
-}: FTS5SearchDialogProps) {
+}: FTS5SearchDialogProps): React.JSX.Element {
   const [query, setQuery] = useState('');
   const [selectedColumns, setSelectedColumns] = useState<string[]>([]);
   const [limit, setLimit] = useState(50);
@@ -54,7 +56,7 @@ export function FTS5SearchDialog({
     }
   }, [open]);
 
-  const handleSearch = async () => {
+  const handleSearch = async (): Promise<void> => {
     if (!query.trim()) {
       setError('Please enter a search query');
       return;
@@ -98,18 +100,18 @@ export function FTS5SearchDialog({
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent): void => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSearch();
+      void handleSearch();
     }
   };
 
-  const insertOperator = (operator: string) => {
+  const insertOperator = (operator: string): void => {
     setQuery(prev => prev + (prev.endsWith(' ') || prev === '' ? '' : ' ') + operator + ' ');
   };
 
-  const toggleColumn = (column: string) => {
+  const toggleColumn = (column: string): void => {
     setSelectedColumns(prev =>
       prev.includes(column)
         ? prev.filter(c => c !== column)
@@ -117,7 +119,7 @@ export function FTS5SearchDialog({
     );
   };
 
-  const exportResults = () => {
+  const exportResults = (): void => {
     if (!searchResponse || searchResponse.results.length === 0) return;
     
     const firstResult = searchResponse.results[0];
@@ -129,7 +131,10 @@ export function FTS5SearchDialog({
       ...searchResponse.results.map(result => 
         headers.map(h => {
           const val = result.row[h];
-          const str = val !== null && val !== undefined ? String(val) : '';
+          let str = '';
+          if (val !== null && val !== undefined) {
+            str = typeof val === 'object' ? JSON.stringify(val) : String(val as string | number | boolean);
+          }
           return str.includes(',') ? `"${str.replace(/"/g, '""')}"` : str;
         }).join(',')
       )
@@ -146,18 +151,18 @@ export function FTS5SearchDialog({
     window.URL.revokeObjectURL(url);
   };
 
-  const copySQLQuery = () => {
+  const copySQLQuery = (): void => {
     const columnsFilter = selectedColumns.length > 0
       ? `{${selectedColumns.join(' ')}} : `
       : '';
     
     const rankFunc = rankingFunction === 'bm25custom'
-      ? `bm25("${tableName}", ${bm25K1}, ${bm25B})`
+      ? `bm25("${tableName}", ${String(bm25K1)}, ${String(bm25B)})`
       : `bm25("${tableName}")`;
 
-    const sql = `SELECT *, ${rankFunc} AS rank FROM "${tableName}" WHERE "${tableName}" MATCH '${columnsFilter}${query}' ORDER BY rank LIMIT ${limit};`;
+    const sql = `SELECT *, ${rankFunc} AS rank FROM "${tableName}" WHERE "${tableName}" MATCH '${columnsFilter}${query}' ORDER BY rank LIMIT ${String(limit)};`;
     
-    navigator.clipboard.writeText(sql);
+    void navigator.clipboard.writeText(sql);
   };
 
   return (
@@ -165,6 +170,9 @@ export function FTS5SearchDialog({
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>Search "{tableName}"</DialogTitle>
+          <DialogDescription>
+            Full-text search using FTS5 with support for boolean operators, phrase matching, and ranking
+          </DialogDescription>
         </DialogHeader>
 
         <div className="grid grid-cols-4 gap-6 flex-1 overflow-hidden">
@@ -294,7 +302,7 @@ export function FTS5SearchDialog({
                   disabled={searching}
                   className="flex-1"
                 />
-                <Button onClick={handleSearch} disabled={searching || !query.trim()}>
+                <Button onClick={() => void handleSearch()} disabled={searching || !query.trim()}>
                   {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                 </Button>
               </div>
@@ -317,11 +325,7 @@ export function FTS5SearchDialog({
             </div>
 
             {/* Error Display */}
-            {error && (
-              <div className="bg-destructive/10 border border-destructive text-destructive px-3 py-2 rounded-lg text-sm">
-                {error}
-              </div>
-            )}
+            <ErrorMessage error={error} variant="inline" />
 
             {/* Performance Metrics */}
             {searchResponse && (

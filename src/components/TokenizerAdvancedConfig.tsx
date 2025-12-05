@@ -12,10 +12,10 @@ interface TokenizerAdvancedConfigProps {
   disabled?: boolean;
 }
 
-export function TokenizerAdvancedConfig({ value, onChange, disabled }: TokenizerAdvancedConfigProps) {
+export function TokenizerAdvancedConfig({ value, onChange, disabled }: TokenizerAdvancedConfigProps): React.JSX.Element | null {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const handleParameterChange = (key: string, paramValue: string | number) => {
+  const handleParameterChange = (key: string, paramValue: string | number): void => {
     onChange({
       ...value,
       parameters: {
@@ -25,11 +25,11 @@ export function TokenizerAdvancedConfig({ value, onChange, disabled }: Tokenizer
     });
   };
 
-  const handleRemoveDiacriticsChange = (checked: boolean) => {
+  const handleRemoveDiacriticsChange = (checked: boolean): void => {
     handleParameterChange('remove_diacritics', checked ? 1 : 0);
   };
 
-  const handleCaseSensitiveChange = (checked: boolean) => {
+  const handleCaseSensitiveChange = (checked: boolean): void => {
     handleParameterChange('case_sensitive', checked ? 1 : 0);
   };
 

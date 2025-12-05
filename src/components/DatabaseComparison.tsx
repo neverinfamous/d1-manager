@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { GitCompare, Loader2, ChevronDown, ChevronRight, Plus, Minus, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { listTables, getTableSchema, type ColumnInfo } from '@/services/api';
 
 interface DatabaseComparisonProps {
-  databases: Array<{ uuid: string; name: string }>;
+  databases: { uuid: string; name: string }[];
+  preSelectedDatabases?: [string, string];
+  onClose?: () => void;
 }
 
 interface SchemaDiff {
@@ -21,15 +23,25 @@ interface ColumnDiff {
   rightDef?: string;
 }
 
-export function DatabaseComparison({ databases }: DatabaseComparisonProps) {
-  const [leftDb, setLeftDb] = useState<string>('');
-  const [rightDb, setRightDb] = useState<string>('');
+export function DatabaseComparison({ databases, preSelectedDatabases, onClose: _onClose }: DatabaseComparisonProps): React.JSX.Element {
+  const [leftDb, setLeftDb] = useState<string>(preSelectedDatabases?.[0] ?? '');
+  const [rightDb, setRightDb] = useState<string>(preSelectedDatabases?.[1] ?? '');
   const [comparing, setComparing] = useState(false);
   const [diffs, setDiffs] = useState<SchemaDiff[]>([]);
   const [expandedTables, setExpandedTables] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
+  const [autoRan, setAutoRan] = useState(false);
 
-  const handleCompare = async () => {
+  // Auto-run comparison when pre-selected databases are provided
+  React.useEffect(() => {
+    if (preSelectedDatabases?.[0] && preSelectedDatabases[1] && !autoRan) {
+      setAutoRan(true);
+      void handleCompare();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preSelectedDatabases]);
+
+  const handleCompare = async (): Promise<void> => {
     if (!leftDb || !rightDb) {
       setError('Please select two databases to compare');
       return;
@@ -146,7 +158,7 @@ export function DatabaseComparison({ databases }: DatabaseComparisonProps) {
     return def;
   };
 
-  const toggleTable = (tableName: string) => {
+  const toggleTable = (tableName: string): void => {
     const newExpanded = new Set(expandedTables);
     if (newExpanded.has(tableName)) {
       newExpanded.delete(tableName);
@@ -156,7 +168,7 @@ export function DatabaseComparison({ databases }: DatabaseComparisonProps) {
     setExpandedTables(newExpanded);
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string): string => {
     switch (status) {
       case 'added':
         return 'text-green-600 dark:text-green-400';
@@ -169,7 +181,7 @@ export function DatabaseComparison({ databases }: DatabaseComparisonProps) {
     }
   };
 
-  const getStatusIcon = (status: string) => {
+  const getStatusIcon = (status: string): React.JSX.Element | null => {
     switch (status) {
       case 'added':
         return <Plus className="h-4 w-4" />;
@@ -246,7 +258,7 @@ export function DatabaseComparison({ databases }: DatabaseComparisonProps) {
           </div>
 
           <Button
-            onClick={handleCompare}
+            onClick={() => void handleCompare()}
             disabled={!leftDb || !rightDb || comparing}
             className="w-full"
           >

@@ -31,8 +31,58 @@ binding = "METADATA"
 database_name = "d1-manager-metadata"  # CHANGE THIS
 database_id = "your-metadata-database-id"  # CHANGE THIS (from wrangler d1 create output)
 
+# ============================================
+# R2 BACKUP BUCKET (OPTIONAL)
+# ============================================
+# R2 bucket for database backups
+# Create bucket: wrangler r2 bucket create d1-manager-backups
+[[r2_buckets]]
+binding = "BACKUP_BUCKET"
+bucket_name = "d1-manager-backups"  # CHANGE THIS
+
+# ============================================
+# DURABLE OBJECTS
+# ============================================
+# Durable Object for async backup operations
+[[durable_objects.bindings]]
+name = "BACKUP_DO"
+class_name = "BackupDO"
+script_name = "d1-manager"
+
+[[migrations]]
+tag = "v2_backup_do"
+new_classes = ["BackupDO"]
+
+# ============================================
+# SCHEDULED BACKUPS (OPTIONAL)
+# ============================================
+# Cron trigger for scheduled R2 backups
+# Runs hourly to check for and execute due scheduled backups
+# Configure backup schedules per-database in the UI
+[triggers]
+crons = ["0 * * * *"]  # Every hour at minute 0
+
+# ============================================
+# OBSERVABILITY (OPTIONAL)
+# ============================================
+# Enable OpenTelemetry export for traces and logs
+# Create destinations in Cloudflare Dashboard: Workers > Observability > Pipelines
+# Common OTLP endpoints:
+#   Grafana Cloud: https://otlp-gateway-{region}.grafana.net/otlp/v1/traces
+#   Sentry: https://{HOST}/api/{PROJECT_ID}/integration/otlp/v1/traces
+#   Datadog: https://otlp.{SITE}.datadoghq.com/v1/logs
+
+[observability]
+enabled = true
+
 [observability.logs]
 enabled = true
+# Uncomment and set your log destination name from Cloudflare Dashboard
+# destinations = ["your-logs-destination"]
+
+# [observability.traces]
+# enabled = true
+# destinations = ["your-traces-destination"]
 
 # ============================================
 # CUSTOM DOMAIN ROUTING (OPTIONAL)

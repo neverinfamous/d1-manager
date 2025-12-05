@@ -16,6 +16,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { TokenizerPresetSelector } from './TokenizerPresetSelector';
 import { TokenizerAdvancedConfig } from './TokenizerAdvancedConfig';
 import type { FTS5TableConfig, TokenizerConfig } from '@/services/fts5-types';
+import { ErrorMessage } from '@/components/ui/error-message';
 
 interface Column {
   id: string;
@@ -29,7 +30,7 @@ interface FTS5SchemaDesignerProps {
   onCreateTable: (config: FTS5TableConfig) => Promise<void>;
 }
 
-export function FTS5SchemaDesigner({ open, onOpenChange, onCreateTable }: FTS5SchemaDesignerProps) {
+export function FTS5SchemaDesigner({ open, onOpenChange, onCreateTable }: FTS5SchemaDesignerProps): React.JSX.Element {
   const [tableName, setTableName] = useState('');
   const [columns, setColumns] = useState<Column[]>([
     { id: '1', name: 'content', unindexed: false }
@@ -43,7 +44,7 @@ export function FTS5SchemaDesigner({ open, onOpenChange, onCreateTable }: FTS5Sc
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
 
-  const addColumn = () => {
+  const addColumn = (): void => {
     const newId = String(Date.now());
     setColumns([
       ...columns,
@@ -51,7 +52,7 @@ export function FTS5SchemaDesigner({ open, onOpenChange, onCreateTable }: FTS5Sc
     ]);
   };
 
-  const removeColumn = (id: string) => {
+  const removeColumn = (id: string): void => {
     if (columns.length <= 1) {
       setError('FTS5 table must have at least one column');
       return;
@@ -60,14 +61,14 @@ export function FTS5SchemaDesigner({ open, onOpenChange, onCreateTable }: FTS5Sc
     setError('');
   };
 
-  const updateColumn = (id: string, field: keyof Column, value: string | boolean) => {
+  const updateColumn = (id: string, field: keyof Column, value: string | boolean): void => {
     setColumns(columns.map(col => 
       col.id === id ? { ...col, [field]: value } : col
     ));
     setError('');
   };
 
-  const validateAndCreate = async () => {
+  const validateAndCreate = async (): Promise<void> => {
     setError('');
 
     // Validate table name
@@ -105,7 +106,7 @@ export function FTS5SchemaDesigner({ open, onOpenChange, onCreateTable }: FTS5Sc
     const columnNames = columns.map(c => c.name.toLowerCase());
     const duplicates = columnNames.filter((name, index) => columnNames.indexOf(name) !== index);
     if (duplicates.length > 0) {
-      setError(`Duplicate column name: ${duplicates[0]}`);
+      setError(`Duplicate column name: ${duplicates[0] ?? ''}`);
       return;
     }
 
@@ -153,7 +154,7 @@ export function FTS5SchemaDesigner({ open, onOpenChange, onCreateTable }: FTS5Sc
     }
   };
 
-  const generateSQL = () => {
+  const generateSQL = (): string => {
     const columnDefs = columns.map(col => {
       return col.unindexed ? `${col.name} UNINDEXED` : col.name;
     }).join(', ');
@@ -162,10 +163,10 @@ export function FTS5SchemaDesigner({ open, onOpenChange, onCreateTable }: FTS5Sc
     if (tokenizer.parameters) {
       const params: string[] = [];
       if (tokenizer.parameters.remove_diacritics !== undefined) {
-        params.push(`remove_diacritics ${tokenizer.parameters.remove_diacritics}`);
+        params.push(`remove_diacritics ${String(tokenizer.parameters.remove_diacritics)}`);
       }
       if (tokenizer.parameters.case_sensitive !== undefined) {
-        params.push(`case_sensitive ${tokenizer.parameters.case_sensitive}`);
+        params.push(`case_sensitive ${String(tokenizer.parameters.case_sensitive)}`);
       }
       if (tokenizer.parameters.separators) {
         params.push(`separators '${tokenizer.parameters.separators}'`);
@@ -333,11 +334,7 @@ export function FTS5SchemaDesigner({ open, onOpenChange, onCreateTable }: FTS5Sc
           </div>
 
           {/* Error Display */}
-          {error && (
-            <div className="bg-destructive/10 border border-destructive text-destructive px-3 py-2 rounded-lg text-sm">
-              {error}
-            </div>
-          )}
+          <ErrorMessage error={error} variant="inline" />
         </div>
 
         <DialogFooter>
@@ -349,7 +346,7 @@ export function FTS5SchemaDesigner({ open, onOpenChange, onCreateTable }: FTS5Sc
             Cancel
           </Button>
           <Button
-            onClick={validateAndCreate}
+            onClick={() => void validateAndCreate()}
             disabled={creating || !tableName.trim()}
           >
             {creating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}

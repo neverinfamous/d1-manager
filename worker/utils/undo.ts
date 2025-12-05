@@ -1,5 +1,6 @@
 import type { Env, UndoSnapshot, ColumnInfo, IndexInfo } from '../types';
 import { sanitizeIdentifier } from './helpers';
+import { logWarning } from './error-logger';
 
 const CF_API = 'https://api.cloudflare.com/client/v4';
 
@@ -24,7 +25,7 @@ async function executeQueryViaAPI(
       headers: cfHeaders,
       body: JSON.stringify({
         sql: query,
-        params: params || []
+        params: params ?? []
       })
     }
   );
@@ -34,7 +35,7 @@ async function executeQueryViaAPI(
     throw new Error(`Query failed: ${errorText}`);
   }
 
-  const data = await response.json() as { result: Array<{ results: unknown[]; meta?: Record<string, unknown>; success: boolean }> };
+  const data: { result: { results: unknown[]; success: boolean }[] } = await response.json();
   const firstResult = data.result[0];
   if (!firstResult) {
     throw new Error('Empty result from D1 API');
@@ -60,7 +61,7 @@ export async function captureTableSnapshot(
     env
   );
 
-  if (!createResult.results || createResult.results.length === 0) {
+  if (createResult.results.length === 0) {
     throw new Error(`Table ${tableName} not found`);
   }
 
@@ -74,7 +75,7 @@ export async function captureTableSnapshot(
   );
 
   const indexes: string[] = [];
-  if (indexListResult.results && indexListResult.results.length > 0) {
+  if (indexListResult.results.length > 0) {
     for (const idx of indexListResult.results as IndexInfo[]) {
       // Skip auto-created indexes (origin 'pk' or 'u')
       if (idx.origin === 'c') {
@@ -84,7 +85,7 @@ export async function captureTableSnapshot(
           `SELECT sql FROM sqlite_master WHERE type='index' AND name='${idx.name}'`,
           env
         );
-        if (idxCreateResult.results && idxCreateResult.results.length > 0) {
+        if (idxCreateResult.results.length > 0) {
           const sql = (idxCreateResult.results[0] as { sql: string | null }).sql;
           if (sql) {
             indexes.push(sql);
@@ -209,7 +210,12 @@ export async function saveUndoSnapshot(
   // Check size (warn if > 1MB)
   const sizeInBytes = new Blob([snapshotData]).size;
   if (sizeInBytes > 1024 * 1024) {
-    console.warn(`[Undo] Large snapshot detected: ${(sizeInBytes / 1024 / 1024).toFixed(2)}MB for ${targetTable}`);
+    logWarning(`Large snapshot detected: ${(sizeInBytes / 1024 / 1024).toFixed(2)}MB for ${targetTable}`, {
+      module: 'undo',
+      operation: 'save_snapshot',
+      databaseId: dbId,
+      metadata: { targetTable, sizeInBytes, sizeMB: (sizeInBytes / 1024 / 1024).toFixed(2) }
+    });
   }
 
   try {
@@ -236,7 +242,12 @@ export async function saveUndoSnapshot(
     await cleanupStmt.run();
   } catch (err) {
     // Log error but don't fail the main operation
-    console.error('[Undo] Failed to save undo snapshot (table may not exist yet):', err);
+    logWarning(`Failed to save undo snapshot (table may not exist yet): ${err instanceof Error ? err.message : String(err)}`, {
+      module: 'undo',
+      operation: 'save_snapshot',
+      databaseId: dbId,
+      metadata: { targetTable, operationType, error: err instanceof Error ? err.message : String(err) }
+    });
   }
 }
 
@@ -253,13 +264,13 @@ export async function restoreFromSnapshot(
       await restoreDroppedTable(dbId, snapshot, env);
       break;
     case 'DROP_COLUMN':
-      await restoreDroppedColumn(dbId, snapshot, env);
+      restoreDroppedColumn(dbId, snapshot, env);
       break;
     case 'DELETE_ROW':
-      await restoreDeletedRows(dbId, snapshot, env);
+      restoreDeletedRows(dbId, snapshot, env);
       break;
     default:
-      throw new Error(`Unknown operation type: ${snapshot.operation_type}`);
+      throw new Error(`Unknown operation type: ${String(snapshot.operation_type)}`);
   }
 }
 
@@ -285,16 +296,21 @@ async function restoreDroppedTable(
     try {
       await executeQueryViaAPI(dbId, indexSql, env);
     } catch (err) {
-      console.error('[Undo] Failed to recreate index:', err);
+      logWarning(`Failed to recreate index: ${err instanceof Error ? err.message : String(err)}`, {
+        module: 'undo',
+        operation: 'restore_table',
+        databaseId: dbId,
+        metadata: { indexSql, error: err instanceof Error ? err.message : String(err) }
+      });
       // Continue even if index creation fails
     }
   }
 
   // 3. Re-insert data
-  const firstDataRow = data?.[0];
-  if (data && data.length > 0 && firstDataRow) {
+  const firstDataRow = data[0];
+  if (data.length > 0 && firstDataRow) {
     // Extract table name from CREATE statement
-    const tableNameMatch = createStatement.match(/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?["']?(\w+)["']?/i);
+    const tableNameMatch = /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?["']?(\w+)["']?/i.exec(createStatement);
     if (!tableNameMatch?.[1]) {
       throw new Error('Could not extract table name from CREATE statement');
     }
@@ -316,7 +332,11 @@ async function restoreDroppedTable(
           if (val === null) return 'NULL';
           if (typeof val === 'number') return val.toString();
           if (typeof val === 'string') return `'${val.replace(/'/g, "''")}'`;
-          return `'${String(val).replace(/'/g, "''")}'`;
+          if (typeof val === 'boolean') return val ? '1' : '0';
+          if (typeof val === 'bigint') return val.toString();
+          // For objects/arrays, JSON stringify; for other types, serialize as JSON
+          const strVal = typeof val === 'object' ? JSON.stringify(val) : JSON.stringify(val);
+          return `'${strVal.replace(/'/g, "''")}'`;
         }).join(', ');
         return `(${rowValues})`;
       }).join(', ');
@@ -330,11 +350,11 @@ async function restoreDroppedTable(
 /**
  * Restore a dropped column from snapshot
  */
-async function restoreDroppedColumn(
+function restoreDroppedColumn(
   _dbId: string,
   snapshot: UndoSnapshot,
-  _env: Env // eslint-disable-line @typescript-eslint/no-unused-vars
-): Promise<void> {
+  _env: Env  
+): void {
   if (!snapshot.columnData) {
     throw new Error('Invalid snapshot: missing columnData');
   }
@@ -354,11 +374,11 @@ async function restoreDroppedColumn(
 /**
  * Restore deleted rows from snapshot
  */
-async function restoreDeletedRows(
+function restoreDeletedRows(
   _dbId: string,
   snapshot: UndoSnapshot,
-  _env: Env // eslint-disable-line @typescript-eslint/no-unused-vars
-): Promise<void> {
+  _env: Env  
+): void {
   if (!snapshot.rowData) {
     throw new Error('Invalid snapshot: missing rowData');
   }

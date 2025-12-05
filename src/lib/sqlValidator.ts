@@ -16,6 +16,191 @@ export interface SqlValidationResult {
 }
 
 /**
+ * Result of identifier validation
+ */
+export interface IdentifierValidationResult {
+  isValid: boolean;
+  error?: string;
+  suggestion?: string;
+}
+
+/**
+ * SQLite reserved words that cannot be used as unquoted identifiers
+ */
+const SQLITE_RESERVED_WORDS = new Set([
+  'ABORT', 'ACTION', 'ADD', 'AFTER', 'ALL', 'ALTER', 'ALWAYS', 'ANALYZE', 'AND', 'AS',
+  'ASC', 'ATTACH', 'AUTOINCREMENT', 'BEFORE', 'BEGIN', 'BETWEEN', 'BY', 'CASCADE',
+  'CASE', 'CAST', 'CHECK', 'COLLATE', 'COLUMN', 'COMMIT', 'CONFLICT', 'CONSTRAINT',
+  'CREATE', 'CROSS', 'CURRENT', 'CURRENT_DATE', 'CURRENT_TIME', 'CURRENT_TIMESTAMP',
+  'DATABASE', 'DEFAULT', 'DEFERRABLE', 'DEFERRED', 'DELETE', 'DESC', 'DETACH',
+  'DISTINCT', 'DO', 'DROP', 'EACH', 'ELSE', 'END', 'ESCAPE', 'EXCEPT', 'EXCLUDE',
+  'EXCLUSIVE', 'EXISTS', 'EXPLAIN', 'FAIL', 'FILTER', 'FIRST', 'FOLLOWING', 'FOR',
+  'FOREIGN', 'FROM', 'FULL', 'GENERATED', 'GLOB', 'GROUP', 'GROUPS', 'HAVING', 'IF',
+  'IGNORE', 'IMMEDIATE', 'IN', 'INDEX', 'INDEXED', 'INITIALLY', 'INNER', 'INSERT',
+  'INSTEAD', 'INTERSECT', 'INTO', 'IS', 'ISNULL', 'JOIN', 'KEY', 'LAST', 'LEFT',
+  'LIKE', 'LIMIT', 'MATCH', 'MATERIALIZED', 'NATURAL', 'NO', 'NOT', 'NOTHING',
+  'NOTNULL', 'NULL', 'NULLS', 'OF', 'OFFSET', 'ON', 'OR', 'ORDER', 'OTHERS', 'OUTER',
+  'OVER', 'PARTITION', 'PLAN', 'PRAGMA', 'PRECEDING', 'PRIMARY', 'QUERY', 'RAISE',
+  'RANGE', 'RECURSIVE', 'REFERENCES', 'REGEXP', 'REINDEX', 'RELEASE', 'RENAME',
+  'REPLACE', 'RESTRICT', 'RETURNING', 'RIGHT', 'ROLLBACK', 'ROW', 'ROWS', 'SAVEPOINT',
+  'SELECT', 'SET', 'TABLE', 'TEMP', 'TEMPORARY', 'THEN', 'TIES', 'TO', 'TRANSACTION',
+  'TRIGGER', 'UNBOUNDED', 'UNION', 'UNIQUE', 'UPDATE', 'USING', 'VACUUM', 'VALUES',
+  'VIEW', 'VIRTUAL', 'WHEN', 'WHERE', 'WINDOW', 'WITH', 'WITHOUT'
+]);
+
+/**
+ * Validate a SQL identifier (table name, column name)
+ */
+export function validateIdentifier(name: string, type: 'table' | 'column' = 'column'): IdentifierValidationResult {
+  const trimmed = name.trim();
+  
+  if (!trimmed) {
+    return {
+      isValid: false,
+      error: `${type === 'table' ? 'Table' : 'Column'} name is required`
+    };
+  }
+  
+  // Check for valid identifier pattern
+  if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(trimmed)) {
+    if (/^\d/.test(trimmed)) {
+      return {
+        isValid: false,
+        error: `${type === 'table' ? 'Table' : 'Column'} name cannot start with a number`,
+        suggestion: `Try: _${trimmed} or ${trimmed.replace(/^\d+/, '')}`
+      };
+    }
+    if (/\s/.test(trimmed)) {
+      return {
+        isValid: false,
+        error: `${type === 'table' ? 'Table' : 'Column'} name cannot contain spaces`,
+        suggestion: `Try: ${trimmed.replace(/\s+/g, '_')}`
+      };
+    }
+    if (/[^a-zA-Z0-9_]/.test(trimmed)) {
+      const invalidChars = trimmed.match(/[^a-zA-Z0-9_]/g)?.join(', ') ?? '';
+      return {
+        isValid: false,
+        error: `Invalid characters: ${invalidChars}. Only letters, numbers, and underscores allowed`,
+        suggestion: `Try: ${trimmed.replace(/[^a-zA-Z0-9_]/g, '_')}`
+      };
+    }
+  }
+  
+  // Check for reserved words
+  if (SQLITE_RESERVED_WORDS.has(trimmed.toUpperCase())) {
+    return {
+      isValid: false,
+      error: `"${trimmed}" is a SQLite reserved word`,
+      suggestion: `Try: ${trimmed}_col or my_${trimmed.toLowerCase()}`
+    };
+  }
+  
+  // Check length (SQLite technically supports very long names but let's be reasonable)
+  if (trimmed.length > 128) {
+    return {
+      isValid: false,
+      error: `${type === 'table' ? 'Table' : 'Column'} name is too long (max 128 characters)`
+    };
+  }
+  
+  return { isValid: true };
+}
+
+/**
+ * Validate NOT NULL constraint with default value requirement
+ */
+export function validateNotNullConstraint(
+  notnull: boolean, 
+  defaultValue: string, 
+  hasExistingRows: boolean,
+  isGenerated: boolean
+): IdentifierValidationResult {
+  if (notnull && !isGenerated && hasExistingRows && !defaultValue.trim()) {
+    return {
+      isValid: false,
+      error: 'NOT NULL columns require a default value when the table already has rows',
+      suggestion: 'Either provide a default value or remove the NOT NULL constraint'
+    };
+  }
+  return { isValid: true };
+}
+
+/**
+ * Validate a default value for type compatibility (basic check)
+ */
+export function validateDefaultValue(defaultValue: string, columnType: string): IdentifierValidationResult {
+  const trimmed = defaultValue.trim();
+  if (!trimmed) return { isValid: true };
+  
+  const upperType = columnType.toUpperCase();
+  const upperDefault = trimmed.toUpperCase();
+  
+  // Allow special keywords for any type
+  if (upperDefault === 'NULL' || upperDefault === 'CURRENT_TIMESTAMP' || 
+      upperDefault === 'CURRENT_DATE' || upperDefault === 'CURRENT_TIME') {
+    return { isValid: true };
+  }
+  
+  // Check numeric types
+  if (upperType.includes('INT') || upperType === 'REAL' || upperType === 'NUMERIC') {
+    if (isNaN(Number(trimmed)) && !trimmed.startsWith("'") && !trimmed.startsWith('"')) {
+      return {
+        isValid: false,
+        error: `Default value "${trimmed}" doesn't appear to be a valid number for ${columnType}`,
+        suggestion: `Use a numeric value or quote it if it's text: '${trimmed}'`
+      };
+    }
+  }
+  
+  return { isValid: true };
+}
+
+/**
+ * Validate a generated column expression (basic syntax check)
+ */
+export function validateGeneratedExpression(expression: string): IdentifierValidationResult {
+  const trimmed = expression.trim();
+  
+  if (!trimmed) {
+    return {
+      isValid: false,
+      error: 'Generated column expression is required'
+    };
+  }
+  
+  // Check for balanced parentheses
+  let depth = 0;
+  for (const char of trimmed) {
+    if (char === '(') depth++;
+    if (char === ')') depth--;
+    if (depth < 0) {
+      return {
+        isValid: false,
+        error: 'Expression has unbalanced parentheses (too many closing parentheses)'
+      };
+    }
+  }
+  
+  if (depth > 0) {
+    return {
+      isValid: false,
+      error: 'Expression has unbalanced parentheses (missing closing parenthesis)'
+    };
+  }
+  
+  // Check for common dangerous patterns
+  if (/;\s*(SELECT|INSERT|UPDATE|DELETE|DROP|ALTER)/i.test(trimmed)) {
+    return {
+      isValid: false,
+      error: 'Expression cannot contain multiple SQL statements'
+    };
+  }
+  
+  return { isValid: true };
+}
+
+/**
  * Check for unmatched parentheses
  */
 function checkParentheses(sql: string): SqlValidationResult {
@@ -62,7 +247,7 @@ function checkParentheses(sql: string): SqlValidationResult {
   if (depth > 0) {
     return {
       isValid: false,
-      error: `Unclosed parenthesis (${depth} opening without closing)`,
+      error: `Unclosed parenthesis (${String(depth)} opening without closing)`,
       errorPosition: lastOpenPos,
     };
   }
@@ -124,6 +309,135 @@ function checkStringLiterals(sql: string): SqlValidationResult {
       error: 'Unclosed double quote',
       errorPosition: doubleQuoteStart,
     };
+  }
+
+  return { isValid: true };
+}
+
+/**
+ * Valid SQL statement keywords that can start a statement
+ */
+const VALID_STATEMENT_KEYWORDS = [
+  'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'CREATE', 'DROP', 'ALTER',
+  'PRAGMA', 'EXPLAIN', 'VACUUM', 'ANALYZE', 'REINDEX', 'ATTACH', 'DETACH',
+  'BEGIN', 'COMMIT', 'ROLLBACK', 'SAVEPOINT', 'RELEASE', 'WITH', 'REPLACE'
+];
+
+/**
+ * Core SQL keywords that must be spelled correctly
+ */
+const CORE_KEYWORDS: Record<string, string[]> = {
+  // Each key is the correct spelling, values are common misspellings to detect
+  'SELECT': ['SELEC', 'SELET', 'SELCT', 'SLECT', 'SEELCT', 'SLEECT'],
+  'FROM': ['FOM', 'FORM', 'FRIM', 'FRMO', 'FRM'],
+  'WHERE': ['WERE', 'WHRE', 'WHER', 'WEHRE'],
+  'INSERT': ['INSER', 'INSRT', 'INSET', 'INSRET'],
+  'INTO': ['ITNO', 'INT', 'INTOO'],
+  'UPDATE': ['UPDAT', 'UPADTE', 'UPDAE', 'UPDTE'],
+  'DELETE': ['DELET', 'DELEET', 'DELEET', 'DELTE'],
+  'CREATE': ['CREAT', 'CRATE', 'CRAETE'],
+  'TABLE': ['TABEL', 'TABL', 'TALBE'],
+  'INDEX': ['INDX', 'IDNEX', 'INDE'],
+  'VALUES': ['VALS', 'VALEUS', 'VALUESS'],
+  'ORDER': ['ORDR', 'ORDE', 'OERDER'],
+  'GROUP': ['GRUOP', 'GROP', 'GROPU'],
+  'HAVING': ['HAVNG', 'HAVIN'],
+  'JOIN': ['JION', 'JOING'],
+  'LEFT': ['LETF', 'LEF'],
+  'RIGHT': ['RGIHT', 'RIGH'],
+  'INNER': ['INNR', 'INER'],
+  'OUTER': ['OUTR', 'OTER'],
+  'AND': ['AN', 'ADN'],
+  'NOT': ['NO', 'NTO'],
+  'NULL': ['NUL', 'NILL'],
+  'LIKE': ['LIK', 'LIEK'],
+  'BETWEEN': ['BETWEN', 'BEETWEEN'],
+  'EXISTS': ['EXSITS', 'EXIS'],
+  'LIMIT': ['LIMT', 'LIMI'],
+  'OFFSET': ['OFSET', 'OFFSE'],
+  'SET': ['SE', 'ST'],
+  'DROP': ['DRO', 'DORP'],
+  'ALTER': ['ALTE', 'ALTR'],
+  'ADD': ['AD'],
+  'COLUMN': ['COLUM', 'COULMN'],
+  'PRIMARY': ['PRIMRY', 'PRMARY'],
+  'FOREIGN': ['FOREING', 'FOREGIN'],
+  'REFERENCES': ['REFERNCES', 'REFERECNES'],
+  'CASCADE': ['CASCDE', 'CASACDE'],
+  'DISTINCT': ['DISTINT', 'DISINCT'],
+  'AS': [],
+  'ON': [],
+  'BY': [],
+  'IN': [],
+  'IS': [],
+  'OR': [],
+};
+
+/**
+ * Check for misspelled SQL keywords
+ */
+function checkKeywordSpelling(sql: string): SqlValidationResult {
+  const trimmed = sql.trim();
+  if (!trimmed) return { isValid: true };
+
+  // Remove string literals to avoid false positives
+  const withoutStrings = trimmed.replace(/'[^']*'/g, "''").replace(/"[^"]*"/g, '""');
+  
+  // Tokenize the SQL into words
+  const words = withoutStrings.split(/[\s,;()=<>!]+/).filter(w => w.length > 0);
+  
+  // Check if the first word is a valid statement keyword
+  if (words.length > 0) {
+    const firstWord = (words[0] ?? '').toUpperCase();
+    const isValidStart = VALID_STATEMENT_KEYWORDS.includes(firstWord);
+    
+    // Check if it might be a misspelled keyword
+    if (!isValidStart) {
+      for (const [correct, misspellings] of Object.entries(CORE_KEYWORDS)) {
+        if (misspellings.includes(firstWord)) {
+          const pos = trimmed.toUpperCase().indexOf(firstWord);
+          return {
+            isValid: false,
+            error: `Did you mean '${correct}'? Found '${firstWord}'`,
+            errorPosition: pos >= 0 ? pos : 0,
+          };
+        }
+      }
+      
+      // If it's not a known misspelling, check if it looks like a keyword attempt
+      // (uppercase word that's not a valid statement start)
+      if (firstWord === firstWord.toUpperCase() && /^[A-Z]+$/.test(firstWord)) {
+        return {
+          isValid: false,
+          error: `Unknown statement type: ${firstWord}`,
+          errorPosition: 0,
+        };
+      }
+    }
+  }
+
+  // Check all words for misspelled keywords
+  let searchPos = 0;
+  for (const word of words) {
+    const upperWord = word.toUpperCase();
+    
+    for (const [correct, misspellings] of Object.entries(CORE_KEYWORDS)) {
+      if (misspellings.includes(upperWord)) {
+        // Find position in original string
+        const pos = withoutStrings.toUpperCase().indexOf(upperWord, searchPos);
+        return {
+          isValid: false,
+          error: `Did you mean '${correct}'? Found '${word}'`,
+          errorPosition: pos >= 0 ? pos : searchPos,
+        };
+      }
+    }
+    
+    // Move search position forward
+    const wordPos = withoutStrings.toUpperCase().indexOf(upperWord, searchPos);
+    if (wordPos >= 0) {
+      searchPos = wordPos + word.length;
+    }
   }
 
   return { isValid: true };
@@ -215,6 +529,12 @@ export function validateSql(sql: string): SqlValidationResult {
   const parenCheck = checkParentheses(sql);
   if (!parenCheck.isValid) {
     return parenCheck;
+  }
+
+  // Check for misspelled keywords
+  const keywordCheck = checkKeywordSpelling(sql);
+  if (!keywordCheck.isValid) {
+    return keywordCheck;
   }
 
   // Check basic structure

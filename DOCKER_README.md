@@ -1,11 +1,11 @@
 # D1 Database Manager
 
-Last Updated November 30, 2025 - Production/Stable v1.1.1
+Last Updated December 5, 2025 - Production/Stable v2.0.0
 
 [![GitHub](https://img.shields.io/badge/GitHub-neverinfamous/d1--manager-blue?logo=github)](https://github.com/neverinfamous/d1-manager)
 [![Docker Pulls](https://img.shields.io/docker/pulls/writenotenow/d1-manager)](https://hub.docker.com/r/writenotenow/d1-manager)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-![Version](https://img.shields.io/badge/version-v1.1.1-green)
+![Version](https://img.shields.io/badge/version-v2.0.0-green)
 ![Status](https://img.shields.io/badge/status-Production%2FStable-brightgreen)
 [![Security](https://img.shields.io/badge/Security-Enhanced-green.svg)](https://github.com/neverinfamous/d1-manager/blob/main/SECURITY.md)
 [![CodeQL](https://img.shields.io/badge/CodeQL-Passing-brightgreen.svg)](https://github.com/neverinfamous/d1-manager/security/code-scanning)
@@ -13,7 +13,7 @@ Last Updated November 30, 2025 - Production/Stable v1.1.1
 
 This Docker image provides a modern, full-featured web application for managing Cloudflare D1 databases with enterprise-grade authentication via Cloudflare Access (Zero Trust). Run D1 Database Manager in Docker for development, testing, or self-hosted deployments.
 
-**[Live Demo](https://d1.adamic.tech/)** • **[GitHub](https://github.com/neverinfamous/d1-manager)** • **[Wiki](https://github.com/neverinfamous/d1-manager/wiki)** • **[Changelog](https://github.com/neverinfamous/d1-manager/wiki/Changelog)** • **[Release Article](https://adamic.tech/articles/d1-manager)**
+**[Live Demo Site](https://d1.adamic.tech/)** • **[GitHub](https://github.com/neverinfamous/d1-manager)** • **[Wiki](https://github.com/neverinfamous/d1-manager/wiki)** • **[Changelog](https://github.com/neverinfamous/d1-manager/wiki/Changelog)** • **[Release Article](https://adamic.tech/articles/d1-manager)**
 
 ## Tech Stack
 
@@ -26,35 +26,83 @@ This Docker image provides a modern, full-featured web application for managing 
 ## 🎯 Features
 
 ### Database Management
-- Create, rename, delete, download, optimize, and upload databases
-- Bulk operations with multi-select
-- Upload/import SQL files
-- **Database search filter** - Quickly find databases by name
-- **NEW ✨Job history tracking** - Track all database operations with detailed history
+- Create, rename, clone, delete, download, and optimize databases
+- **Quick Actions** - Icon buttons on each database card for instant access to all operations
+- **Bulk Operations** - Multi-select for batch download, optimize, and delete
+- **Import Database** - Upload SQL files or paste SQL content directly
+- **Clone Database** - Multi-step wizard with selective table cloning and granular options
+- **Grid/List View Toggle** - Switch between card grid and compact sortable table view
+- **Copyable Database IDs** - Click to copy database IDs with visual feedback
+- **Expanded Color Picker** - 27 colors organized by hue family for visual organization
+- **R2 Backup/Restore + Unified Hub** *(Cloudflare Workers only)* - Manual backups, undo history, and R2 snapshots in one dialog with multi-select, backup counts, and orphaned-backup visibility
+- **Scheduled R2 Backups** *(Cloudflare Workers only)* - Per-database daily/weekly/monthly schedules with cron triggers, next-run tracking, and enable/disable controls
+- **Safety Backups** *(Cloudflare Workers only)* - Delete, rename, and STRICT mode operations automatically create R2 backups before proceeding
+- **Automated Migration System** - Auto-detects and applies schema upgrades with one-click "Upgrade Now" banner
+- **Database search filter & job history** - Quickly find databases and audit all operations with full date/time and duration tracking
 
 ### Table Operations
-- Visual schema designer
-- Clone, export (SQL/CSV), and bulk operations
-- Column management (add, modify, rename, delete)
+- Visual schema designer with STRICT mode and generated column support
+- Clone, export (SQL/CSV/JSON), import (CSV/JSON/SQL), and bulk operations
+- Column management (add, modify, rename, delete) with UNIQUE constraint support
 - Foreign key dependency analysis
-- **Table search filter** - Quickly find tables by name
+- **Quick Actions** - Icon buttons on each table card for instant access to all operations
+- **Import Data** - Import CSV, JSON, or SQL into new or existing tables with duplicate handling (Fail/Replace/Skip) and auto-add missing columns
+- **STRICT Mode** - Create new tables with STRICT mode or convert existing tables with automatic type mapping and validation
+- **Generated Columns** - Create STORED or VIRTUAL computed columns with expression editor
+- **Table-level R2 Backup/Restore** *(Cloudflare Workers only)* - Backup or restore individual tables directly from table cards (Grid and List views)
+- **Grid/List View Toggle** - Switch between card grid and compact sortable table view (list view is default)
+- **Row search filter + table search** - Quickly filter visible rows and find tables
+- **Table Row Counts** - See row counts on table cards (formatted with locale separators)
+- **Table color tags** - Assign colors for visual organization
 
 ### Query Console
-- SQL editor with syntax highlighting
+- **Tabbed interface** - Query, SQL Diff, Drizzle ORM, and Query Builder in dedicated tabs
+- **Drizzle ORM Console** - Introspect schemas, view migration status/history, generate SQL, push changes (with dry-run), and export TypeScript schema
+- **SQL Formatter** - One-click formatting with SQLite-aware sql-formatter library
+- **SQL Autocomplete Toggle** - Turn suggestions on/off with preference persisted to localStorage
+- **Rich editor** - Syntax highlighting, line numbers, find/replace, hover docs, and inline error squiggles
+- **SQL Diff Editor** - Compare queries side-by-side with syntax highlighting
+- **Visual Query Builder** - Build queries interactively with editable SQL output and "Send to Editor" integration
 - Query history and saved queries
 - CSV export
 
 ### Advanced Features
-- **Row-Level Filtering** - Type-aware filters with OR logic, BETWEEN, IN operators
-- **Foreign Key Visualizer** - Interactive graph with add/modify/delete constraints
-- **ER Diagram** - Visual schema documentation with PNG/SVG/JSON export
-- **Cascade Impact Simulator** - Preview DELETE cascades before execution
-- **Undo/Rollback** - Restore dropped tables, columns, or deleted rows
-- **FTS5 Full-Text Search** - Create and manage virtual tables
-- **Constraint Validator** - Detect orphans and integrity violations
-- **Index Analyzer** - Smart index recommendations
-- **NEW ✨Time Travel** - View bookmarks, checkpoint history, and CLI restore commands
-- **NEW ✨Read Replication** - Enable/disable global read replicas with D1 Sessions API info
+- **Unified Backup & Restore Hub** *(Cloudflare Workers only)* - Undo history and R2 backups in one dialog with bulk restore/download/delete, backup counts, source tags, and orphaned-backup visibility
+- **Scheduled R2 Backups** *(Cloudflare Workers only)* - Daily/weekly/monthly schedules with per-database controls, next-run previews, last-run status, and job history integration
+- **Foreign Key Visualizer & ER Diagram** - Interactive graphs with fullscreen mode, export (PNG/SVG/JSON), alphabetized dropdowns, and dual layouts (hierarchical/force-directed)
+- **Cascade Impact Simulator** - Preview DELETE cascades before execution with optimized dependency checks and multi-format export (CSV/JSON/Text/PDF)
+- **Circular Dependency Detector** - DFS-based cycle detection with severity classification and breaking suggestions
+- **Undo/Rollback with safeguards** - Automatic undo snapshots for destructive operations (R2 backups available on Cloudflare Workers deployments)
+- **FTS5 Full-Text Search** - Manage virtual tables, convert to/from regular tables, dedicated FTS5 search mode in main Search tab, and quick actions on FTS5 table cards
+- **Index Analyzer** - Smart index recommendations plus "Create All Indexes" one-click apply with progress tracking
+- **Metrics Dashboard** - Query volume (reads/writes), P90 latency, rows read, and storage trends via GraphQL Analytics with time range selector (24h/7d/30d)
+- **Time Travel** - View bookmarks, checkpoint history, manual checkpoint capture, and CLI restore commands
+- **Read Replication** - Enable/disable global read replicas with D1 Sessions API info
+- **Constraint Validator** - Validate foreign key, NOT NULL, and UNIQUE constraints across database with guided fix workflow
+
+### Webhook Notifications
+- **Event-driven webhooks** - Send HTTP notifications on key database events
+- **Configurable events** - database_create, database_delete, database_export, database_import, job_failed, batch_complete
+- **HMAC signatures** - Optional secret-based request signing for security
+- **Test webhooks** - Verify endpoint connectivity before going live
+- **Centralized Error Logging** - Structured logging with module-prefixed error codes, automatic webhook notifications for critical errors
+
+### User Experience
+- Dark/Light/System themes
+- Responsive design
+- **Sticky Navigation** - Main navigation stays fixed at top with backdrop blur
+- **Jump to Top Button** - Floating button on long pages (Job History, Search)
+- **Header Quick Links** - Direct access to Cloudflare Dashboard, D1 Docs, Wiki, and SQLite Docs
+- **Error Support Links** - All error messages include "Report this error" mailto link
+- **Enhanced Input Validation** - SQLite reserved word checking, constraint validation, and helpful suggestions
+
+### Performance
+- **Dramatically improved load times** - ER Diagram loads with single API call instead of N+1 calls
+- **Client-side caching** - 5-minute TTL for tables, schemas, FKs, indexes, FTS5, Time Travel, and Replication data
+- **Unified cache** - All relationship views share single cache entry for instant tab switching
+- **Metrics caching** - 2-minute TTL per time range for instant dashboard revisits
+- **Parallel batch processing** - Index Analyzer processes 5 tables at a time with parallel queries
+- **Smart cache invalidation** - Caches automatically cleared on data modifications
 
 ---
 
@@ -116,13 +164,56 @@ Open **http://localhost:8080**
 
 ## ⬆️ Upgrading
 
-### 1. Update Schema (Required for New Features)
+### 1. Update Schema
 
-Run this after updating to add new tables (safe to run multiple times):
+**Automated Migrations (Recommended)**
+
+D1 Manager includes an automated migration system:
+1. Update the container to the latest version
+2. Open the app - a banner will appear if schema updates are needed
+3. Click "Upgrade Now" to apply migrations automatically
+
+The app detects pending migrations and handles legacy installations gracefully.
+
+**Manual Schema Update (Alternative)**
+
+If you prefer manual control:
 
 ```bash
 npx wrangler d1 execute d1-manager-metadata --remote --file=worker/schema.sql
 ```
+
+Or apply individual migrations:
+
+```bash
+npx wrangler d1 execute d1-manager-metadata --remote --file=worker/migrations/002_add_color_tags.sql
+```
+
+| Migration | When to Run |
+|-----------|-------------|
+| `001_add_job_history.sql` | If you don't have job history tables yet |
+| `002_add_color_tags.sql` | If you don't have color tags yet |
+| `003_add_error_message_column.sql` | If you have job history but no error_message column |
+| `004_add_webhooks.sql` | If you don't have the webhooks table yet |
+
+> **Note:** New installations should use the automated migration system or `schema.sql`.
+
+### Docker vs Cloudflare Workers Features
+
+**Docker deployments do not require Durable Object configuration.** The Durable Object binding (used for R2 backups in Cloudflare Workers deployments) is not applicable to Docker containers.
+
+| Feature | Docker | Cloudflare Workers |
+|---------|--------|-------------------|
+| Database management | ✅ | ✅ |
+| Query console | ✅ | ✅ |
+| Download/Import backups | ✅ | ✅ |
+| R2 cloud backups | ❌ | ✅ (requires Durable Object) |
+| Scheduled R2 backups | ❌ | ✅ (requires Durable Object + cron) |
+| Backup before delete/rename | ❌ | ✅ (requires Durable Object) |
+
+If you see documentation about Durable Objects or `BACKUP_DO` bindings, those apply only to Cloudflare Workers deployments. Docker users can safely ignore those sections.
+
+For R2 backup features, deploy to Cloudflare Workers instead. See the main [README.md](README.md) for Workers deployment instructions.
 
 ### 2. Update Container
 
@@ -208,6 +299,8 @@ docker-compose pull && docker-compose up -d
 | `PORT` | ❌ | Port (default: `8080`) |
 | `NODE_ENV` | ❌ | Environment (default: `production`) |
 
+> **Note:** R2 Backup/Restore is only available when deploying to Cloudflare Workers (not Docker). Docker deployments can still use the Download/Import functionality for local backups.
+
 ---
 
 ## 📊 Container Info
@@ -228,7 +321,8 @@ docker-compose pull && docker-compose up -d
 | Tag | Description |
 |-----|-------------|
 | `latest` | Latest stable release |
-| `v1.1.1` | Specific version (recommended for production) |
+| `v2.0.0` | Specific version (recommended for production) |
+| `v1.2.0` | Previous stable release |
 | `sha-XXXXXX` | Commit SHA for reproducible builds |
 
 ---

@@ -11,19 +11,29 @@ export default defineConfig({
     },
   },
   build: {
-    // Increase chunk size warning limit (default is 500 kB)
-    // Main app bundle is ~750 kB with heavy dependencies split out
-    chunkSizeWarningLimit: 800,
+    // Chunk size warning limit - raised to accommodate optimized chunks
+    chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
-        // Manual chunks for better code splitting
+        // Manual chunks for better code splitting - split large vendor deps
         manualChunks: {
-          // Vendor chunks for large dependencies
-          'vendor-react': ['react', 'react-dom'],
-          'vendor-reactflow': ['reactflow', '@reactflow/core', '@reactflow/minimap', '@reactflow/controls', '@reactflow/background'],
-          'vendor-pdf': ['jspdf'],
+          'vendor-react': ['react', 'react-dom', 'scheduler'],
+          'vendor-reactflow': ['reactflow', '@reactflow/core', '@reactflow/minimap', '@reactflow/controls', '@reactflow/background', 'dagre'],
+          'vendor-pdf': ['jspdf', 'html2canvas'],
           'vendor-zip': ['jszip'],
-          'vendor-ui': ['@radix-ui/react-dialog', '@radix-ui/react-select', '@radix-ui/react-checkbox', '@radix-ui/react-label', '@radix-ui/react-radio-group', '@radix-ui/react-accordion', '@radix-ui/react-progress', '@radix-ui/react-slot'],
+          'vendor-ui': [
+            '@radix-ui/react-dialog', 
+            '@radix-ui/react-select', 
+            '@radix-ui/react-checkbox', 
+            '@radix-ui/react-label', 
+            '@radix-ui/react-radio-group', 
+            '@radix-ui/react-accordion', 
+            '@radix-ui/react-progress', 
+            '@radix-ui/react-slot'
+          ],
+          'vendor-icons': ['lucide-react'],
+          'vendor-sql': ['sql-formatter', 'prismjs'],
+          'vendor-utils': ['diff', 'drizzle-orm', 'jose'],
         },
       },
     },

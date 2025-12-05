@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -20,6 +20,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { getTableSchema, simulateAddForeignKey, type ColumnInfo, type ForeignKeyGraphNode, type CircularDependencyCycle } from '@/services/api';
 import { Checkbox } from '@/components/ui/checkbox';
+import { ErrorMessage } from '@/components/ui/error-message';
 
 interface ForeignKeyEditorProps {
   open: boolean;
@@ -57,7 +58,7 @@ export function ForeignKeyEditor({
   nodes,
   existingConstraint,
   onSave
-}: ForeignKeyEditorProps) {
+}: ForeignKeyEditorProps): React.JSX.Element {
   const [sourceTable, setSourceTable] = useState('');
   const [sourceColumn, setSourceColumn] = useState('');
   const [targetTable, setTargetTable] = useState('');
@@ -106,20 +107,19 @@ export function ForeignKeyEditor({
       return;
     }
     
-    const loadSourceColumns = async () => {
+    const loadSourceColumns = async (): Promise<void> => {
       setLoadingSourceCols(true);
       try {
         const cols = await getTableSchema(databaseId, sourceTable);
         setSourceColumns(cols);
-      } catch (err) {
-        console.error('Failed to load source columns:', err);
+      } catch {
         setError('Failed to load source table columns');
       } finally {
         setLoadingSourceCols(false);
       }
     };
     
-    loadSourceColumns();
+    void loadSourceColumns();
   }, [databaseId, sourceTable]);
   
   // Load target table columns
@@ -129,52 +129,74 @@ export function ForeignKeyEditor({
       return;
     }
     
-    const loadTargetColumns = async () => {
+    const loadTargetColumns = async (): Promise<void> => {
       setLoadingTargetCols(true);
       try {
         const cols = await getTableSchema(databaseId, targetTable);
         setTargetColumns(cols);
-      } catch (err) {
-        console.error('Failed to load target columns:', err);
+      } catch {
         setError('Failed to load target table columns');
       } finally {
         setLoadingTargetCols(false);
       }
     };
     
-    loadTargetColumns();
+    void loadTargetColumns();
   }, [databaseId, targetTable]);
   
+  // Track the debounce timer for cycle checking
+  const cycleCheckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  
+  // Memoized cycle check function to avoid recreation
+  const checkForCycles = useCallback(async (srcTable: string, tgtTable: string): Promise<void> => {
+    setCheckingCycle(true);
+    try {
+      const result = await simulateAddForeignKey(databaseId, srcTable, tgtTable);
+      if (result.wouldCreateCycle && result.cycle) {
+        setCycleWarning(result.cycle);
+        setAcknowledgedCycle(false);
+      } else {
+        setCycleWarning(null);
+        setAcknowledgedCycle(false);
+      }
+    } catch {
+      // Don't block FK creation if check fails
+      setCycleWarning(null);
+    } finally {
+      setCheckingCycle(false);
+    }
+  }, [databaseId]);
+  
   // Check for circular dependencies when both tables are selected (only in add mode)
+  // OPTIMIZED: Debounced to prevent rapid API calls when user is still selecting
   useEffect(() => {
+    // Clear any pending timer
+    if (cycleCheckTimerRef.current) {
+      clearTimeout(cycleCheckTimerRef.current);
+      cycleCheckTimerRef.current = null;
+    }
+    
     if (mode !== 'add' || !sourceTable || !targetTable) {
       setCycleWarning(null);
       setAcknowledgedCycle(false);
+      setCheckingCycle(false);
       return;
     }
     
-    const checkForCycles = async () => {
-      setCheckingCycle(true);
-      try {
-        const result = await simulateAddForeignKey(databaseId, sourceTable, targetTable);
-        if (result.wouldCreateCycle && result.cycle) {
-          setCycleWarning(result.cycle);
-          setAcknowledgedCycle(false);
-        } else {
-          setCycleWarning(null);
-          setAcknowledgedCycle(false);
-        }
-      } catch (err) {
-        console.error('Failed to check for cycles:', err);
-        // Don't block FK creation if check fails
-        setCycleWarning(null);
-      } finally {
-        setCheckingCycle(false);
+    // Debounce the cycle check by 500ms to avoid rapid API calls
+    setCheckingCycle(true); // Show loading state immediately
+    cycleCheckTimerRef.current = setTimeout(() => {
+      void checkForCycles(sourceTable, targetTable);
+    }, 500);
+    
+    // Cleanup on unmount or dependency change
+    return () => {
+      if (cycleCheckTimerRef.current) {
+        clearTimeout(cycleCheckTimerRef.current);
+        cycleCheckTimerRef.current = null;
       }
     };
-    
-    checkForCycles();
-  }, [databaseId, sourceTable, targetTable, mode]);
+  }, [sourceTable, targetTable, mode, checkForCycles]);
   
   // Validate column type compatibility
   useEffect(() => {
@@ -211,7 +233,7 @@ export function ForeignKeyEditor({
     setWarnings(newWarnings);
   }, [sourceColumn, targetColumn, sourceColumns, targetColumns, onDelete, onUpdate]);
   
-  const handleSave = async () => {
+  const handleSave = async (): Promise<void> => {
     setError(null);
     
     // Validation
@@ -283,8 +305,8 @@ export function ForeignKeyEditor({
               <SelectTrigger id="source-table">
                 <SelectValue placeholder="Select source table..." />
               </SelectTrigger>
-              <SelectContent>
-                {nodes.map(node => (
+              <SelectContent position="popper" className="max-h-[200px]">
+                {[...nodes].sort((a, b) => a.label.localeCompare(b.label)).map(node => (
                   <SelectItem key={node.id} value={node.id}>
                     {node.label}
                   </SelectItem>
@@ -308,8 +330,8 @@ export function ForeignKeyEditor({
                   'Select source column...'
                 } />
               </SelectTrigger>
-              <SelectContent>
-                {sourceColumns.map(col => (
+              <SelectContent position="popper" className="max-h-[200px]">
+                {[...sourceColumns].sort((a, b) => a.name.localeCompare(b.name)).map(col => (
                   <SelectItem key={col.name} value={col.name}>
                     {col.name} ({col.type || 'ANY'})
                   </SelectItem>
@@ -329,8 +351,8 @@ export function ForeignKeyEditor({
               <SelectTrigger id="target-table">
                 <SelectValue placeholder="Select target table..." />
               </SelectTrigger>
-              <SelectContent>
-                {nodes.filter(node => node.id !== sourceTable).map(node => (
+              <SelectContent position="popper" className="max-h-[200px]">
+                {[...nodes].filter(node => node.id !== sourceTable).sort((a, b) => a.label.localeCompare(b.label)).map(node => (
                   <SelectItem key={node.id} value={node.id}>
                     {node.label}
                   </SelectItem>
@@ -354,8 +376,8 @@ export function ForeignKeyEditor({
                   'Select target column...'
                 } />
               </SelectTrigger>
-              <SelectContent>
-                {targetColumns.map(col => (
+              <SelectContent position="popper" className="max-h-[200px]">
+                {[...targetColumns].sort((a, b) => a.name.localeCompare(b.name)).map(col => (
                   <SelectItem key={col.name} value={col.name}>
                     {col.name} ({col.type || 'ANY'})
                     {col.pk > 0 && ' [PK]'}
@@ -376,7 +398,7 @@ export function ForeignKeyEditor({
               <SelectTrigger id="on-delete">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent position="popper">
                 {FK_ACTIONS.map(action => (
                   <SelectItem key={action} value={action}>
                     {action}
@@ -400,7 +422,7 @@ export function ForeignKeyEditor({
               <SelectTrigger id="on-update">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent position="popper">
                 {FK_ACTIONS.map(action => (
                   <SelectItem key={action} value={action}>
                     {action}
@@ -423,6 +445,7 @@ export function ForeignKeyEditor({
                 value={constraintName}
                 onChange={(e) => setConstraintName(e.target.value)}
                 disabled={saving}
+                autoComplete="off"
               />
             </div>
           )}
@@ -488,11 +511,7 @@ export function ForeignKeyEditor({
           )}
           
           {/* Error */}
-          {error && (
-            <div className="bg-destructive/10 border border-destructive text-destructive px-3 py-2 rounded-lg text-sm">
-              {error}
-            </div>
-          )}
+          <ErrorMessage error={error} variant="inline" />
         </div>
         
         <DialogFooter>
@@ -504,7 +523,7 @@ export function ForeignKeyEditor({
             Cancel
           </Button>
           <Button
-            onClick={handleSave}
+            onClick={() => void handleSave()}
             disabled={
               saving ||
               !sourceTable ||
@@ -513,6 +532,7 @@ export function ForeignKeyEditor({
               !targetColumn ||
               loadingSourceCols ||
               loadingTargetCols ||
+              checkingCycle ||
               (cycleWarning !== null && !acknowledgedCycle)
             }
           >

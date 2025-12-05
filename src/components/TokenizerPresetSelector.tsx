@@ -8,8 +8,8 @@ interface TokenizerPresetSelectorProps {
   disabled?: boolean;
 }
 
-export function TokenizerPresetSelector({ value, onChange, disabled }: TokenizerPresetSelectorProps) {
-  const handlePresetChange = (presetType: string) => {
+export function TokenizerPresetSelector({ value, onChange, disabled }: TokenizerPresetSelectorProps): React.JSX.Element {
+  const handlePresetChange = (presetType: string): void => {
     const preset = TOKENIZER_PRESETS.find(p => p.type === presetType);
     if (preset) {
       onChange({

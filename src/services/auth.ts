@@ -8,7 +8,7 @@ class AuthService {
   /**
    * Logout - Redirects to Cloudflare Access logout endpoint
    */
-  async logout(): Promise<void> {
+  logout(): void {
     try {
       // Clear any local storage/session storage first
       localStorage.clear();
@@ -22,8 +22,7 @@ class AuthService {
       // and redirect back to the login page
       window.location.replace('/cdn-cgi/access/logout');
       
-    } catch (error) {
-      console.error('Logout failed:', error);
+    } catch {
       // Clear storage and force redirect anyway
       localStorage.clear();
       sessionStorage.clear();
@@ -43,7 +42,6 @@ class AuthService {
 
   initialize(): void {
     // No initialization needed - Cloudflare Access handles everything
-    console.log('[Auth] Cloudflare Access authentication initialized');
   }
 }
 

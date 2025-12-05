@@ -1,18 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { getJobList, type JobListItem, type D1Database } from '../services/api';
-import { Loader2, CheckCircle2, XCircle, AlertCircle, FileText, Download, Upload, Trash2, Search, ArrowUp, ArrowDown, X, Database, RefreshCw, Pencil, Copy, Zap } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, AlertCircle, FileText, Download, Upload, Trash2, Search, ArrowUp, ArrowDown, X, Database, RefreshCw, Pencil, Copy, Zap, Plus, Columns, Link2, Type, ListOrdered, Undo2, Wrench, Shield, ChevronUp } from 'lucide-react';
 import { JobHistoryDialog } from './JobHistoryDialog';
 
 interface JobHistoryProps {
   databases: D1Database[];
 }
 
-export function JobHistory({ databases }: JobHistoryProps) {
+export function JobHistory({ databases }: JobHistoryProps): React.JSX.Element {
   const [jobs, setJobs] = useState<JobListItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -28,7 +28,22 @@ export function JobHistory({ databases }: JobHistoryProps) {
   const [offset, setOffset] = useState(0);
   const [total, setTotal] = useState(0);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
   const limit = 20;
+
+  // Scroll-to-top button visibility
+  useEffect(() => {
+    const handleScroll = (): void => {
+      setShowScrollTop(window.scrollY > 300);
+    };
+    
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const scrollToTop = useCallback((): void => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
 
   // Debounce job ID search
   useEffect(() => {
@@ -38,7 +53,7 @@ export function JobHistory({ databases }: JobHistoryProps) {
     return () => clearTimeout(timer);
   }, [jobIdInput]);
 
-  const loadJobs = async (reset = false) => {
+  const loadJobs = async (reset = false): Promise<void> => {
     try {
       setLoading(true);
       setError('');
@@ -118,7 +133,6 @@ export function JobHistory({ databases }: JobHistoryProps) {
 
       setTotal(data.total);
     } catch (err) {
-      console.error('Failed to load job history:', err);
       setError(err instanceof Error ? err.message : 'Failed to load job history');
     } finally {
       setLoading(false);
@@ -126,15 +140,15 @@ export function JobHistory({ databases }: JobHistoryProps) {
   };
 
   useEffect(() => {
-    loadJobs(true);
+    void loadJobs(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter, operationFilter, databaseFilter, datePreset, jobIdSearch, minErrors, sortBy, sortOrder]);
 
-  const handleLoadMore = () => {
-    loadJobs(false);
+  const handleLoadMore = (): void => {
+    void loadJobs(false);
   };
 
-  const handleResetFilters = () => {
+  const handleResetFilters = (): void => {
     setStatusFilter('all');
     setOperationFilter('all');
     setDatabaseFilter('all');
@@ -146,27 +160,49 @@ export function JobHistory({ databases }: JobHistoryProps) {
     setSortOrder('desc');
   };
 
-  const toggleSortOrder = () => {
+  const toggleSortOrder = (): void => {
     setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
   };
 
-  const formatTimestamp = (timestamp: string) => {
+  const formatTimestamp = (timestamp: string): string => {
     const date = new Date(timestamp);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
-
-    if (diffMins < 1) return 'just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-
-    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
   };
 
-  const getStatusBadge = (status: string) => {
+  const formatDuration = (startedAt: string, completedAt: string | null): string | null => {
+    if (!completedAt) return null;
+    
+    const start = new Date(startedAt).getTime();
+    const end = new Date(completedAt).getTime();
+    const durationMs = end - start;
+    
+    if (durationMs < 0) return null;
+    
+    if (durationMs < 1000) {
+      return `${String(durationMs)}ms`;
+    } else if (durationMs < 60000) {
+      const seconds = Math.floor(durationMs / 1000);
+      const ms = durationMs % 1000;
+      return ms > 0 ? `${String(seconds)}.${String(Math.floor(ms / 100))}s` : `${String(seconds)}s`;
+    } else if (durationMs < 3600000) {
+      const minutes = Math.floor(durationMs / 60000);
+      const seconds = Math.floor((durationMs % 60000) / 1000);
+      return seconds > 0 ? `${String(minutes)}m ${String(seconds)}s` : `${String(minutes)}m`;
+    } else {
+      const hours = Math.floor(durationMs / 3600000);
+      const minutes = Math.floor((durationMs % 3600000) / 60000);
+      return minutes > 0 ? `${String(hours)}h ${String(minutes)}m` : `${String(hours)}h`;
+    }
+  };
+
+  const getStatusBadge = (status: string): React.JSX.Element => {
     switch (status) {
       case 'completed':
         return (
@@ -212,8 +248,11 @@ export function JobHistory({ databases }: JobHistoryProps) {
     }
   };
 
-  const getOperationIcon = (operationType: string) => {
+  const getOperationIcon = (operationType: string): React.JSX.Element => {
     switch (operationType) {
+      // Database operations
+      case 'database_create':
+        return <Plus className="h-4 w-4" />;
       case 'database_export':
         return <Download className="h-4 w-4" />;
       case 'database_import':
@@ -224,19 +263,66 @@ export function JobHistory({ databases }: JobHistoryProps) {
         return <Pencil className="h-4 w-4" />;
       case 'database_optimize':
         return <Zap className="h-4 w-4" />;
+      // Table operations
+      case 'table_create':
+        return <Plus className="h-4 w-4" />;
       case 'table_export':
         return <Download className="h-4 w-4" />;
       case 'table_delete':
         return <Trash2 className="h-4 w-4" />;
+      case 'table_rename':
+        return <Pencil className="h-4 w-4" />;
       case 'table_clone':
         return <Copy className="h-4 w-4" />;
+      case 'table_strict':
+        return <Shield className="h-4 w-4" />;
+      case 'row_delete':
+        return <Trash2 className="h-4 w-4" />;
+      // Column operations
+      case 'column_add':
+        return <Plus className="h-4 w-4" />;
+      case 'column_rename':
+        return <Pencil className="h-4 w-4" />;
+      case 'column_modify':
+        return <Columns className="h-4 w-4" />;
+      case 'column_delete':
+        return <Trash2 className="h-4 w-4" />;
+      // Foreign key operations
+      case 'foreign_key_add':
+        return <Link2 className="h-4 w-4" />;
+      case 'foreign_key_modify':
+        return <Link2 className="h-4 w-4" />;
+      case 'foreign_key_delete':
+        return <Trash2 className="h-4 w-4" />;
+      // FTS5 operations
+      case 'fts5_create':
+      case 'fts5_create_from_table':
+        return <Type className="h-4 w-4" />;
+      case 'fts5_delete':
+        return <Trash2 className="h-4 w-4" />;
+      case 'fts5_rebuild':
+        return <RefreshCw className="h-4 w-4" />;
+      case 'fts5_optimize':
+        return <Zap className="h-4 w-4" />;
+      // Index operations
+      case 'index_create':
+        return <ListOrdered className="h-4 w-4" />;
+      // Constraint operations
+      case 'constraint_fix':
+        return <Wrench className="h-4 w-4" />;
+      // Undo operations
+      case 'undo_restore':
+        return <Undo2 className="h-4 w-4" />;
       default:
         return <FileText className="h-4 w-4" />;
     }
   };
 
-  const getOperationLabel = (operationType: string) => {
+  const getOperationLabel = (operationType: string): string => {
     switch (operationType) {
+      // Database operations
+      case 'database_create':
+        return 'Database Create';
       case 'database_export':
         return 'Database Export';
       case 'database_import':
@@ -247,18 +333,63 @@ export function JobHistory({ databases }: JobHistoryProps) {
         return 'Database Rename';
       case 'database_optimize':
         return 'Database Optimize';
+      // Table operations
+      case 'table_create':
+        return 'Table Create';
       case 'table_export':
         return 'Table Export';
       case 'table_delete':
         return 'Table Delete';
+      case 'table_rename':
+        return 'Table Rename';
       case 'table_clone':
         return 'Table Clone';
+      case 'table_strict':
+        return 'Enable STRICT Mode';
+      case 'row_delete':
+        return 'Row Delete';
+      // Column operations
+      case 'column_add':
+        return 'Column Add';
+      case 'column_rename':
+        return 'Column Rename';
+      case 'column_modify':
+        return 'Column Modify';
+      case 'column_delete':
+        return 'Column Delete';
+      // Foreign key operations
+      case 'foreign_key_add':
+        return 'Foreign Key Add';
+      case 'foreign_key_modify':
+        return 'Foreign Key Modify';
+      case 'foreign_key_delete':
+        return 'Foreign Key Delete';
+      // FTS5 operations
+      case 'fts5_create':
+        return 'FTS5 Create';
+      case 'fts5_create_from_table':
+        return 'FTS5 Create from Table';
+      case 'fts5_delete':
+        return 'FTS5 Delete';
+      case 'fts5_rebuild':
+        return 'FTS5 Rebuild';
+      case 'fts5_optimize':
+        return 'FTS5 Optimize';
+      // Index operations
+      case 'index_create':
+        return 'Index Create';
+      // Constraint operations
+      case 'constraint_fix':
+        return 'Constraint Fix';
+      // Undo operations
+      case 'undo_restore':
+        return 'Undo Restore';
       default:
         return operationType;
     }
   };
 
-  const getDatabaseName = (databaseId: string) => {
+  const getDatabaseName = (databaseId: string): string => {
     const database = databases.find((db) => db.uuid === databaseId);
     return database?.name || databaseId;
   };
@@ -275,7 +406,7 @@ export function JobHistory({ databases }: JobHistoryProps) {
               View history and event timeline for all bulk operations
             </p>
           </div>
-          <Button variant="outline" onClick={() => loadJobs(true)} disabled={loading}>
+          <Button variant="outline" onClick={() => void loadJobs(true)} disabled={loading}>
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
@@ -312,14 +443,40 @@ export function JobHistory({ databases }: JobHistoryProps) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Operations</SelectItem>
+                  {/* Database Operations */}
+                  <SelectItem value="database_create">Database Create</SelectItem>
                   <SelectItem value="database_export">Database Export</SelectItem>
                   <SelectItem value="database_import">Database Import</SelectItem>
                   <SelectItem value="database_delete">Database Delete</SelectItem>
                   <SelectItem value="database_rename">Database Rename</SelectItem>
                   <SelectItem value="database_optimize">Database Optimize</SelectItem>
+                  {/* Table Operations */}
+                  <SelectItem value="table_create">Table Create</SelectItem>
                   <SelectItem value="table_export">Table Export</SelectItem>
                   <SelectItem value="table_delete">Table Delete</SelectItem>
+                  <SelectItem value="table_rename">Table Rename</SelectItem>
                   <SelectItem value="table_clone">Table Clone</SelectItem>
+                  <SelectItem value="table_strict">Enable STRICT Mode</SelectItem>
+                  <SelectItem value="row_delete">Row Delete</SelectItem>
+                  {/* Column Operations */}
+                  <SelectItem value="column_add">Column Add</SelectItem>
+                  <SelectItem value="column_rename">Column Rename</SelectItem>
+                  <SelectItem value="column_modify">Column Modify</SelectItem>
+                  <SelectItem value="column_delete">Column Delete</SelectItem>
+                  {/* Foreign Key Operations */}
+                  <SelectItem value="foreign_key_add">Foreign Key Add</SelectItem>
+                  <SelectItem value="foreign_key_modify">Foreign Key Modify</SelectItem>
+                  <SelectItem value="foreign_key_delete">Foreign Key Delete</SelectItem>
+                  {/* FTS5 Operations */}
+                  <SelectItem value="fts5_create">FTS5 Create</SelectItem>
+                  <SelectItem value="fts5_create_from_table">FTS5 Create from Table</SelectItem>
+                  <SelectItem value="fts5_delete">FTS5 Delete</SelectItem>
+                  <SelectItem value="fts5_rebuild">FTS5 Rebuild</SelectItem>
+                  <SelectItem value="fts5_optimize">FTS5 Optimize</SelectItem>
+                  {/* Other Operations */}
+                  <SelectItem value="index_create">Index Create</SelectItem>
+                  <SelectItem value="constraint_fix">Constraint Fix</SelectItem>
+                  <SelectItem value="undo_restore">Undo Restore</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -506,20 +663,28 @@ export function JobHistory({ databases }: JobHistoryProps) {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                   <div>
                     <div className="text-muted-foreground text-xs">Started</div>
-                    <div className="font-medium" title={new Date(job.started_at).toLocaleString()}>
+                    <div className="font-medium">
                       {formatTimestamp(job.started_at)}
                     </div>
                   </div>
-                  {job.total_items !== null && (
+                  {formatDuration(job.started_at, job.completed_at) && (
                     <div>
-                      <div className="text-muted-foreground text-xs">Total Items</div>
-                      <div className="font-medium">{job.total_items.toLocaleString()}</div>
+                      <div className="text-muted-foreground text-xs">Duration</div>
+                      <div className="font-medium">{formatDuration(job.started_at, job.completed_at)}</div>
                     </div>
                   )}
-                  {job.processed_items !== null && (
+                  <div>
+                    <div className="text-muted-foreground text-xs">Progress</div>
+                    <div className={`font-medium ${job.percentage === 100 ? 'text-green-600 dark:text-green-400' : ''}`}>
+                      {String(Math.round(job.percentage))}%
+                    </div>
+                  </div>
+                  {job.total_items !== null && job.total_items > 1 && (
                     <div>
-                      <div className="text-muted-foreground text-xs">Processed</div>
-                      <div className="font-medium">{job.processed_items.toLocaleString()}</div>
+                      <div className="text-muted-foreground text-xs">Items</div>
+                      <div className="font-medium">
+                        {job.processed_items !== null ? `${job.processed_items.toLocaleString()} / ` : ''}{job.total_items.toLocaleString()}
+                      </div>
                     </div>
                   )}
                   {job.error_count !== null && job.error_count > 0 && (
@@ -531,6 +696,17 @@ export function JobHistory({ databases }: JobHistoryProps) {
                     </div>
                   )}
                 </div>
+                {/* Error message for failed jobs */}
+                {job.status === 'failed' && job.error_message && (
+                  <div className="mt-3 p-2 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-md">
+                    <div className="flex items-start gap-2">
+                      <XCircle className="h-4 w-4 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                      <div className="text-sm text-red-700 dark:text-red-300 break-words">
+                        {job.error_message}
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div className="mt-3 text-xs text-muted-foreground font-mono">
                   Job ID: {job.job_id}
                 </div>
@@ -548,7 +724,7 @@ export function JobHistory({ databases }: JobHistoryProps) {
                     Loading...
                   </>
                 ) : (
-                  `Load More (${jobs.length} of ${total})`
+                  `Load More (${String(jobs.length)} of ${String(total)})`
                 )}
               </Button>
             </div>
@@ -563,6 +739,21 @@ export function JobHistory({ databases }: JobHistoryProps) {
           jobId={selectedJobId}
           onClose={() => setSelectedJobId(null)}
         />
+      )}
+
+      {/* Scroll to Top Button */}
+      {showScrollTop && (
+        <Button
+          variant="default"
+          size="sm"
+          onClick={scrollToTop}
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 h-10 px-4 rounded-full shadow-xl bg-primary hover:bg-primary/90 text-primary-foreground gap-2"
+          aria-label="Scroll to top"
+          title="Scroll to top"
+        >
+          <ChevronUp className="h-5 w-5" />
+          <span className="text-sm font-medium">Back to Top</span>
+        </Button>
       )}
     </div>
   );

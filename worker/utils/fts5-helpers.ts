@@ -69,7 +69,7 @@ export function buildTokenizerString(config: TokenizerConfig): string {
     const params: string[] = [];
     
     if (parameters?.remove_diacritics !== undefined) {
-      params.push(`remove_diacritics ${parameters.remove_diacritics}`);
+      params.push(`remove_diacritics ${String(parameters.remove_diacritics)}`);
     }
     
     if (params.length > 0) {
@@ -85,7 +85,7 @@ export function buildTokenizerString(config: TokenizerConfig): string {
   const params: string[] = [];
   
   if (parameters.remove_diacritics !== undefined) {
-    params.push(`remove_diacritics ${parameters.remove_diacritics}`);
+    params.push(`remove_diacritics ${String(parameters.remove_diacritics)}`);
   }
   
   if (parameters.categories) {
@@ -101,7 +101,7 @@ export function buildTokenizerString(config: TokenizerConfig): string {
   }
   
   if (parameters.case_sensitive !== undefined && type === 'trigram') {
-    params.push(`case_sensitive ${parameters.case_sensitive}`);
+    params.push(`case_sensitive ${String(parameters.case_sensitive)}`);
   }
   
   if (params.length === 0) {
@@ -128,20 +128,20 @@ export function extractFTS5Config(createSql: string): Partial<FTS5TableConfig> |
   const config: Partial<FTS5TableConfig> = {};
   
   // Extract table name
-  const tableNameMatch = createSql.match(/CREATE\s+VIRTUAL\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?["']?(\w+)["']?/i);
+  const tableNameMatch = /CREATE\s+VIRTUAL\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?["']?(\w+)["']?/i.exec(createSql);
   if (tableNameMatch?.[1]) {
     config.tableName = tableNameMatch[1];
   }
   
   // Extract tokenizer
-  const tokenizerMatch = createSql.match(/tokenize\s*=\s*'([^']+)'/i);
+  const tokenizerMatch = /tokenize\s*=\s*'([^']+)'/i.exec(createSql);
   if (tokenizerMatch?.[1]) {
     const tokenizerStr = tokenizerMatch[1];
     config.tokenizer = parseTokenizerString(tokenizerStr);
   }
   
   // Extract prefix index
-  const prefixMatch = createSql.match(/prefix\s*=\s*'([^']+)'/i);
+  const prefixMatch = /prefix\s*=\s*'([^']+)'/i.exec(createSql);
   if (prefixMatch?.[1]) {
     const lengths = prefixMatch[1].split(/\s+/).map(l => parseInt(l, 10)).filter(l => !isNaN(l));
     config.prefixIndex = {
@@ -151,19 +151,19 @@ export function extractFTS5Config(createSql: string): Partial<FTS5TableConfig> |
   }
   
   // Extract content table
-  const contentMatch = createSql.match(/content\s*=\s*'([^']+)'/i);
+  const contentMatch = /content\s*=\s*'([^']+)'/i.exec(createSql);
   if (contentMatch?.[1]) {
     config.contentTable = contentMatch[1];
   }
   
   // Extract content rowid
-  const contentRowIdMatch = createSql.match(/content_rowid\s*=\s*'([^']+)'/i);
+  const contentRowIdMatch = /content_rowid\s*=\s*'([^']+)'/i.exec(createSql);
   if (contentRowIdMatch?.[1]) {
     config.contentRowId = contentRowIdMatch[1];
   }
   
   // Extract columns (this is complex due to UNINDEXED modifiers)
-  const columnsMatch = createSql.match(/USING\s+fts5\s*\(([^)]+)\)/i);
+  const columnsMatch = /USING\s+fts5\s*\(([^)]+)\)/i.exec(createSql);
   if (columnsMatch?.[1]) {
     const columnsPart = columnsMatch[1];
     const columns: string[] = [];
@@ -177,14 +177,14 @@ export function extractFTS5Config(createSql: string): Partial<FTS5TableConfig> |
       if (part.includes('=')) continue;
       
       // Check for UNINDEXED modifier
-      const unindexedMatch = part.match(/(\w+)\s+UNINDEXED/i);
+      const unindexedMatch = /(\w+)\s+UNINDEXED/i.exec(part);
       if (unindexedMatch?.[1]) {
         const colName = unindexedMatch[1];
         columns.push(colName);
         unindexed.push(colName);
       } else {
         // Regular column
-        const colMatch = part.match(/(\w+)/);
+        const colMatch = /(\w+)/.exec(part);
         if (colMatch?.[1]) {
           columns.push(colMatch[1]);
         }
@@ -278,7 +278,7 @@ export function buildFTS5SearchQuery(
   if (rankingFunction === 'bm25custom' && (bm25_k1 !== undefined || bm25_b !== undefined)) {
     const k1 = bm25_k1 ?? 1.2;
     const b = bm25_b ?? 0.75;
-    selectParts.push(`bm25("${tableName}", ${k1}, ${b}) AS rank`);
+    selectParts.push(`bm25("${tableName}", ${String(k1)}, ${String(b)}) AS rank`);
   } else {
     selectParts.push(`bm25("${tableName}") AS rank`);
   }
@@ -293,7 +293,7 @@ export function buildFTS5SearchQuery(
     // snippet(table, column_idx, startMark, endMark, ellipsis, tokenCount)
     // Using -1 for column_idx means use all columns
     selectParts.push(
-      `snippet("${tableName}", -1, '${startMark}', '${endMark}', '${ellipsis}', ${tokenCount}) AS snippet`
+      `snippet("${tableName}", -1, '${startMark}', '${endMark}', '${ellipsis}', ${String(tokenCount)}) AS snippet`
     );
   }
   
@@ -303,7 +303,7 @@ export function buildFTS5SearchQuery(
     FROM "${tableName}"
     WHERE ${matchClause}
     ORDER BY rank
-    LIMIT ${limit} OFFSET ${offset};
+    LIMIT ${String(limit)} OFFSET ${String(offset)};
   `.trim();
   
   return { query: sql, includeSnippet };
@@ -408,7 +408,7 @@ export function buildFTS5PopulateQuery(
   ftsTableName: string,
   sourceTable: string,
   columns: string[],
-  useRowId: boolean = false
+  useRowId = false
 ): string {
   const columnList = columns.join(', ');
   

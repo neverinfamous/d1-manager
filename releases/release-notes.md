@@ -1,5 +1,245 @@
 # D1 Database Manager - Release Notes
 
+## Version 2.0.0 - Enterprise-Ready Release
+**Release Date:** December 5, 2025  
+**Status:** Production/Stable
+
+This major release transforms D1 Database Manager into an enterprise-ready solution with Drizzle ORM integration, scheduled R2 backups, a comprehensive metrics dashboard, and dramatic performance improvements. No breaking changes - all new features are additive.
+
+> **⬆️ Upgrading from v1.x?** If you want to use R2 backup features (scheduled backups, backup before delete/rename), you need to add a **Durable Object binding** to your `wrangler.toml`. See the [Upgrading section in README.md](https://github.com/neverinfamous/d1-manager#%EF%B8%8F-upgrading) for step-by-step instructions. Docker users can skip this - Durable Objects only apply to Cloudflare Workers deployments.
+
+---
+
+### 🎉 Major New Features
+
+#### Drizzle ORM Console
+- **Introspect** - Pull schema from D1 database and generate Drizzle TypeScript schema
+- **Migration Status** - View applied Drizzle migrations and migration history
+- **Generate** - Upload or paste Drizzle schema to preview migration SQL
+- **Push** - Push schema changes directly to database (with dry-run option)
+- **Check** - Validate schema against current database state
+- **Export** - Download generated schema as `schema.ts` TypeScript file
+- **Schema Input** - Upload `.ts` file or paste schema directly into textarea
+- **Schema Comparison** - Parses Drizzle schema and generates SQL diff against current database
+- Schema viewer with syntax highlighting and copy-to-clipboard
+- Output log panel showing command execution history
+- Automatic cache invalidation after push (table list refreshes without page reload)
+
+#### Scheduled R2 Backups
+- Configure daily, weekly, or monthly backup schedules per database
+- Backups run automatically via Cloudflare Workers cron triggers (hourly check)
+- Choose specific day of week for weekly backups, day of month for monthly
+- Select backup hour (0-23 UTC) for precise scheduling
+- Enable/disable schedules without deleting configuration
+- View last run status (success/failed), next run time, and backup history
+- All scheduled backups appear in the Backup & Restore hub for easy restore
+- Job history tracks all scheduled backups as "Scheduled Backup" operation type
+- New "Schedule" tab in Backup & Restore dialog for per-database configuration
+
+#### Metrics Dashboard
+- **Summary cards** - Total queries (reads/writes), rows read, average P90 latency, total storage
+- **Time range selector** - Last 24 hours, 7 days, or 30 days
+- **Query volume trend chart** - Shows reads and writes over time
+- **Rows read trend chart** - Important for billing visibility
+- **Per-database breakdown** - Horizontal bar charts
+- **Detailed metrics table** - All database statistics
+- Lightweight SVG-based charts (no heavy chart library dependencies)
+- Full accessibility: screen reader support, keyboard navigation, WCAG-compliant contrast
+- 2-minute caching per time range for instant dashboard revisits
+
+#### Unified Backup & Restore Hub
+- Replaces separate Undo History and R2 Restore dialogs with a single, tabbed interface
+- **Quick Restore Tab** - Undo recent destructive operations (last 10 dropped tables, columns, deleted rows)
+- **R2 Backups Tab** - Full database snapshots stored in R2 cloud storage
+- **Schedule Tab** - Configure automated backup schedules per database
+- Multi-select capability for bulk download and bulk delete of R2 backups
+- File size and creation date displayed for each backup
+- Source tags show backup origin (Manual, Before Rename, Before STRICT Mode, Scheduled, etc.)
+- Database picker shows R2 backup counts alongside undo counts
+- **Orphaned Backups Section** - View and restore backups from deleted databases
+
+#### Comprehensive Safety Backups
+- **Delete Database** - Creates R2 backup before deletion; backup viewable/restorable in Backup & Restore hub
+- **Rename Database** - Creates R2 backup before rename operation
+- **Delete Table** - Creates undo snapshot for quick restore
+- **Enable STRICT Mode** - Creates R2 backup before table conversion
+- **Modify Column** - Creates undo snapshot before schema changes
+- **FTS5 Conversion** - Creates undo snapshot when converting FTS5 tables
+- Deleted database backups persist and can be restored even after database deletion
+
+#### SQL Formatter & Autocomplete Toggle
+- **SQL Formatter** - One-click formatting with `sql-formatter` library using SQLite dialect
+- **SQL Autocomplete Toggle** - Turn suggestions on/off with preference persisted to localStorage
+- Dynamic placeholder text and help hints based on toggle state
+
+#### Table-Level R2 Backup & Restore
+- Each table card now has quick-access Backup and Restore icons
+- Create instant R2 backups of individual tables
+- Restore tables directly from R2 backups via table card actions
+- Available in both Grid view (card icons) and List view (action column buttons)
+- Table backups distinguished from database backups with visual badges
+
+#### STRICT Mode Enhancements
+- **Create tables with STRICT mode** - New checkbox in Schema Designer
+- Column type dropdown automatically filters to STRICT-compatible types (INTEGER, REAL, TEXT, BLOB, ANY)
+- Generated columns disabled when STRICT mode is selected (not supported together)
+- **Pre-conversion validation** - Shows blockers (red), warnings (amber), and compatibility status before conversion
+- Improved type inference sampling data to detect actual types in use
+- Virtual tables (FTS5, FTS4, rtree) and generated columns blocked with helpful error messages
+
+#### Generated Column Support
+- Create STORED or VIRTUAL generated columns in Schema Designer
+- Add generated columns to existing tables via Add Column dialog
+- Expression editor with syntax validation
+- Purple "STORED" or "VIRTUAL" badges in schema display
+- Proper handling in row operations (read-only values)
+
+#### Create All Indexes Button
+- One-click creation of all recommended indexes on Performance tab
+- Warning dialog explains impact on storage and write performance
+- Optional R2 backup before proceeding (when R2 is configured)
+- Progress indicator shows real-time creation status
+- Detailed results showing succeeded and failed indexes
+
+---
+
+### 🚀 Performance Improvements
+
+#### ER Diagram Load Optimization
+- ER Diagram now loads with a single API call instead of N+1 calls
+- Added `includeSchemas` parameter to `/api/tables/{dbId}/foreign-keys` endpoint
+- Backend returns full column schemas for all tables in one request
+- **60-70% faster** load times for databases with many tables
+
+#### Index Analyzer Optimization
+- Parallel batch processing: Processes 5 tables at a time instead of sequential
+- Within each batch, fetches columns, FKs, and indexes in parallel
+- Client-side caching with 60-second TTL to avoid redundant API calls
+- "Re-analyze" button forces fresh analysis (bypasses cache)
+
+#### Comprehensive Client-Side Caching
+- **Tables Tab** - 5-minute cache for instant tab switching
+- **Table Schema** - 5-minute cache, invalidated on column modifications
+- **Foreign Keys** - 5-minute cache, invalidated on FK modifications
+- **R2 Backup Status** - 10-minute cache shared across all components
+- **FTS5 Manager** - 5-minute cache, invalidated on create/delete
+- **Time Travel** - 5-minute cache, invalidated on capture/delete
+- **Replication** - 5-minute cache, invalidated on mode change
+- **Metrics** - 2-minute cache per time range
+- **Unified Relationship Tabs** - All views share single cache entry
+
+#### Additional Optimizations
+- Cascade Impact Simulator uses upfront FK index building instead of per-step API calls
+- Circular Dependencies Detector uses lightweight graph builder (~65% fewer API calls)
+- Delete Table dependency check reduced from O(M×N) to O(N) API calls
+- TableView shows cached schema immediately while loading fresh rows
+
+---
+
+### 🛠️ UI/UX Improvements
+
+#### Database & Table List Views
+- Toggle between grid (cards) and list (table) view for both databases and tables
+- Sortable columns: Name, Size, Tables, Created date (databases); Name, Type, Columns, Rows (tables)
+- All action buttons available in list view
+- List view is default for tables (faster rendering)
+- View preference persisted to localStorage
+
+#### Fullscreen Mode for Graphs
+- View Foreign Key Editor and ER Diagram in fullscreen
+- Maximize button in toolbar expands diagram to fill entire viewport
+- Press Escape or click minimize button to exit
+- Diagram automatically refits when entering/exiting fullscreen
+
+#### Enhanced Job History
+- Full date/time display (e.g., "Dec 2, 2025, 11:16 AM") instead of relative times
+- Duration column showing job execution time (ms, s, m, h)
+- Progress percentage column with green highlight at 100%
+- Combined Items column showing "processed / total"
+- New "Scheduled Backup" operation type for automated backups
+
+#### External Documentation Links
+- Quick-access icon buttons in the header
+- Cloudflare Dashboard, D1 Documentation, D1 Manager Wiki, SQLite Documentation
+- All links open in new tabs with proper accessibility attributes
+
+#### Sticky Navigation & Jump to Top
+- Main navigation bar stays fixed at top when scrolling with backdrop blur
+- Floating "Back to Top" button on Job History and Search pages
+- Appears after scrolling down 300px with smooth scroll animation
+
+#### Expanded Color Picker
+- 27 colors (up from 9) organized by hue family
+- 6-column grid layout: Reds/Pinks, Oranges/Yellows, Greens/Teals, Blues/Purples, Neutrals
+
+#### Always-Visible Undo History
+- Undo icon always visible in the header with total undo count badge
+- Database picker dialog when clicking from list view
+- View any database's undo history without navigating to it first
+
+#### Error Support Links
+- All error messages include "Report this error to support@adamic.tech" mailto link
+- Reusable ErrorMessage component with consistent styling
+- WCAG/ARIA compliant with proper `role="alert"` and `aria-live` attributes
+
+---
+
+### 🔧 API & Backend Changes
+
+#### New Endpoints
+- `GET /api/metrics?range=24h|7d|30d` - D1 analytics via GraphQL
+- `GET /api/scheduled-backups` - List scheduled backups
+- `POST /api/scheduled-backups` - Create/update scheduled backup
+- `DELETE /api/scheduled-backups/:dbId` - Delete scheduled backup
+- `POST /api/drizzle/:dbId/introspect` - Generate Drizzle schema
+- `GET /api/drizzle/:dbId/migrations` - Migration status
+- `POST /api/drizzle/:dbId/push` - Push schema changes
+- `POST /api/drizzle/:dbId/check` - Validate schema
+- `GET /api/drizzle/:dbId/export` - Export schema file
+- `GET /api/r2-backup/orphaned` - List orphaned backups
+- `DELETE /api/r2-backup/:databaseId/bulk` - Bulk delete backups
+- `GET /api/tables/:dbId/:tableName/strict-check` - STRICT mode validation
+
+#### Centralized Error Logging
+- Converted 337+ ad-hoc console statements to use centralized error logger
+- All logging includes structured context: module, operation, databaseId, databaseName, metadata
+- Critical errors automatically trigger webhook notifications
+- Module-prefixed error codes for easy identification (e.g., `DB_CREATE_FAILED`, `TBL_DELETE_FAILED`)
+
+---
+
+### 🐛 Bug Fixes
+
+- **Database Rename D1 Eventual Consistency** - Added 3-second delay and retry logic for verification
+- **R2 Backup Dialog Navigation** - Dialogs properly return to parent context after backup completes
+- **Undo Restore Table Refresh** - Restored tables now appear immediately without page refresh
+- **STRICT Mode Conversion Reliability** - Fixed D1 REST API request body, index recreation, DEFAULT CURRENT_TIMESTAMP syntax
+- **Table Creation Not Updating UI** - Fixed cache usage preventing new tables from appearing
+- **SQL Validator False Positives** - Fixed incorrect keyword misspelling suggestions
+- **Database Name Validation** - Enforces D1 naming rules (3-63 chars, lowercase, hyphens)
+- **Table Rename Validation** - Checks for existing table names and validates format
+- **Query Console Autocomplete** - Fixed popup not closing when clicking into input
+- **Cross-Database Search Rate Limiting** - Sequential processing with delays to avoid 429 errors
+- **Convert to FTS5 Dialog Overflow** - SQL preview properly contained within dialog
+- **STRICT Mode Type Inference** - Samples data to detect actual types, uses ANY for mixed types
+- **Table Clone Index Names** - Generates unique index names when needed
+- **SQL Reserved Keywords** - Table/column names now properly quoted with double quotes
+- **Improved Rate Limit Error Messages** - User-friendly messages for 429, 503, 504 errors
+- **Time Travel Cache Fix** - Properly tracks cached state for null/empty values
+
+---
+
+### 📝 Other Changes
+
+- **Query Console UI** - Moved Clear button to left side of card header
+- **Foreign Key Editor** - Tables and columns now sorted alphabetically in dropdowns
+- **Production Badge Removed** - Removed always-showing "production" badge from database cards
+- **Table View Row Filters Removed** - Simplified UI (client-side row search remains)
+- **Strict TypeScript Configuration** - Enabled `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`, and more
+- **ESLint Configuration** - Upgraded to `strictTypeChecked` + `stylisticTypeChecked` rulesets
+
+---
+
 ## Version 1.1.0 - Major Feature Release
 **Release Date:** November 27, 2025  
 **Status:** Production/Stable
@@ -191,10 +431,24 @@ This release introduces three major features (Read Replication, Time Travel, Job
 
 ### 📈 Roadmap Updates
 
+#### Completed in v2.0.0
+- ✅ Analytics dashboard with comprehensive usage metrics (Metrics Dashboard)
+- ✅ Drizzle ORM integration for TypeScript developers
+- ✅ Scheduled automated backups
+- ✅ Enhanced cross-database search with FTS5 support
+
 #### Still Planned
 - Dependency export as JSON documentation files
 - Force delete mode with audit logging for power users
-- Analytics dashboard with comprehensive usage metrics
+- AI-assisted query optimization suggestions
+
+---
+
+## Version 1.1.0 - Major Feature Release
+**Release Date:** November 27, 2025  
+**Status:** Production/Stable
+
+This release introduces three major features (Read Replication, Time Travel, Job History), along with comprehensive TypeScript strict mode compliance fixing 100+ type issues across the codebase.
 
 ---
 

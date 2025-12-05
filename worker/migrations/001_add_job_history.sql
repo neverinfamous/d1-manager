@@ -10,7 +10,14 @@
 CREATE TABLE IF NOT EXISTS bulk_jobs (
   job_id TEXT PRIMARY KEY,
   database_id TEXT NOT NULL,
-  operation_type TEXT NOT NULL, -- 'database_export', 'database_import', 'database_delete', 'database_rename', 'database_optimize', 'table_export', 'table_delete', 'table_clone'
+  -- Operation types:
+  -- Database: 'database_create', 'database_export', 'database_import', 'database_delete', 'database_rename', 'database_optimize'
+  -- Table: 'table_create', 'table_export', 'table_delete', 'table_rename', 'table_clone', 'row_delete'
+  -- Column: 'column_add', 'column_rename', 'column_modify', 'column_delete'
+  -- Foreign Key: 'foreign_key_add', 'foreign_key_modify', 'foreign_key_delete'
+  -- FTS5: 'fts5_create', 'fts5_create_from_table', 'fts5_delete', 'fts5_rebuild', 'fts5_optimize'
+  -- Other: 'index_create', 'constraint_fix', 'undo_restore'
+  operation_type TEXT NOT NULL,
   status TEXT NOT NULL, -- 'queued', 'running', 'completed', 'failed', 'cancelled'
   total_items INTEGER,
   processed_items INTEGER,
@@ -19,7 +26,8 @@ CREATE TABLE IF NOT EXISTS bulk_jobs (
   started_at DATETIME,
   completed_at DATETIME,
   user_email TEXT,
-  metadata TEXT -- JSON object for operation-specific data (e.g., database names, table names)
+  metadata TEXT, -- JSON object for operation-specific data (e.g., database names, table names)
+  error_message TEXT -- Error message for failed jobs
 );
 
 CREATE INDEX IF NOT EXISTS idx_bulk_jobs_status ON bulk_jobs(status, started_at DESC);

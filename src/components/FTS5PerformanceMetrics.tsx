@@ -6,27 +6,27 @@ interface FTS5PerformanceMetricsProps {
   searchResponse: FTS5SearchResponse;
 }
 
-export function FTS5PerformanceMetrics({ searchResponse }: FTS5PerformanceMetricsProps) {
+export function FTS5PerformanceMetrics({ searchResponse }: FTS5PerformanceMetricsProps): React.JSX.Element {
   const { executionTime, total, results, meta } = searchResponse;
   
-  const getPerformanceColor = (time: number) => {
+  const getPerformanceColor = (time: number): string => {
     if (time < 100) return 'text-green-600 dark:text-green-400';
     if (time < 500) return 'text-yellow-600 dark:text-yellow-400';
     return 'text-red-600 dark:text-red-400';
   };
 
-  const getEfficiency = () => {
+  const getEfficiency = (): number => {
     if (!meta?.rowsScanned || meta.rowsScanned === 0) return 100;
     return Math.round((results.length / meta.rowsScanned) * 100);
   };
 
-  const getEfficiencyColor = (efficiency: number) => {
+  const getEfficiencyColor = (efficiency: number): string => {
     if (efficiency > 10) return 'text-green-600 dark:text-green-400';
     if (efficiency > 1) return 'text-yellow-600 dark:text-yellow-400';
     return 'text-red-600 dark:text-red-400';
   };
 
-  const getRecommendations = () => {
+  const getRecommendations = (): string[] => {
     const recommendations: string[] = [];
     
     if (executionTime > 500) {

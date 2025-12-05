@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Plus, Trash2, Play, Save, History, Loader2 } from 'lucide-react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { Plus, Trash2, Play, Save, History, Loader2, RotateCcw, Pencil, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -23,10 +23,20 @@ import {
   type ColumnInfo,
   type SavedQuery as APISavedQuery
 } from '@/services/api';
+import { SqlEditor } from '@/components/SqlEditor';
+import { validateSql } from '@/lib/sqlValidator';
+import { handleSqlKeydown } from '@/lib/sqlAutocomplete';
+import { useSchemaContext } from '@/hooks/useSchemaContext';
+import { parseContext, filterSuggestions } from '@/lib/sqlContextParser';
+import { ALL_SQL_KEYWORDS } from '@/lib/sqlKeywords';
+import { getCaretCoordinates } from '@/lib/caretPosition';
+import { AutocompletePopup, type Suggestion } from '@/components/AutocompletePopup';
 
 interface QueryBuilderProps {
   databaseId: string;
   databaseName: string;
+  /** Optional callback to send generated SQL to the parent SQL Editor */
+  onSendToEditor?: (sql: string) => void;
 }
 
 interface QueryCondition {
@@ -49,7 +59,7 @@ const OPERATORS = [
   { value: 'IS NOT NULL', label: 'Is Not Null' },
 ];
 
-export function QueryBuilder({ databaseId, databaseName }: QueryBuilderProps) {
+export function QueryBuilder({ databaseId, databaseName, onSendToEditor }: QueryBuilderProps): React.JSX.Element {
   const [tables, setTables] = useState<TableInfo[]>([]);
   const [selectedTable, setSelectedTable] = useState<string>('');
   const [columns, setColumns] = useState<ColumnInfo[]>([]);
@@ -70,16 +80,37 @@ export function QueryBuilder({ databaseId, databaseName }: QueryBuilderProps) {
   const [showSavedQueries, setShowSavedQueries] = useState(false);
   const [savingQuery, setSavingQuery] = useState(false);
   const [loadingQueries, setLoadingQueries] = useState(false);
+  
+  // Track manual SQL edits
+  const [editedSQL, setEditedSQL] = useState<string>('');
+  const [isManuallyEdited, setIsManuallyEdited] = useState(false);
+  const lastGeneratedSQL = useRef<string>('');
+  
+  // Refs for editor
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  
+  // Autocomplete state
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [popupPosition, setPopupPosition] = useState({ top: 0, left: 0 });
+  const [showAutocomplete, setShowAutocomplete] = useState(false);
+  
+  // Schema context for table/column suggestions
+  const schema = useSchemaContext(databaseId);
+  
+  // Real-time SQL validation
+  const validation = useMemo(() => validateSql(editedSQL), [editedSQL]);
 
   useEffect(() => {
-    loadTables();
-    loadSavedQueries();
+    void loadTables();
+    void loadSavedQueries();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [databaseId]);
 
   useEffect(() => {
     if (selectedTable) {
-      loadTableSchema();
+      void loadTableSchema();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTable]);
@@ -89,27 +120,39 @@ export function QueryBuilder({ databaseId, databaseName }: QueryBuilderProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTable, selectedColumns, conditions, orderBy, orderDirection, limit]);
 
-  const loadTables = async () => {
+  // Sync editedSQL with generatedSQL when it changes (unless manually edited)
+  useEffect(() => {
+    if (generatedSQL !== lastGeneratedSQL.current) {
+      lastGeneratedSQL.current = generatedSQL;
+      if (!isManuallyEdited) {
+        setEditedSQL(generatedSQL);
+      }
+    }
+  }, [generatedSQL, isManuallyEdited]);
+
+  const loadTables = async (): Promise<void> => {
     try {
       const tableList = await listTables(databaseId);
-      setTables(tableList.filter(t => t.type === 'table'));
-    } catch (err) {
-      console.error('Failed to load tables:', err);
+      // Include both regular tables and virtual tables (FTS5, etc.)
+      // Exclude shadow tables which are internal FTS5 implementation tables
+      setTables(tableList.filter(t => t.type === 'table' || t.type === 'virtual'));
+    } catch {
+      // Silently ignore failures
     }
   };
 
-  const loadTableSchema = async () => {
+  const loadTableSchema = async (): Promise<void> => {
     try {
       const schema = await getTableSchema(databaseId, selectedTable);
       setColumns(schema);
       setSelectedColumns(['*']);
       setConditions([]);
-    } catch (err) {
-      console.error('Failed to load schema:', err);
+    } catch {
+      // Silently ignore failures
     }
   };
 
-  const loadSavedQueries = async () => {
+  const loadSavedQueries = async (): Promise<void> => {
     setLoadingQueries(true);
     try {
       // First try to load from API
@@ -121,12 +164,12 @@ export function QueryBuilder({ databaseId, databaseName }: QueryBuilderProps) {
       const stored = localStorage.getItem(localStorageKey);
       if (stored) {
         try {
-          const localQueries = JSON.parse(stored) as Array<{
+          const localQueries = JSON.parse(stored) as {
             id: string;
             name: string;
             query: string;
             createdAt: string;
-          }>;
+          }[];
           
           // Migrate any localStorage queries that don't exist in the database
           const existingNames = new Set(queries.map(q => q.name));
@@ -145,20 +188,18 @@ export function QueryBuilder({ databaseId, databaseName }: QueryBuilderProps) {
           const updatedQueries = await getSavedQueries(databaseId);
           setSavedQueries(updatedQueries);
           localStorage.removeItem(localStorageKey);
-          console.log('[QueryBuilder] Migrated localStorage queries to database');
-        } catch (err) {
-          console.error('[QueryBuilder] Failed to migrate localStorage queries:', err);
+        } catch {
+          // Silently ignore migration failures
         }
       }
-    } catch (err) {
-      console.error('[QueryBuilder] Failed to load saved queries:', err);
+    } catch {
       setError('Failed to load saved queries');
     } finally {
       setLoadingQueries(false);
     }
   };
 
-  const generateSQL = () => {
+  const generateSQL = (): void => {
     if (!selectedTable) {
       setGeneratedSQL('');
       return;
@@ -198,33 +239,229 @@ export function QueryBuilder({ databaseId, databaseName }: QueryBuilderProps) {
     setGeneratedSQL(sql);
   };
 
-  const addCondition = () => {
+  const addCondition = (): void => {
     setConditions([
       ...conditions,
       { id: String(Date.now()), column: '', operator: '=', value: '' }
     ]);
   };
 
-  const removeCondition = (id: string) => {
+  const removeCondition = (id: string): void => {
     setConditions(conditions.filter(c => c.id !== id));
   };
 
-  const updateCondition = (id: string, field: keyof QueryCondition, value: string) => {
+  const updateCondition = (id: string, field: keyof QueryCondition, value: string): void => {
     setConditions(conditions.map(c =>
       c.id === id ? { ...c, [field]: value } : c
     ));
   };
 
-  const executeGeneratedQuery = async () => {
-    if (!generatedSQL) return;
+  const handleSQLChange = useCallback((newSQL: string) => {
+    setEditedSQL(newSQL);
+    // Mark as manually edited if it differs from generated SQL
+    if (newSQL !== generatedSQL) {
+      setIsManuallyEdited(true);
+    }
+  }, [generatedSQL]);
+
+  const resetToGeneratedSQL = (): void => {
+    setEditedSQL(generatedSQL);
+    setIsManuallyEdited(false);
+    setShowAutocomplete(false);
+  };
+
+  // Get the current SQL to execute/save (edited version takes precedence)
+  const currentSQL = editedSQL || generatedSQL;
+  
+  // Update suggestions based on current context
+  const updateSuggestions = useCallback(async (text: string, cursorPos: number) => {
+    const context = parseContext(text, cursorPos);
+    
+    if (!context.currentWord && context.type === 'keyword') {
+      setSuggestions([]);
+      setShowAutocomplete(false);
+      return;
+    }
+    
+    let items: Suggestion[] = [];
+    
+    if (context.type === 'keyword') {
+      items = ALL_SQL_KEYWORDS
+        .filter(kw => kw.toUpperCase().startsWith(context.currentWord.toUpperCase()))
+        .slice(0, 20)
+        .map(kw => ({ text: kw, type: 'keyword' as const }));
+    } else if (context.type === 'table') {
+      items = filterSuggestions(schema.tables, context.currentWord)
+        .slice(0, 20)
+        .map(t => ({ text: t, type: 'table' as const }));
+    } else if (context.type === 'column') {
+      let columns: string[] = [];
+      
+      if (context.dotTable) {
+        // Specific table after dot notation
+        columns = await schema.fetchColumnsForTable(context.dotTable);
+      } else if (context.tableNames.length > 0) {
+        // Columns from tables in query
+        columns = await schema.getColumnsForTables(context.tableNames);
+      }
+      
+      items = filterSuggestions(columns, context.currentWord)
+        .slice(0, 20)
+        .map(c => ({ text: c, type: 'column' as const }));
+      
+      // Also add table names if no dot notation
+      if (!context.dotTable && context.currentWord.length > 0) {
+        const tableMatches = filterSuggestions(schema.tables, context.currentWord, 3);
+        const tableSuggestions = tableMatches.map(t => ({ text: t, type: 'table' as const }));
+        items = [...items, ...tableSuggestions].slice(0, 10);
+      }
+    }
+    
+    // Show popup if we have suggestions and user has typed something or used dot notation
+    const shouldShow = items.length > 0 && 
+      (context.currentWord.length > 0 || context.dotTable !== null);
+    
+    setSuggestions(items);
+    setSelectedIndex(0);
+    setShowAutocomplete(shouldShow);
+  }, [schema]);
+  
+  // Handle accepting a suggestion
+  const acceptSuggestion = useCallback((suggestion: Suggestion) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    
+    const cursorPos = textarea.selectionStart;
+    const text = editedSQL;
+    const context = parseContext(text, cursorPos);
+    
+    const beforeWord = text.slice(0, cursorPos - context.currentWord.length);
+    const afterCursor = text.slice(cursorPos);
+    
+    const newText = beforeWord + suggestion.text + afterCursor;
+    handleSQLChange(newText);
+    
+    setShowAutocomplete(false);
+    
+    const newCursorPos = beforeWord.length + suggestion.text.length;
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(newCursorPos, newCursorPos);
+    }, 0);
+  }, [editedSQL, handleSQLChange]);
+  
+  // Handle keydown for autocomplete navigation
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Handle autocomplete navigation when popup is visible
+    if (showAutocomplete && suggestions.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedIndex(prev => (prev + 1) % suggestions.length);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedIndex(prev => (prev - 1 + suggestions.length) % suggestions.length);
+        return;
+      }
+      if (e.key === 'Tab' || e.key === 'Enter') {
+        if (suggestions[selectedIndex]) {
+          e.preventDefault();
+          acceptSuggestion(suggestions[selectedIndex]);
+          return;
+        }
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setShowAutocomplete(false);
+        return;
+      }
+    }
+    
+    // Handle SQL autocomplete features (auto-pairing, indentation, etc.)
+    const textarea = e.currentTarget;
+    const result = handleSqlKeydown(
+      e.key,
+      textarea.value,
+      textarea.selectionStart,
+      textarea.selectionEnd,
+      e.shiftKey
+    );
+    
+    if (result.handled && result.newValue !== undefined) {
+      e.preventDefault();
+      handleSQLChange(result.newValue);
+      if (result.newCursorPos !== undefined) {
+        const cursorPos = result.newCursorPos;
+        setTimeout(() => {
+          textarea.setSelectionRange(cursorPos, cursorPos);
+        }, 0);
+      }
+    }
+  }, [showAutocomplete, suggestions, selectedIndex, acceptSuggestion, handleSQLChange]);
+  
+  // Handle text change with autocomplete update
+  const handleEditorChange = useCallback((newValue: string) => {
+    handleSQLChange(newValue);
+    
+    const textarea = textareaRef.current;
+    if (textarea) {
+      setTimeout(() => {
+        void updateSuggestions(newValue, textarea.selectionStart);
+        
+        // Update popup position
+        if (containerRef.current) {
+          const coords = getCaretCoordinates(textarea, textarea.selectionStart);
+          const containerRect = containerRef.current.getBoundingClientRect();
+          const textareaRect = textarea.getBoundingClientRect();
+          
+          setPopupPosition({
+            top: textareaRect.top - containerRect.top + coords.top + 20,
+            left: textareaRect.left - containerRect.left + coords.left,
+          });
+        }
+      }, 0);
+    }
+  }, [updateSuggestions, handleSQLChange]);
+  
+  // Handle selection change (for autocomplete positioning)
+  const handleSelect = useCallback(() => {
+    const textarea = textareaRef.current;
+    if (textarea && containerRef.current) {
+      void updateSuggestions(editedSQL, textarea.selectionStart);
+      
+      const coords = getCaretCoordinates(textarea, textarea.selectionStart);
+      const containerRect = containerRef.current.getBoundingClientRect();
+      const textareaRect = textarea.getBoundingClientRect();
+      
+      setPopupPosition({
+        top: textareaRect.top - containerRect.top + coords.top + 20,
+        left: textareaRect.left - containerRect.left + coords.left,
+      });
+    }
+  }, [editedSQL, updateSuggestions]);
+  
+  // Close autocomplete when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent): void => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setShowAutocomplete(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const executeGeneratedQuery = async (): Promise<void> => {
+    if (!currentSQL) return;
 
     try {
       setExecuting(true);
       setError(null);
-      const response = await executeQuery(databaseId, generatedSQL);
+      const response = await executeQuery(databaseId, currentSQL);
 
-      if (response.results && response.results.length > 0) {
-        const rows = response.results as Record<string, unknown>[];
+      if (response.results.length > 0) {
+        const rows = response.results;
         setResults(rows);
         const firstRow = rows[0];
         if (rows.length > 0 && firstRow) {
@@ -243,15 +480,15 @@ export function QueryBuilder({ databaseId, databaseName }: QueryBuilderProps) {
     }
   };
 
-  const saveQuery = async () => {
-    if (!queryName.trim() || !generatedSQL) return;
+  const saveQuery = async (): Promise<void> => {
+    if (!queryName.trim() || !currentSQL) return;
 
     setSavingQuery(true);
     setError(null);
     try {
       await createSavedQuery(
         queryName.trim(),
-        generatedSQL,
+        currentSQL,
         queryDescription.trim() || undefined,
         databaseId
       );
@@ -269,13 +506,13 @@ export function QueryBuilder({ databaseId, databaseName }: QueryBuilderProps) {
     }
   };
 
-  const loadSavedQuery = (query: APISavedQuery) => {
+  const loadSavedQuery = (query: APISavedQuery): void => {
     setGeneratedSQL(query.query);
     setShowSavedQueries(false);
     // Optionally parse and populate the builder fields
   };
 
-  const handleDeleteSavedQuery = async (id: number) => {
+  const handleDeleteSavedQuery = async (id: number): Promise<void> => {
     try {
       await deleteSavedQuery(id);
       // Reload saved queries
@@ -289,7 +526,7 @@ export function QueryBuilder({ databaseId, databaseName }: QueryBuilderProps) {
     if (value === null) return 'NULL';
     if (value === undefined) return '';
     if (typeof value === 'object') return JSON.stringify(value);
-    return String(value);
+    return String(value as string | number | boolean);
   };
 
   return (
@@ -432,6 +669,7 @@ export function QueryBuilder({ databaseId, databaseName }: QueryBuilderProps) {
                               placeholder="Value..."
                               value={condition.value}
                               onChange={(e) => updateCondition(condition.id, 'value', e.target.value)}
+                              autoComplete="off"
                             />
                           </>
                         )}
@@ -491,6 +729,7 @@ export function QueryBuilder({ databaseId, databaseName }: QueryBuilderProps) {
                   value={limit}
                   onChange={(e) => setLimit(e.target.value)}
                   placeholder="100"
+                  autoComplete="off"
                 />
               </div>
             </>
@@ -499,12 +738,50 @@ export function QueryBuilder({ databaseId, databaseName }: QueryBuilderProps) {
       </Card>
 
       {/* Generated SQL */}
-      {generatedSQL && (
+      {(generatedSQL || editedSQL) && (
         <Card>
-          <CardHeader>
+          <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base">Generated SQL</CardTitle>
+              <div className="flex items-center gap-3">
+                <CardTitle className="text-base">
+                  {isManuallyEdited ? 'Custom SQL' : 'Generated SQL'}
+                </CardTitle>
+                {isManuallyEdited && (
+                  <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+                    <Pencil className="h-3 w-3" />
+                    Edited
+                  </span>
+                )}
+                {editedSQL.trim() && (
+                  <span className={`text-xs flex items-center gap-1 ${
+                    validation.isValid ? 'text-green-600 dark:text-green-400' : 'text-destructive'
+                  }`}>
+                    {validation.isValid ? (
+                      <>
+                        <CheckCircle2 className="h-3 w-3" />
+                        Valid SQL
+                      </>
+                    ) : (
+                      <>
+                        <AlertCircle className="h-3 w-3" />
+                        {validation.error}
+                      </>
+                    )}
+                  </span>
+                )}
+              </div>
               <div className="flex gap-2">
+                {isManuallyEdited && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={resetToGeneratedSQL}
+                    title="Reset to auto-generated SQL"
+                  >
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                    Reset
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   size="sm"
@@ -513,7 +790,18 @@ export function QueryBuilder({ databaseId, databaseName }: QueryBuilderProps) {
                   <Save className="h-4 w-4 mr-2" />
                   Save Query
                 </Button>
-                <Button size="sm" onClick={executeGeneratedQuery} disabled={executing}>
+                {onSendToEditor && (
+                  <Button 
+                    variant="outline"
+                    size="sm" 
+                    onClick={() => onSendToEditor(editedSQL || generatedSQL)}
+                    disabled={!editedSQL && !generatedSQL}
+                  >
+                    <ArrowRight className="h-4 w-4 mr-2" />
+                    Send to Editor
+                  </Button>
+                )}
+                <Button size="sm" onClick={() => void executeGeneratedQuery()} disabled={executing}>
                   {executing ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -529,10 +817,38 @@ export function QueryBuilder({ databaseId, databaseName }: QueryBuilderProps) {
               </div>
             </div>
           </CardHeader>
-          <CardContent>
-            <pre className="p-4 bg-muted rounded-md text-sm font-mono overflow-x-auto">
-              {generatedSQL}
-            </pre>
+          <CardContent className="space-y-2">
+            <div ref={containerRef} className="relative">
+              <SqlEditor
+                id="sql-editor-builder"
+                name="sql-editor-builder"
+                value={editedSQL}
+                onChange={handleEditorChange}
+                onKeyDown={handleKeyDown}
+                onSelect={handleSelect}
+                placeholder="SELECT * FROM table_name;"
+                hasError={!validation.isValid}
+                errorPosition={validation.errorPosition}
+                textareaRef={textareaRef}
+                ariaLabel="SQL Query Editor"
+                ariaAutoComplete="list"
+                ariaControls={showAutocomplete ? 'builder-autocomplete-popup' : undefined}
+                ariaExpanded={showAutocomplete}
+              />
+              
+              <AutocompletePopup
+                suggestions={suggestions}
+                selectedIndex={selectedIndex}
+                position={popupPosition}
+                onSelect={acceptSuggestion}
+                visible={showAutocomplete}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {isManuallyEdited 
+                ? 'You can edit the SQL directly. Click Reset to restore the auto-generated query.'
+                : 'Tip: You can edit the SQL directly to customize your query.'}
+            </p>
           </CardContent>
         </Card>
       )}
@@ -603,18 +919,22 @@ export function QueryBuilder({ databaseId, databaseName }: QueryBuilderProps) {
               <Label htmlFor="query-name">Query Name</Label>
               <Input
                 id="query-name"
+                name="query-name"
                 placeholder="My saved query"
                 value={queryName}
                 onChange={(e) => setQueryName(e.target.value)}
+                autoComplete="off"
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="query-description">Description (Optional)</Label>
               <Input
                 id="query-description"
+                name="query-description"
                 placeholder="What does this query do?"
                 value={queryDescription}
                 onChange={(e) => setQueryDescription(e.target.value)}
+                autoComplete="off"
               />
             </div>
           </div>
@@ -622,7 +942,7 @@ export function QueryBuilder({ databaseId, databaseName }: QueryBuilderProps) {
             <Button variant="outline" onClick={() => setShowSaveDialog(false)} disabled={savingQuery}>
               Cancel
             </Button>
-            <Button onClick={saveQuery} disabled={!queryName.trim() || savingQuery}>
+            <Button onClick={() => void saveQuery()} disabled={!queryName.trim() || !currentSQL || savingQuery}>
               {savingQuery ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -681,7 +1001,7 @@ export function QueryBuilder({ databaseId, databaseName }: QueryBuilderProps) {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleDeleteSavedQuery(query.id)}
+                          onClick={() => void handleDeleteSavedQuery(query.id)}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>

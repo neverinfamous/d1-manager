@@ -8,6 +8,7 @@ const PAIRS: Record<string, string> = {
   '(': ')',
   '{': '}',
   '[': ']',
+  '<': '>',
   "'": "'",
   '"': '"',
 };
@@ -49,7 +50,7 @@ function getCurrentLineText(text: string, cursorPos: number): string {
 }
 
 /**
- * Check if cursor is inside an empty pair like (), {}, [], or ''
+ * Check if cursor is inside an empty pair like (), {}, [], <>, or ''
  */
 function isInsideEmptyPair(text: string, cursorPos: number): boolean {
   if (cursorPos === 0 || cursorPos >= text.length) return false;
@@ -59,6 +60,7 @@ function isInsideEmptyPair(text: string, cursorPos: number): boolean {
     (before === '(' && after === ')') ||
     (before === '{' && after === '}') ||
     (before === '[' && after === ']') ||
+    (before === '<' && after === '>') ||
     (before === "'" && after === "'") ||
     (before === '"' && after === '"')
   );
@@ -150,7 +152,8 @@ export function handleSqlKeydown(
     // Inside empty brackets - add extra indentation and closing on new line
     if ((charBefore === '(' && charAfter === ')') ||
         (charBefore === '{' && charAfter === '}') ||
-        (charBefore === '[' && charAfter === ']')) {
+        (charBefore === '[' && charAfter === ']') ||
+        (charBefore === '<' && charAfter === '>')) {
       const newIndent = currentIndent + '  ';
       const newValue =
         text.slice(0, selectionStart) +
@@ -168,7 +171,7 @@ export function handleSqlKeydown(
     }
 
     // After opening bracket - increase indent
-    if (charBefore === '(' || charBefore === '{' || charBefore === '[') {
+    if (charBefore === '(' || charBefore === '{' || charBefore === '[' || charBefore === '<') {
       const newIndent = currentIndent + '  ';
       const newValue =
         text.slice(0, selectionStart) + '\n' + newIndent + text.slice(selectionStart);
@@ -254,7 +257,7 @@ export function handleSqlKeydown(
     }
   }
 
-  // Handle Shift+Tab - unindent
+  // Handle Shift+Tab - unindent (single line)
   if (key === 'Tab' && shiftKey && !hasSelection) {
     const lineStart = text.lastIndexOf('\n', selectionStart - 1) + 1;
     const lineText = text.slice(lineStart, selectionStart);
@@ -266,6 +269,31 @@ export function handleSqlKeydown(
         handled: true,
         newValue,
         newCursorPos: Math.max(lineStart, selectionStart - 2),
+      };
+    }
+  }
+
+  // Handle Shift+Tab with selection - unindent multiple lines
+  if (key === 'Tab' && shiftKey && hasSelection) {
+    const beforeSelection = text.slice(0, selectionStart);
+    const afterSelection = text.slice(selectionEnd);
+    
+    // Find the start of the first selected line
+    const lineStart = beforeSelection.lastIndexOf('\n') + 1;
+    const prefix = text.slice(0, lineStart);
+    const selectedWithLineStart = text.slice(lineStart, selectionEnd);
+    
+    // Remove up to 2 spaces from the start of each line
+    const unindented = selectedWithLineStart.replace(/^( {1,2})/gm, '');
+    const removedChars = selectedWithLineStart.length - unindented.length;
+    
+    if (removedChars > 0) {
+      const newValue = prefix + unindented + afterSelection;
+      
+      return {
+        handled: true,
+        newValue,
+        newCursorPos: selectionEnd - removedChars,
       };
     }
   }

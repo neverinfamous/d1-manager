@@ -1,6 +1,34 @@
 import type { Env, QueryHistoryEntry } from '../types';
 import { validateQuery, parseD1Error } from '../utils/helpers';
 import { isProtectedDatabase, createProtectedDatabaseResponse, getDatabaseInfo } from '../utils/database-protection';
+import { logError, logInfo, logWarning } from '../utils/error-logger';
+
+// Helper to create response headers with CORS
+function jsonHeaders(corsHeaders: HeadersInit): Headers {
+  const headers = new Headers(corsHeaders);
+  headers.set('Content-Type', 'application/json');
+  return headers;
+}
+
+interface QueryBody {
+  query: string;
+  params?: unknown[];
+  skipValidation?: boolean;
+}
+
+interface BatchQueryBody {
+  queries: { query: string; params?: unknown[] }[];
+}
+
+interface D1ApiResponse {
+  success: boolean;
+  result?: {
+    results: unknown[];
+    meta?: Record<string, unknown>;
+    success: boolean;
+  }[];
+  errors?: { message: string }[];
+}
 
 export async function handleQueryRoutes(
   request: Request,
@@ -10,7 +38,7 @@ export async function handleQueryRoutes(
   isLocalDev: boolean,
   userEmail: string | null
 ): Promise<Response> {
-  console.log('[Queries] Handling query operation');
+  logInfo('Handling query operation', { module: 'queries', operation: 'request', ...(userEmail !== null && { userId: userEmail }) });
   
   // Extract database ID from URL (format: /api/query/:dbId/...)
   const pathParts = url.pathname.split('/');
@@ -21,10 +49,7 @@ export async function handleQueryRoutes(
       error: 'Database ID required' 
     }), { 
       status: 400,
-      headers: {
-        'Content-Type': 'application/json',
-        ...corsHeaders
-      }
+      headers: jsonHeaders(corsHeaders)
     });
   }
 
@@ -32,7 +57,7 @@ export async function handleQueryRoutes(
   if (!isLocalDev) {
     const dbInfo = await getDatabaseInfo(dbId, env);
     if (dbInfo && isProtectedDatabase(dbInfo.name)) {
-      console.warn('[Queries] Attempted to query protected database:', dbInfo.name);
+      logWarning(`Attempted to query protected database: ${dbInfo.name}`, { module: 'queries', operation: 'access_check', databaseId: dbId, databaseName: dbInfo.name });
       return createProtectedDatabaseResponse(corsHeaders);
     }
   }
@@ -40,12 +65,8 @@ export async function handleQueryRoutes(
   try {
     // Execute query
     if (request.method === 'POST' && url.pathname === `/api/query/${dbId}/execute`) {
-      const body = await request.json() as { 
-        query: string; 
-        params?: unknown[];
-        skipValidation?: boolean;
-      };
-      console.log('[Queries] Executing query:', body.query.substring(0, 100));
+      const body: QueryBody = await request.json();
+      logInfo(`Executing query: ${body.query.substring(0, 100)}`, { module: 'queries', operation: 'execute', databaseId: dbId });
       
       // Validate query unless explicitly skipped
       if (!body.skipValidation) {
@@ -56,10 +77,7 @@ export async function handleQueryRoutes(
             warning: validation.warning
           }), { 
             status: 400,
-            headers: {
-              'Content-Type': 'application/json',
-              ...corsHeaders
-            }
+            headers: jsonHeaders(corsHeaders)
           });
         }
       }
@@ -82,10 +100,7 @@ export async function handleQueryRoutes(
             success: true
           }
         }), {
-          headers: {
-            'Content-Type': 'application/json',
-            ...corsHeaders
-          }
+          headers: jsonHeaders(corsHeaders)
         });
       }
       
@@ -97,12 +112,12 @@ export async function handleQueryRoutes(
         const duration = Date.now() - startTime;
         
         // Store in query history
-        if (!isLocalDev && userEmail) {
+        if (userEmail) {
           await storeQueryHistory(
             dbId,
             body.query,
             duration,
-            result.meta?.['rows_written'] as number || 0,
+            (result.meta['rows_written'] as number | undefined) ?? 0,
             null,
             userEmail,
             env
@@ -113,29 +128,25 @@ export async function handleQueryRoutes(
           result,
           success: true
         }), {
-          headers: {
-            'Content-Type': 'application/json',
-            ...corsHeaders
-          }
+          headers: jsonHeaders(corsHeaders)
         });
-      } catch (err) {
+      } catch (err: unknown) {
         const duration = Date.now() - startTime;
         const rawErrorMsg = parseD1Error(err);
         
         // Log full error details on server
-        console.error('[Queries] Query execution error:', rawErrorMsg);
-        console.error('[Queries] Full error object:', err);
+        void logError(env, rawErrorMsg, { module: 'queries', operation: 'execute', databaseId: dbId }, isLocalDev);
         
         // Extract clean error message from D1 error format
         let cleanErrorMsg = rawErrorMsg;
         
         // Try to extract message from JSON error format: "Query failed: 400 - {...}"
-        const jsonMatch = rawErrorMsg.match(/Query failed: \d+ - (.+)/);
-        if (jsonMatch && jsonMatch[1]) {
+        const jsonMatch = /Query failed: \d+ - (.+)/.exec(rawErrorMsg);
+        if (jsonMatch?.[1]) {
           try {
-            const errorJson = JSON.parse(jsonMatch[1]);
+            const errorJson = JSON.parse(jsonMatch[1]) as { errors?: { message?: string; error?: string }[] };
             if (errorJson.errors && Array.isArray(errorJson.errors) && errorJson.errors.length > 0) {
-              cleanErrorMsg = errorJson.errors[0].message || errorJson.errors[0].error || rawErrorMsg;
+              cleanErrorMsg = errorJson.errors[0]?.message ?? errorJson.errors[0]?.error ?? rawErrorMsg;
             }
           } catch {
             // Keep raw message if JSON parsing fails
@@ -149,7 +160,7 @@ export async function handleQueryRoutes(
           .replace(/: SQLITE_CONSTRAINT$/, '');
         
         // Store error in query history
-        if (!isLocalDev && userEmail) {
+        if (userEmail) {
           await storeQueryHistory(
             dbId,
             body.query,
@@ -158,7 +169,7 @@ export async function handleQueryRoutes(
             cleanErrorMsg,
             userEmail,
             env
-          ).catch(histErr => console.error('[Queries] Failed to store error in history:', histErr));
+          ).catch((histErr: unknown) => void logError(env, histErr instanceof Error ? histErr : String(histErr), { module: 'queries', operation: 'store_history' }, isLocalDev));
         }
         
         // Return detailed error message to authenticated admin users
@@ -168,20 +179,15 @@ export async function handleQueryRoutes(
           message: cleanErrorMsg
         }), { 
           status: 400,
-          headers: {
-            'Content-Type': 'application/json',
-            ...corsHeaders
-          }
+          headers: jsonHeaders(corsHeaders)
         });
       }
     }
 
     // Execute batch queries
     if (request.method === 'POST' && url.pathname === `/api/query/${dbId}/batch`) {
-      const body = await request.json() as { 
-        queries: Array<{ query: string; params?: unknown[] }>;
-      };
-      console.log('[Queries] Executing batch:', body.queries.length, 'queries');
+      const body: BatchQueryBody = await request.json();
+      logInfo(`Executing batch: ${String(body.queries.length)} queries`, { module: 'queries', operation: 'batch', databaseId: dbId, metadata: { queryCount: body.queries.length } });
       
       // Mock response for local development
       if (isLocalDev) {
@@ -193,15 +199,12 @@ export async function handleQueryRoutes(
           })),
           success: true
         }), {
-          headers: {
-            'Content-Type': 'application/json',
-            ...corsHeaders
-          }
+          headers: jsonHeaders(corsHeaders)
         });
       }
       
       // Execute queries sequentially (REST API doesn't support true batch)
-      const results: Array<{ results: unknown[]; meta: Record<string, unknown>; success: boolean }> = [];
+      const results: { results: unknown[]; meta: Record<string, unknown>; success: boolean }[] = [];
       for (const q of body.queries) {
         const result = await executeQueryViaAPI(dbId, q.query, q.params, env);
         results.push(result);
@@ -211,17 +214,14 @@ export async function handleQueryRoutes(
         result: results,
         success: true
       }), {
-        headers: {
-          'Content-Type': 'application/json',
-          ...corsHeaders
-        }
+        headers: jsonHeaders(corsHeaders)
       });
     }
 
     // Get query history
     if (request.method === 'GET' && url.pathname === `/api/query/${dbId}/history`) {
-      const limit = parseInt(url.searchParams.get('limit') || '10');
-      console.log('[Queries] Getting query history, limit:', limit);
+      const limit = parseInt(url.searchParams.get('limit') ?? '10');
+      logInfo(`Getting query history, limit: ${String(limit)}`, { module: 'queries', operation: 'history', databaseId: dbId, metadata: { limit } });
       
       // Mock response for local development
       if (isLocalDev) {
@@ -238,10 +238,7 @@ export async function handleQueryRoutes(
           ],
           success: true
         }), {
-          headers: {
-            'Content-Type': 'application/json',
-            ...corsHeaders
-          }
+          headers: jsonHeaders(corsHeaders)
         });
       }
       
@@ -256,10 +253,7 @@ export async function handleQueryRoutes(
         result: result.results,
         success: true
       }), {
-        headers: {
-          'Content-Type': 'application/json',
-          ...corsHeaders
-        }
+        headers: jsonHeaders(corsHeaders)
       });
     }
 
@@ -268,15 +262,12 @@ export async function handleQueryRoutes(
       error: 'Route not found' 
     }), { 
       status: 404,
-      headers: {
-        'Content-Type': 'application/json',
-        ...corsHeaders
-      }
+      headers: jsonHeaders(corsHeaders)
     });
 
   } catch (err) {
     // Log full error details on server only (never expose to client)
-    console.error('[Queries] Error:', err);
+    void logError(env, err instanceof Error ? err : String(err), { module: 'queries', operation: 'request', databaseId: dbId }, isLocalDev);
     
     // Return generic static error message to client
     // Security: Never expose error details, stack traces, or database information to end users
@@ -285,10 +276,7 @@ export async function handleQueryRoutes(
       message: 'Unable to complete query operation. Please try again.'
     }), { 
       status: 500,
-      headers: {
-        'Content-Type': 'application/json',
-        ...corsHeaders
-      }
+      headers: jsonHeaders(corsHeaders)
     });
   }
 }
@@ -312,38 +300,35 @@ async function executeQueryViaAPI(
     },
       body: JSON.stringify({ 
         sql: query,
-        params: params || []
+        params: params ?? []
       })
     }
   );
   
   if (!response.ok) {
     const errorText = await response.text();
-    console.error('[Queries] Query error:', errorText);
-    throw new Error(`Query failed: ${response.status} - ${errorText}`);
+    logWarning(`Query error: ${errorText}`, { module: 'queries', operation: 'execute_api', databaseId, metadata: { status: response.status } });
+    throw new Error(`Query failed: ${String(response.status)} - ${errorText}`);
   }
   
-  const data = await response.json() as { 
-    result: Array<{ results: unknown[]; meta: Record<string, unknown>; success: boolean }>;
-    success: boolean;
-  };
+  const data: D1ApiResponse = await response.json();
   
   const firstResult = data.result?.[0];
-  console.log('[Queries] D1 API response:', JSON.stringify({
+  logInfo('D1 API response', { module: 'queries', operation: 'execute_api', databaseId, metadata: {
     success: data.success,
     resultLength: data.result?.length,
-    firstResult: firstResult ? {
-      resultsLength: Array.isArray(firstResult.results) ? firstResult.results.length : 'not array',
-      meta: firstResult.meta,
-      success: firstResult.success
-    } : 'no result'
-  }));
+    firstResultSuccess: firstResult?.success
+  } });
   
   // REST API returns array of results, take the first one
   if (!firstResult) {
     throw new Error('Empty result from D1 API');
   }
-  return firstResult;
+  return { 
+    results: firstResult.results, 
+    meta: firstResult.meta ?? {}, 
+    success: firstResult.success 
+  };
 }
 
 /**
@@ -381,7 +366,7 @@ async function storeQueryHistory(
     
     await cleanupStmt.run();
   } catch (err) {
-    console.error('[Queries] Failed to store query history:', err);
+    logWarning(`Failed to store query history: ${err instanceof Error ? err.message : String(err)}`, { module: 'queries', operation: 'store_history', databaseId });
     // Don't fail the request if history storage fails
   }
 }

@@ -1,12 +1,13 @@
 import dagre from 'dagre';
-import { Node, Edge, Position, MarkerType } from 'reactflow';
+import type { Node, Edge } from 'reactflow';
+import { Position, MarkerType } from 'reactflow';
 
 export type LayoutType = 'hierarchical' | 'force-directed';
 
 export interface GraphNode {
   id: string;
   label: string;
-  columns: Array<{name: string; type: string; isPK: boolean}>;
+  columns: {name: string; type: string; isPK: boolean}[];
   rowCount: number;
 }
 
@@ -143,7 +144,7 @@ function applyForceDirectedLayout(graphData: GraphData): { nodes: Node[]; edges:
   
   // Convert to ReactFlow nodes
   const nodes: Node[] = graphData.nodes.map((node) => {
-    const pos = positions[node.id] || { x: 0, y: 0 };
+    const pos = positions[node.id] ?? { x: 0, y: 0 };
     
     return {
       id: node.id,
@@ -226,7 +227,8 @@ function calculateForceDirectedPositions(graphData: GraphData): Record<string, {
     if (!adjacency.has(edge.source)) {
       adjacency.set(edge.source, new Set());
     }
-    adjacency.get(edge.source)!.add(edge.target);
+    const adjSet = adjacency.get(edge.source);
+    if (adjSet) adjSet.add(edge.target);
   });
   
   // Run simulation
@@ -241,11 +243,13 @@ function calculateForceDirectedPositions(graphData: GraphData): Record<string, {
     // Calculate repulsion forces (all pairs)
     for (let i = 0; i < graphData.nodes.length; i++) {
       for (let j = i + 1; j < graphData.nodes.length; j++) {
-        const node1 = graphData.nodes[i]!;
-        const node2 = graphData.nodes[j]!;
+        const node1 = graphData.nodes[i];
+        const node2 = graphData.nodes[j];
+        if (!node1 || !node2) continue;
         
-        const pos1 = positions[node1.id]!;
-        const pos2 = positions[node2.id]!;
+        const pos1 = positions[node1.id];
+        const pos2 = positions[node2.id];
+        if (!pos1 || !pos2) continue;
         
         const dx = pos2.x - pos1.x;
         const dy = pos2.y - pos1.y;
@@ -257,10 +261,16 @@ function calculateForceDirectedPositions(graphData: GraphData): Record<string, {
           const fx = (dx / dist) * force;
           const fy = (dy / dist) * force;
           
-          forces[node1.id]!.x -= fx;
-          forces[node1.id]!.y -= fy;
-          forces[node2.id]!.x += fx;
-          forces[node2.id]!.y += fy;
+          const force1 = forces[node1.id];
+          const force2 = forces[node2.id];
+          if (force1) {
+            force1.x -= fx;
+            force1.y -= fy;
+          }
+          if (force2) {
+            force2.x += fx;
+            force2.y += fy;
+          }
         }
       }
     }
@@ -290,9 +300,10 @@ function calculateForceDirectedPositions(graphData: GraphData): Record<string, {
     
     // Apply forces to velocities and positions
     graphData.nodes.forEach(node => {
-      const vel = velocities[node.id]!;
-      const force = forces[node.id]!;
-      const pos = positions[node.id]!;
+      const vel = velocities[node.id];
+      const force = forces[node.id];
+      const pos = positions[node.id];
+      if (!vel || !force || !pos) return;
       
       vel.x = (vel.x + force.x) * damping;
       vel.y = (vel.y + force.y) * damping;
@@ -307,7 +318,8 @@ function calculateForceDirectedPositions(graphData: GraphData): Record<string, {
   const minY = Math.min(...Object.values(positions).map(p => p.y));
   
   Object.keys(positions).forEach(nodeId => {
-    const pos = positions[nodeId]!;
+    const pos = positions[nodeId];
+    if (!pos) return;
     pos.x -= minX - 50;
     pos.y -= minY - 50;
   });

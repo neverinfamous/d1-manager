@@ -1,4 +1,5 @@
 import type { Env } from '../types';
+import { logInfo, logWarning } from './error-logger';
 
 /**
  * Track database access by updating the databases table
@@ -22,17 +23,23 @@ export async function trackDatabaseAccess(
     );
 
     if (!response.ok) {
-      console.error('[DatabaseTracking] Failed to fetch database info:', response.status);
+      logWarning(`Failed to fetch database info: ${String(response.status)}`, {
+        module: 'database_tracking',
+        operation: 'track_access',
+        databaseId,
+        metadata: { status: response.status }
+      });
       return;
     }
 
-    const data = await response.json() as {
-      result: { name: string };
-      success: boolean;
-    };
+    const data: { success: boolean; result?: { name: string } } = await response.json();
 
     if (!data.success || !data.result?.name) {
-      console.error('[DatabaseTracking] Invalid API response');
+      logWarning('Invalid API response', {
+        module: 'database_tracking',
+        operation: 'track_access',
+        databaseId
+      });
       return;
     }
 
@@ -52,7 +59,12 @@ export async function trackDatabaseAccess(
       ).bind(databaseId);
 
       await updateStmt.run();
-      console.log('[DatabaseTracking] Updated last_accessed for:', databaseName);
+      logInfo(`Updated last_accessed for: ${databaseName}`, {
+        module: 'database_tracking',
+        operation: 'update_access',
+        databaseId,
+        databaseName
+      });
     } else {
       // Insert new database record
       const insertStmt = env.METADATA.prepare(
@@ -60,37 +72,51 @@ export async function trackDatabaseAccess(
       ).bind(databaseId, databaseName);
 
       await insertStmt.run();
-      console.log('[DatabaseTracking] Tracked new database:', databaseName);
+      logInfo(`Tracked new database: ${databaseName}`, {
+        module: 'database_tracking',
+        operation: 'track_new',
+        databaseId,
+        databaseName
+      });
     }
   } catch (err) {
     // Don't fail the request if tracking fails
-    console.error('[DatabaseTracking] Error tracking database access:', err);
+    logWarning(`Error tracking database access: ${err instanceof Error ? err.message : String(err)}`, {
+      module: 'database_tracking',
+      operation: 'track_access',
+      databaseId,
+      metadata: { error: err instanceof Error ? err.message : String(err) }
+    });
   }
 }
 
 /**
  * Get all tracked databases with their access times
  */
-export async function getTrackedDatabases(env: Env): Promise<Array<{
+export async function getTrackedDatabases(env: Env): Promise<{
   database_id: string;
   database_name: string;
   first_accessed: string;
   last_accessed: string;
-}>> {
+}[]> {
   try {
     const stmt = env.METADATA.prepare(
       'SELECT * FROM databases ORDER BY last_accessed DESC'
     );
 
     const result = await stmt.all();
-    return result.results as Array<{
+    return result.results as {
       database_id: string;
       database_name: string;
       first_accessed: string;
       last_accessed: string;
-    }>;
+    }[];
   } catch (err) {
-    console.error('[DatabaseTracking] Error getting tracked databases:', err);
+    logWarning(`Error getting tracked databases: ${err instanceof Error ? err.message : String(err)}`, {
+      module: 'database_tracking',
+      operation: 'get_tracked',
+      metadata: { error: err instanceof Error ? err.message : String(err) }
+    });
     return [];
   }
 }

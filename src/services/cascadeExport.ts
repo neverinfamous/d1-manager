@@ -29,17 +29,17 @@ export class CascadeExportService {
       const severity = this.getSeverityForTable(table.action, affectedRows);
       
       lines.push(
-        `"${table.tableName}","${table.action}",${table.rowsBefore},${table.rowsAfter},${affectedRows},${table.depth},"${severity}"`
+        `"${table.tableName}","${table.action}",${String(table.rowsBefore)},${String(table.rowsAfter)},${String(affectedRows)},${String(table.depth)},"${severity}"`
       );
     }
     
     // Add summary section
     lines.push('');
     lines.push('Summary');
-    lines.push(`Total Tables Affected,${this.simulation.affectedTables.length}`);
-    lines.push(`Total Rows Affected,${this.simulation.totalAffectedRows}`);
-    lines.push(`Maximum Cascade Depth,${this.simulation.maxDepth}`);
-    lines.push(`Total Cascade Paths,${this.simulation.cascadePaths.length}`);
+    lines.push(`Total Tables Affected,${String(this.simulation.affectedTables.length)}`);
+    lines.push(`Total Rows Affected,${String(this.simulation.totalAffectedRows)}`);
+    lines.push(`Maximum Cascade Depth,${String(this.simulation.maxDepth)}`);
+    lines.push(`Total Cascade Paths,${String(this.simulation.cascadePaths.length)}`);
     
     // Add warnings section
     if (this.simulation.warnings.length > 0) {
@@ -116,18 +116,18 @@ export class CascadeExportService {
     // Summary
     lines.push('SUMMARY');
     lines.push('-'.repeat(60));
-    lines.push(`Total Tables Affected: ${stats.totalTables}`);
-    lines.push(`Total Rows Affected: ${stats.totalRowsAffected}`);
-    lines.push(`Maximum Cascade Depth: ${stats.maxDepth} level(s)`);
+    lines.push(`Total Tables Affected: ${String(stats.totalTables)}`);
+    lines.push(`Total Rows Affected: ${String(stats.totalRowsAffected)}`);
+    lines.push(`Maximum Cascade Depth: ${String(stats.maxDepth)} level(s)`);
     lines.push(`Severity: ${stats.severityLevel.toUpperCase()}`);
     lines.push('');
     
     // Action breakdown
     lines.push('ACTION BREAKDOWN');
     lines.push('-'.repeat(60));
-    lines.push(`CASCADE Actions: ${stats.cascadeActions}`);
-    lines.push(`SET NULL Actions: ${stats.setNullActions}`);
-    lines.push(`RESTRICT Actions: ${stats.restrictActions}`);
+    lines.push(`CASCADE Actions: ${String(stats.cascadeActions)}`);
+    lines.push(`SET NULL Actions: ${String(stats.setNullActions)}`);
+    lines.push(`RESTRICT Actions: ${String(stats.restrictActions)}`);
     lines.push('');
     
     // Affected tables by depth
@@ -136,12 +136,12 @@ export class CascadeExportService {
     const tablesByDepth = this.engine.getTablesByDepth();
     
     for (let depth = 0; depth <= stats.maxDepth; depth++) {
-      const tables = tablesByDepth.get(depth) || [];
+      const tables = tablesByDepth.get(depth) ?? [];
       if (tables.length > 0) {
-        lines.push(`\nDepth ${depth}:`);
+        lines.push(`\nDepth ${String(depth)}:`);
         for (const table of tables) {
           const affectedRows = table.rowsBefore - table.rowsAfter;
-          lines.push(`  - ${table.tableName} (${table.action}): ${affectedRows} row(s) affected`);
+          lines.push(`  - ${table.tableName} (${table.action}): ${String(affectedRows)} row(s) affected`);
         }
       }
     }
@@ -157,7 +157,7 @@ export class CascadeExportService {
         lines.push(`\nFrom ${source}:`);
         for (const path of paths) {
           lines.push(
-            `  -> ${path.targetTable} (${path.action}, ${path.affectedRows} rows, depth ${path.depth})`
+            `  -> ${path.targetTable} (${path.action}, ${String(path.affectedRows)} rows, depth ${String(path.depth)})`
           );
         }
       }
@@ -246,13 +246,13 @@ export class CascadeExportService {
     pdf.setFontSize(10);
     pdf.setFont('helvetica', 'normal');
     const summaryLines = [
-      `Total Tables Affected: ${stats.totalTables}`,
-      `Total Rows Affected: ${stats.totalRowsAffected}`,
-      `Maximum Cascade Depth: ${stats.maxDepth} level(s)`,
+      `Total Tables Affected: ${String(stats.totalTables)}`,
+      `Total Rows Affected: ${String(stats.totalRowsAffected)}`,
+      `Maximum Cascade Depth: ${String(stats.maxDepth)} level(s)`,
       `Severity: ${stats.severityLevel.toUpperCase()}`,
-      `CASCADE Actions: ${stats.cascadeActions}`,
-      `SET NULL Actions: ${stats.setNullActions}`,
-      `RESTRICT Actions: ${stats.restrictActions}`
+      `CASCADE Actions: ${String(stats.cascadeActions)}`,
+      `SET NULL Actions: ${String(stats.setNullActions)}`,
+      `RESTRICT Actions: ${String(stats.restrictActions)}`
     ];
     
     for (const line of summaryLines) {
@@ -272,9 +272,9 @@ export class CascadeExportService {
       pdf.setFont('helvetica', 'normal');
       for (const warning of this.simulation.warnings) {
         const warningText = `[${warning.severity.toUpperCase()}] ${warning.message}`;
-        const lines = pdf.splitTextToSize(warningText, contentWidth);
-        pdf.text(lines, margin, yPosition);
-        yPosition += lines.length * 5;
+        const splitLines = pdf.splitTextToSize(warningText, contentWidth) as string[];
+        pdf.text(splitLines, margin, yPosition);
+        yPosition += splitLines.length * 5;
       }
       yPosition += 5;
     }
@@ -310,8 +310,8 @@ export class CascadeExportService {
         } else {
           pdf.addImage(imgData, 'PNG', margin, yPosition, imgWidth, imgHeight);
         }
-      } catch (error) {
-        console.error('Failed to add graph to PDF:', error);
+      } catch {
+        // Failed to add graph to PDF, continue without it
       }
     }
     
@@ -329,7 +329,7 @@ export class CascadeExportService {
     
     const tablesByDepth = this.engine.getTablesByDepth();
     for (let depth = 0; depth <= stats.maxDepth; depth++) {
-      const tables = tablesByDepth.get(depth) || [];
+      const tables = tablesByDepth.get(depth) ?? [];
       if (tables.length > 0) {
         // Check if we need a new page
         if (yPosition > pdf.internal.pageSize.getHeight() - margin - 20) {
@@ -338,13 +338,13 @@ export class CascadeExportService {
         }
         
         pdf.setFont('helvetica', 'bold');
-        pdf.text(`Depth ${depth}:`, margin, yPosition);
+        pdf.text(`Depth ${String(depth)}:`, margin, yPosition);
         yPosition += 6;
         
         pdf.setFont('helvetica', 'normal');
         for (const table of tables) {
           const affectedRows = table.rowsBefore - table.rowsAfter;
-          const text = `  ${table.tableName} (${table.action}): ${affectedRows} rows affected`;
+          const text = `  ${table.tableName} (${table.action}): ${String(affectedRows)} rows affected`;
           pdf.text(text, margin + 5, yPosition);
           yPosition += 5;
           
@@ -382,7 +382,7 @@ export class CascadeExportService {
   /**
    * Export and download as CSV
    */
-  public async exportAndDownloadCSV(): Promise<void> {
+  public exportAndDownloadCSV(): void {
     const csv = this.exportAsCSV();
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
     const filename = `cascade-impact-${this.simulation.targetTable}-${timestamp}.csv`;
@@ -392,7 +392,7 @@ export class CascadeExportService {
   /**
    * Export and download as JSON
    */
-  public async exportAndDownloadJSON(): Promise<void> {
+  public exportAndDownloadJSON(): void {
     const json = this.exportAsJSON();
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
     const filename = `cascade-impact-${this.simulation.targetTable}-${timestamp}.json`;
@@ -402,7 +402,7 @@ export class CascadeExportService {
   /**
    * Export and download as text
    */
-  public async exportAndDownloadText(): Promise<void> {
+  public exportAndDownloadText(): void {
     const text = this.exportAsText();
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
     const filename = `cascade-impact-${this.simulation.targetTable}-${timestamp}.txt`;

@@ -1,10 +1,11 @@
 import type { Env } from '../types';
+import { logWarning } from './error-logger';
 
 /**
  * Get database size using D1 PRAGMA
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export async function getDatabaseSize(_databaseId: string, _env: Env): Promise<number> {
+ 
+export function getDatabaseSize(_databaseId: string, _env: Env): number {
   // For now, return 0 - will be implemented when we have dynamic database bindings
   // In production, this would query the specific D1 database
   return 0;
@@ -96,19 +97,20 @@ export function buildWhereClause(
   
   const filterEntries = Object.entries(filters);
   
-  for (let i = 0; i < filterEntries.length; i++) {
-    const entry = filterEntries[i];
-    if (!entry) continue;
-    const [columnName, filter] = entry;
+  for (const [columnName, filter] of filterEntries) {
     
     // Validate column exists in schema
     if (!columnMap.has(columnName)) {
-      console.warn(`[buildWhereClause] Invalid column name: ${columnName}`);
+      logWarning(`Invalid column name: ${columnName}`, {
+        module: 'helpers',
+        operation: 'build_where_clause',
+        metadata: { columnName }
+      });
       continue;
     }
     
     const sanitizedColumn = sanitizeIdentifier(columnName);
-    const columnType = columnMap.get(columnName)?.toUpperCase() || '';
+    const columnType = columnMap.get(columnName)?.toUpperCase() ?? '';
     let condition = '';
     
     // Handle NULL checks (no value needed)
@@ -119,9 +121,12 @@ export function buildWhereClause(
     }
     // Handle BETWEEN operator
     else if (filter.type === 'between' || filter.type === 'notBetween') {
-      if ((filter.value === undefined || filter.value === null || filter.value === '') ||
-          (filter.value2 === undefined || filter.value2 === null || filter.value2 === '')) {
-        console.warn(`[buildWhereClause] BETWEEN requires both value and value2`);
+      if (filter.value === '' || filter.value2 === '') {
+        logWarning('BETWEEN requires both value and value2', {
+          module: 'helpers',
+          operation: 'build_where_clause',
+          metadata: { filterType: filter.type, columnName }
+        });
         continue;
       }
       
@@ -135,15 +140,19 @@ export function buildWhereClause(
       const operator = filter.type === 'between' ? 'BETWEEN' : 'NOT BETWEEN';
       
       if (typeof filter.value === 'number' && typeof filter.value2 === 'number') {
-        condition = `"${sanitizedColumn}" ${operator} ${escapedValue1} AND ${escapedValue2}`;
+        condition = `"${sanitizedColumn}" ${operator} ${String(escapedValue1)} AND ${String(escapedValue2)}`;
       } else {
-        condition = `"${sanitizedColumn}" ${operator} '${escapedValue1}' AND '${escapedValue2}'`;
+        condition = `"${sanitizedColumn}" ${operator} '${String(escapedValue1)}' AND '${String(escapedValue2)}'`;
       }
     }
     // Handle IN operator
     else if (filter.type === 'in' || filter.type === 'notIn') {
       if (!filter.values || filter.values.length === 0) {
-        console.warn(`[buildWhereClause] IN requires values array`);
+        logWarning('IN requires values array', {
+          module: 'helpers',
+          operation: 'build_where_clause',
+          metadata: { filterType: filter.type, columnName }
+        });
         continue;
       }
       
@@ -163,7 +172,7 @@ export function buildWhereClause(
     // Handle value-based filters
     else {
       // Skip if no value provided
-      if (filter.value === undefined || filter.value === null || filter.value === '') {
+      if (filter.value === '') {
         continue;
       }
       
@@ -176,23 +185,23 @@ export function buildWhereClause(
       switch (filter.type) {
         case 'equals':
           if (typeof filter.value === 'number') {
-            condition = `"${sanitizedColumn}" = ${escapedValue}`;
+            condition = `"${sanitizedColumn}" = ${String(escapedValue)}`;
           } else if (columnType.includes('TEXT') || columnType.includes('CHAR')) {
             // Case-insensitive comparison for text
-            condition = `LOWER("${sanitizedColumn}") = LOWER('${escapedValue}')`;
+            condition = `LOWER("${sanitizedColumn}") = LOWER('${String(escapedValue)}')`;
           } else {
-            condition = `"${sanitizedColumn}" = '${escapedValue}'`;
+            condition = `"${sanitizedColumn}" = '${String(escapedValue)}'`;
           }
           break;
           
         case 'notEquals':
           if (typeof filter.value === 'number') {
-            condition = `"${sanitizedColumn}" != ${escapedValue}`;
+            condition = `"${sanitizedColumn}" != ${String(escapedValue)}`;
           } else if (columnType.includes('TEXT') || columnType.includes('CHAR')) {
             // Case-insensitive comparison for text
-            condition = `LOWER("${sanitizedColumn}") != LOWER('${escapedValue}')`;
+            condition = `LOWER("${sanitizedColumn}") != LOWER('${String(escapedValue)}')`;
           } else {
-            condition = `"${sanitizedColumn}" != '${escapedValue}'`;
+            condition = `"${sanitizedColumn}" != '${String(escapedValue)}'`;
           }
           break;
           
@@ -219,33 +228,33 @@ export function buildWhereClause(
           
         case 'gt':
           if (typeof filter.value === 'number') {
-            condition = `"${sanitizedColumn}" > ${escapedValue}`;
+            condition = `"${sanitizedColumn}" > ${String(escapedValue)}`;
           } else {
-            condition = `"${sanitizedColumn}" > '${escapedValue}'`;
+            condition = `"${sanitizedColumn}" > '${String(escapedValue)}'`;
           }
           break;
           
         case 'gte':
           if (typeof filter.value === 'number') {
-            condition = `"${sanitizedColumn}" >= ${escapedValue}`;
+            condition = `"${sanitizedColumn}" >= ${String(escapedValue)}`;
           } else {
-            condition = `"${sanitizedColumn}" >= '${escapedValue}'`;
+            condition = `"${sanitizedColumn}" >= '${String(escapedValue)}'`;
           }
           break;
           
         case 'lt':
           if (typeof filter.value === 'number') {
-            condition = `"${sanitizedColumn}" < ${escapedValue}`;
+            condition = `"${sanitizedColumn}" < ${String(escapedValue)}`;
           } else {
-            condition = `"${sanitizedColumn}" < '${escapedValue}'`;
+            condition = `"${sanitizedColumn}" < '${String(escapedValue)}'`;
           }
           break;
           
         case 'lte':
           if (typeof filter.value === 'number') {
-            condition = `"${sanitizedColumn}" <= ${escapedValue}`;
+            condition = `"${sanitizedColumn}" <= ${String(escapedValue)}`;
           } else {
-            condition = `"${sanitizedColumn}" <= '${escapedValue}'`;
+            condition = `"${sanitizedColumn}" <= '${String(escapedValue)}'`;
           }
           break;
       }

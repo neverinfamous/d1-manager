@@ -17,17 +17,32 @@
 
     /* Strict Type-Checking Options */
     "strict": true,
-    // TODO: Enable these and fix errors in another thread
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noImplicitThis": true,
+    "useUnknownInCatchVariables": true,
+    "alwaysStrict": true,
     "exactOptionalPropertyTypes": true,
-    "noUncheckedIndexedAccess": true,
-    "noImplicitOverride": true,
 
     /* Additional Checks */
     "noUnusedLocals": true,
     "noUnusedParameters": true,
+    "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "allowUnusedLabels": false,
+    "allowUnreachableCode": false,
     "noUncheckedSideEffectImports": true,
+
+    /* Module Resolution */
     "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
 
     /* Path Aliases */
     "baseUrl": ".",
@@ -37,4 +52,3 @@
   },
   "include": ["src"]
 }
-

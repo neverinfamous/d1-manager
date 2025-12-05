@@ -16,7 +16,6 @@ import {
   Check,
   RefreshCw,
   Loader2,
-  AlertCircle,
   History,
   Trash2,
   Terminal,
@@ -25,13 +24,14 @@ import {
   Bookmark,
   Info
 } from 'lucide-react';
+import { ErrorMessage } from '@/components/ui/error-message';
 
 interface TimeTravelInfoProps {
   databaseId: string;
   databaseName: string;
 }
 
-export function TimeTravelInfo({ databaseId, databaseName }: TimeTravelInfoProps) {
+export function TimeTravelInfo({ databaseId, databaseName }: TimeTravelInfoProps): React.JSX.Element {
   const [currentBookmark, setCurrentBookmark] = useState<BookmarkInfo | null>(null);
   const [history, setHistory] = useState<BookmarkHistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,14 +41,15 @@ export function TimeTravelInfo({ databaseId, databaseName }: TimeTravelInfoProps
   const [historyExpanded, setHistoryExpanded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (skipCache = false) => {
     try {
       setLoading(true);
       setError(null);
       
+      // Use cache on initial load for instant tab switching
       const [bookmarkResult, historyResult] = await Promise.all([
-        getCurrentBookmark(databaseId),
-        getBookmarkHistory(databaseId, 10)
+        getCurrentBookmark(databaseId, skipCache),
+        getBookmarkHistory(databaseId, 10, skipCache)
       ]);
       
       setCurrentBookmark(bookmarkResult);
@@ -61,29 +62,29 @@ export function TimeTravelInfo({ databaseId, databaseName }: TimeTravelInfoProps
   }, [databaseId]);
 
   useEffect(() => {
-    loadData();
+    void loadData();
   }, [loadData]);
 
-  const handleRefresh = async () => {
+  const handleRefresh = async (): Promise<void> => {
     try {
       setRefreshing(true);
-      await loadData();
+      await loadData(true); // Skip cache on manual refresh
     } finally {
       setRefreshing(false);
     }
   };
 
-  const handleCopy = async (text: string, id: string) => {
+  const handleCopy = async (text: string, id: string): Promise<void> => {
     try {
       await navigator.clipboard.writeText(text);
       setCopiedId(id);
       setTimeout(() => setCopiedId(null), 2000);
-    } catch (err) {
-      console.error('Failed to copy:', err);
+    } catch {
+      // Silently ignore copy failures
     }
   };
 
-  const handleCapture = async () => {
+  const handleCapture = async (): Promise<void> => {
     try {
       setCapturing(true);
       await captureBookmark(databaseId, 'Manual checkpoint');
@@ -95,7 +96,7 @@ export function TimeTravelInfo({ databaseId, databaseName }: TimeTravelInfoProps
     }
   };
 
-  const handleDeleteBookmark = async (bookmarkId: number) => {
+  const handleDeleteBookmark = async (bookmarkId: number): Promise<void> => {
     try {
       await deleteBookmarkEntry(databaseId, bookmarkId);
       setHistory(prev => prev.filter(h => h.id !== bookmarkId));
@@ -104,7 +105,7 @@ export function TimeTravelInfo({ databaseId, databaseName }: TimeTravelInfoProps
     }
   };
 
-  const formatRelativeTime = (timestamp: string) => {
+  const formatRelativeTime = (timestamp: string): string => {
     const date = new Date(timestamp);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
@@ -113,13 +114,13 @@ export function TimeTravelInfo({ databaseId, databaseName }: TimeTravelInfoProps
     const diffDays = Math.floor(diffHours / 24);
 
     if (diffMins < 1) return 'just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
+    if (diffMins < 60) return `${String(diffMins)}m ago`;
+    if (diffHours < 24) return `${String(diffHours)}h ago`;
+    if (diffDays < 7) return `${String(diffDays)}d ago`;
     return date.toLocaleDateString();
   };
 
-  const getOperationLabel = (type: string) => {
+  const getOperationLabel = (type: string): string => {
     switch (type) {
       case 'manual':
         return 'Manual Checkpoint';
@@ -138,7 +139,7 @@ export function TimeTravelInfo({ databaseId, databaseName }: TimeTravelInfoProps
     }
   };
 
-  const truncateBookmark = (bookmark: string, length: number = 40) => {
+  const truncateBookmark = (bookmark: string, length = 40): string => {
     if (bookmark.length <= length) return bookmark;
     return bookmark.substring(0, length) + '...';
   };
@@ -158,11 +159,8 @@ export function TimeTravelInfo({ databaseId, databaseName }: TimeTravelInfoProps
     return (
       <Card>
         <CardContent className="py-6">
-          <div className="flex items-center gap-2 text-destructive mb-4">
-            <AlertCircle className="h-5 w-5" />
-            <span>{error}</span>
-          </div>
-          <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
+          <ErrorMessage error={error} className="mb-4" />
+          <Button variant="outline" onClick={() => void handleRefresh()} disabled={refreshing}>
             {refreshing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
             Retry
           </Button>
@@ -188,7 +186,7 @@ export function TimeTravelInfo({ databaseId, databaseName }: TimeTravelInfoProps
             <Button
               variant="ghost"
               size="sm"
-              onClick={handleRefresh}
+              onClick={() => void handleRefresh()}
               disabled={refreshing}
             >
               {refreshing ? (
@@ -214,7 +212,7 @@ export function TimeTravelInfo({ databaseId, databaseName }: TimeTravelInfoProps
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => handleCopy(currentBookmark.bookmark, 'current')}
+                  onClick={() => void handleCopy(currentBookmark.bookmark, 'current')}
                   className="shrink-0"
                 >
                   {copiedId === 'current' ? (
@@ -249,7 +247,7 @@ export function TimeTravelInfo({ databaseId, databaseName }: TimeTravelInfoProps
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => handleCopy(restoreCommand, 'restore')}
+                  onClick={() => void handleCopy(restoreCommand, 'restore')}
                   className="shrink-0"
                 >
                   {copiedId === 'restore' ? (
@@ -270,7 +268,7 @@ export function TimeTravelInfo({ databaseId, databaseName }: TimeTravelInfoProps
             <Button
               variant="outline"
               size="sm"
-              onClick={handleCapture}
+              onClick={() => void handleCapture()}
               disabled={capturing}
               className="w-full"
             >
@@ -340,13 +338,13 @@ export function TimeTravelInfo({ databaseId, databaseName }: TimeTravelInfoProps
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleCopy(
+                          onClick={() => void handleCopy(
                             generateRestoreCommand(databaseName, entry.bookmark),
-                            `history-${entry.id}`
+                            `history-${String(entry.id)}`
                           )}
                           title="Copy restore command"
                         >
-                          {copiedId === `history-${entry.id}` ? (
+                          {copiedId === `history-${String(entry.id)}` ? (
                             <Check className="h-4 w-4 text-green-500" />
                           ) : (
                             <Terminal className="h-4 w-4" />
@@ -355,7 +353,7 @@ export function TimeTravelInfo({ databaseId, databaseName }: TimeTravelInfoProps
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleDeleteBookmark(entry.id)}
+                          onClick={() => void handleDeleteBookmark(entry.id)}
                           title="Delete checkpoint"
                           className="text-destructive hover:text-destructive"
                         >

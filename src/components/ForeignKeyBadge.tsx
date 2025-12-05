@@ -8,13 +8,13 @@ interface ForeignKeyBadgeProps {
   onClick: () => void;
 }
 
-export function ForeignKeyBadge({ value, refTable, refColumn, onClick }: ForeignKeyBadgeProps) {
+export function ForeignKeyBadge({ value, refTable, refColumn, onClick }: ForeignKeyBadgeProps): React.JSX.Element {
   // Don't make null/undefined values clickable
   if (value === null || value === undefined) {
     return <span className="text-muted-foreground">NULL</span>;
   }
 
-  const displayValue = String(value);
+  const displayValue = typeof value === 'object' ? JSON.stringify(value) : String(value as string | number | boolean);
   const tooltip = `References ${refTable}.${refColumn}`;
 
   return (

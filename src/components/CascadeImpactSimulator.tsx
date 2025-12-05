@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import ReactFlow, {
-  Node,
-  Edge,
+  type Node,
+  type Edge,
   Background,
   useNodesState,
   useEdgesState,
@@ -50,8 +50,8 @@ interface CustomNodeData {
   isTarget: boolean;
 }
 
-const CustomNode = ({ data }: { data: CustomNodeData }) => {
-  const getSeverityColor = (action: string) => {
+const CustomNode = ({ data }: { data: CustomNodeData }): React.JSX.Element => {
+  const getSeverityColor = (action: string): string => {
     switch (action.toUpperCase()) {
       case 'DELETE': return 'text-red-100';
       case 'CASCADE': return 'text-yellow-900';
@@ -94,7 +94,7 @@ export function CascadeImpactSimulator({
   whereClause,
   open,
   onClose
-}: CascadeImpactSimulatorProps) {
+}: CascadeImpactSimulatorProps): React.JSX.Element | null {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [simulation, setSimulation] = useState<CascadeSimulationResult | null>(null);
@@ -135,11 +135,11 @@ export function CascadeImpactSimulator({
   // Load simulation on mount
   useEffect(() => {
     if (open) {
-      loadSimulation();
+      void loadSimulation();
     }
   }, [open, loadSimulation]);
 
-  const handleExport = async (format: 'csv' | 'json' | 'text' | 'pdf') => {
+  const handleExport = async (format: 'csv' | 'json' | 'text' | 'pdf'): Promise<void> => {
     if (!exportService) return;
     
     try {
@@ -147,27 +147,26 @@ export function CascadeImpactSimulator({
       
       switch (format) {
         case 'csv':
-          await exportService.exportAndDownloadCSV();
+          exportService.exportAndDownloadCSV();
           break;
         case 'json':
-          await exportService.exportAndDownloadJSON();
+          exportService.exportAndDownloadJSON();
           break;
         case 'text':
-          await exportService.exportAndDownloadText();
+          exportService.exportAndDownloadText();
           break;
         case 'pdf':
           await exportService.exportAndDownloadPDF(graphRef.current);
           break;
       }
-    } catch (err) {
-      console.error('Export failed:', err);
+    } catch {
       setError(`Failed to export as ${format.toUpperCase()}`);
     } finally {
       setExporting(false);
     }
   };
 
-  const getSeverityColor = (severity: 'low' | 'medium' | 'high') => {
+  const getSeverityColor = (severity: 'low' | 'medium' | 'high'): string => {
     switch (severity) {
       case 'high': return 'text-red-600 dark:text-red-400';
       case 'medium': return 'text-yellow-600 dark:text-yellow-400';
@@ -175,7 +174,7 @@ export function CascadeImpactSimulator({
     }
   };
 
-  const getSeverityBg = (severity: 'low' | 'medium' | 'high') => {
+  const getSeverityBg = (severity: 'low' | 'medium' | 'high'): string => {
     switch (severity) {
       case 'high': return 'bg-red-100 dark:bg-red-950/30';
       case 'medium': return 'bg-yellow-100 dark:bg-yellow-950/30';
@@ -452,7 +451,7 @@ export function CascadeImpactSimulator({
                         <Button
                           variant="outline"
                           className="justify-start h-auto py-4 px-4"
-                          onClick={() => handleExport('csv')}
+                          onClick={() => void handleExport('csv')}
                           disabled={exporting}
                         >
                           <FileSpreadsheet className="h-5 w-5 mr-3 flex-shrink-0" />
@@ -467,7 +466,7 @@ export function CascadeImpactSimulator({
                         <Button
                           variant="outline"
                           className="justify-start h-auto py-4 px-4"
-                          onClick={() => handleExport('json')}
+                          onClick={() => void handleExport('json')}
                           disabled={exporting}
                         >
                           <FileJson className="h-5 w-5 mr-3 flex-shrink-0" />
@@ -482,7 +481,7 @@ export function CascadeImpactSimulator({
                         <Button
                           variant="outline"
                           className="justify-start h-auto py-4 px-4"
-                          onClick={() => handleExport('text')}
+                          onClick={() => void handleExport('text')}
                           disabled={exporting}
                         >
                           <FileText className="h-5 w-5 mr-3 flex-shrink-0" />
@@ -497,7 +496,7 @@ export function CascadeImpactSimulator({
                         <Button
                           variant="outline"
                           className="justify-start h-auto py-4 px-4"
-                          onClick={() => handleExport('pdf')}
+                          onClick={() => void handleExport('pdf')}
                           disabled={exporting}
                         >
                           <Download className="h-5 w-5 mr-3 flex-shrink-0" />

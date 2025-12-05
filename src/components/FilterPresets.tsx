@@ -39,15 +39,15 @@ const getBuiltInPresets = (columns: ColumnInfo[]): FilterPreset[] => {
   
   // Find date/time columns
   const dateColumns = columns.filter(col => 
-    col.type?.toUpperCase().includes('DATE') || 
-    col.type?.toUpperCase().includes('TIME')
+    col.type.toUpperCase().includes('DATE') || 
+    col.type.toUpperCase().includes('TIME')
   );
   
   // Find numeric columns
   const numericColumns = columns.filter(col =>
-    col.type?.toUpperCase().includes('INT') ||
-    col.type?.toUpperCase().includes('REAL') ||
-    col.type?.toUpperCase().includes('NUMERIC')
+    col.type.toUpperCase().includes('INT') ||
+    col.type.toUpperCase().includes('REAL') ||
+    col.type.toUpperCase().includes('NUMERIC')
   );
   
   // Empty values preset
@@ -72,8 +72,9 @@ const getBuiltInPresets = (columns: ColumnInfo[]): FilterPreset[] => {
   }
   
   // Date-based presets
-  if (dateColumns.length > 0) {
-    const dateCol = dateColumns[0]!.name;
+  const firstDateCol = dateColumns[0];
+  if (firstDateCol) {
+    const dateCol = firstDateCol.name;
     const today = new Date();
     const sevenDaysAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
     const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -87,7 +88,7 @@ const getBuiltInPresets = (columns: ColumnInfo[]): FilterPreset[] => {
       filters: {
         [dateCol]: {
           type: 'gte',
-          value: sevenDaysAgo.toISOString().split('T')[0]!
+          value: sevenDaysAgo.toISOString().split('T')[0] ?? ''
         }
       }
     });
@@ -99,7 +100,7 @@ const getBuiltInPresets = (columns: ColumnInfo[]): FilterPreset[] => {
       filters: {
         [dateCol]: {
           type: 'gte',
-          value: thirtyDaysAgo.toISOString().split('T')[0]!
+          value: thirtyDaysAgo.toISOString().split('T')[0] ?? ''
         }
       }
     });
@@ -111,7 +112,7 @@ const getBuiltInPresets = (columns: ColumnInfo[]): FilterPreset[] => {
       filters: {
         [dateCol]: {
           type: 'gte',
-          value: startOfMonth.toISOString().split('T')[0]!
+          value: startOfMonth.toISOString().split('T')[0] ?? ''
         }
       }
     });
@@ -123,15 +124,16 @@ const getBuiltInPresets = (columns: ColumnInfo[]): FilterPreset[] => {
       filters: {
         [dateCol]: {
           type: 'gte',
-          value: startOfYear.toISOString().split('T')[0]!
+          value: startOfYear.toISOString().split('T')[0] ?? ''
         }
       }
     });
   }
   
   // Numeric range presets
-  if (numericColumns.length > 0) {
-    const numCol = numericColumns[0]!.name;
+  const firstNumCol = numericColumns[0];
+  if (firstNumCol) {
+    const numCol = firstNumCol.name;
     
     presets.push({
       id: 'range-0-100',
@@ -162,7 +164,7 @@ const getBuiltInPresets = (columns: ColumnInfo[]): FilterPreset[] => {
   return presets;
 };
 
-export function FilterPresets({ columns, currentFilters, onApplyPreset }: FilterPresetsProps) {
+export function FilterPresets({ columns, currentFilters, onApplyPreset }: FilterPresetsProps): React.JSX.Element {
   const [customPresets, setCustomPresets] = useState<FilterPreset[]>([]);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [presetName, setPresetName] = useState('');
@@ -173,14 +175,14 @@ export function FilterPresets({ columns, currentFilters, onApplyPreset }: Filter
   
   // Load custom presets from localStorage on mount
   useEffect(() => {
-    const loadPresets = () => {
+    const loadPresets = (): void => {
       const stored = localStorage.getItem('d1-filter-presets');
       if (stored) {
         try {
-          const parsed = JSON.parse(stored);
+          const parsed = JSON.parse(stored) as FilterPreset[];
           setCustomPresets(parsed);
-        } catch (e) {
-          console.error('Failed to load filter presets:', e);
+        } catch {
+          // Silently ignore parse errors
         }
       }
     };
@@ -189,16 +191,16 @@ export function FilterPresets({ columns, currentFilters, onApplyPreset }: Filter
   }, []);
   
   // Save custom presets to localStorage
-  const saveCustomPresets = (presets: FilterPreset[]) => {
+  const saveCustomPresets = (presets: FilterPreset[]): void => {
     setCustomPresets(presets);
     localStorage.setItem('d1-filter-presets', JSON.stringify(presets));
   };
   
-  const handleSavePreset = () => {
+  const handleSavePreset = (): void => {
     if (!presetName.trim()) return;
     
     const newPreset: FilterPreset = {
-      id: `custom-${Date.now()}`,
+      id: `custom-${String(Date.now())}`,
       name: presetName.trim(),
       description: presetDescription.trim() || 'Custom filter preset',
       filters: currentFilters
@@ -210,12 +212,12 @@ export function FilterPresets({ columns, currentFilters, onApplyPreset }: Filter
     setSaveDialogOpen(false);
   };
   
-  const handleDeletePreset = (presetId: string) => {
+  const handleDeletePreset = (presetId: string): void => {
     const updated = customPresets.filter(p => p.id !== presetId);
     saveCustomPresets(updated);
   };
   
-  const handleApplyPreset = (presetId: string) => {
+  const handleApplyPreset = (presetId: string): void => {
     const preset = allPresets.find(p => p.id === presetId);
     if (preset) {
       onApplyPreset(preset.filters);

@@ -1,5 +1,6 @@
 import type { Env } from '../types';
 import { CF_API } from '../types';
+import { logInfo, logWarning } from './error-logger';
 
 /**
  * Time Travel utility functions for D1 databases
@@ -36,7 +37,11 @@ export async function getCurrentBookmark(
   env: Env
 ): Promise<string | null> {
   try {
-    console.log('[TimeTravel] Getting current bookmark for database:', databaseId);
+    logInfo(`Getting current bookmark for database: ${databaseId}`, {
+      module: 'time_travel',
+      operation: 'get_bookmark',
+      databaseId
+    });
     
     const cfHeaders = {
       'Authorization': `Bearer ${env.API_KEY}`,
@@ -56,27 +61,40 @@ export async function getCurrentBookmark(
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('[TimeTravel] Export API error:', response.status, errorText);
+      logWarning(`Export API error: ${String(response.status)} ${errorText}`, {
+        module: 'time_travel',
+        operation: 'get_bookmark',
+        databaseId,
+        metadata: { status: response.status, errorText }
+      });
       return null;
     }
 
-    const data = await response.json() as {
-      result: {
-        at_bookmark?: string;
-        status?: string;
-      };
-      success: boolean;
-    };
+    const data: { success: boolean; result?: { at_bookmark?: string } } = await response.json();
 
     if (!data.success || !data.result?.at_bookmark) {
-      console.error('[TimeTravel] No bookmark in response:', JSON.stringify(data));
+      logWarning(`No bookmark in response: ${JSON.stringify(data)}`, {
+        module: 'time_travel',
+        operation: 'get_bookmark',
+        databaseId
+      });
       return null;
     }
 
-    console.log('[TimeTravel] Got bookmark:', data.result.at_bookmark);
+    logInfo(`Got bookmark: ${data.result.at_bookmark}`, {
+      module: 'time_travel',
+      operation: 'get_bookmark',
+      databaseId,
+      metadata: { bookmark: data.result.at_bookmark }
+    });
     return data.result.at_bookmark;
   } catch (err) {
-    console.error('[TimeTravel] Error getting bookmark:', err);
+    logWarning(`Error getting bookmark: ${err instanceof Error ? err.message : String(err)}`, {
+      module: 'time_travel',
+      operation: 'get_bookmark',
+      databaseId,
+      metadata: { error: err instanceof Error ? err.message : String(err) }
+    });
     return null;
   }
 }
@@ -94,44 +112,68 @@ export async function captureBookmark(
   userEmail?: string
 ): Promise<string | null> {
   try {
-    console.log('[TimeTravel] Capturing bookmark before operation:', operationType);
+    logInfo(`Capturing bookmark before operation: ${operationType}`, {
+      module: 'time_travel',
+      operation: 'capture_bookmark',
+      databaseId,
+      ...(databaseName ? { databaseName } : {}),
+      metadata: { operationType }
+    });
     
     // Get the current bookmark
     const bookmark = await getCurrentBookmark(databaseId, env);
     
     if (!bookmark) {
-      console.warn('[TimeTravel] Could not get bookmark - operation will proceed without checkpoint');
+      logWarning('Could not get bookmark - operation will proceed without checkpoint', {
+        module: 'time_travel',
+        operation: 'capture_bookmark',
+        databaseId,
+        metadata: { operationType }
+      });
       return null;
     }
 
-    // Store in metadata database if available
-    if (env.METADATA) {
-      try {
-        await env.METADATA.prepare(
+    // Store in metadata database
+    try {
+      await env.METADATA.prepare(
           `INSERT INTO bookmark_history (database_id, database_name, bookmark, operation_type, description, user_email)
            VALUES (?, ?, ?, ?, ?, ?)`
         ).bind(
           databaseId,
-          databaseName || null,
+          databaseName ?? null,
           bookmark,
           operationType,
-          description || null,
-          userEmail || null
+          description ?? null,
+          userEmail ?? null
         ).run();
         
-        console.log('[TimeTravel] Bookmark stored in metadata DB');
+        logInfo('Bookmark stored in metadata DB', {
+          module: 'time_travel',
+          operation: 'capture_bookmark',
+          databaseId,
+          metadata: { bookmark, operationType }
+        });
         
         // Clean up old bookmarks (keep last 50 per database)
         await cleanupOldBookmarks(databaseId, env);
-      } catch (dbErr) {
-        console.error('[TimeTravel] Failed to store bookmark in metadata DB:', dbErr);
-        // Don't fail the operation - bookmark capture is best-effort
-      }
+    } catch (dbErr) {
+      logWarning(`Failed to store bookmark in metadata DB: ${dbErr instanceof Error ? dbErr.message : String(dbErr)}`, {
+        module: 'time_travel',
+        operation: 'capture_bookmark',
+        databaseId,
+        metadata: { error: dbErr instanceof Error ? dbErr.message : String(dbErr) }
+      });
+      // Don't fail the operation - bookmark capture is best-effort
     }
 
     return bookmark;
   } catch (err) {
-    console.error('[TimeTravel] Error capturing bookmark:', err);
+    logWarning(`Error capturing bookmark: ${err instanceof Error ? err.message : String(err)}`, {
+      module: 'time_travel',
+      operation: 'capture_bookmark',
+      databaseId,
+      metadata: { error: err instanceof Error ? err.message : String(err) }
+    });
     return null;
   }
 }
@@ -142,12 +184,8 @@ export async function captureBookmark(
 export async function getBookmarkHistory(
   databaseId: string,
   env: Env,
-  limit: number = 20
+  limit = 20
 ): Promise<BookmarkHistoryEntry[]> {
-  if (!env.METADATA) {
-    return [];
-  }
-
   try {
     const result = await env.METADATA.prepare(
       `SELECT id, database_id, database_name, bookmark, operation_type, description, captured_at, user_email
@@ -157,9 +195,14 @@ export async function getBookmarkHistory(
        LIMIT ?`
     ).bind(databaseId, limit).all<BookmarkHistoryEntry>();
 
-    return result.results || [];
+    return result.results;
   } catch (err) {
-    console.error('[TimeTravel] Error getting bookmark history:', err);
+    logWarning(`Error getting bookmark history: ${err instanceof Error ? err.message : String(err)}`, {
+      module: 'time_travel',
+      operation: 'get_history',
+      databaseId,
+      metadata: { error: err instanceof Error ? err.message : String(err) }
+    });
     return [];
   }
 }
@@ -171,10 +214,6 @@ export async function deleteBookmarkEntry(
   bookmarkId: number,
   env: Env
 ): Promise<boolean> {
-  if (!env.METADATA) {
-    return false;
-  }
-
   try {
     await env.METADATA.prepare(
       'DELETE FROM bookmark_history WHERE id = ?'
@@ -182,7 +221,11 @@ export async function deleteBookmarkEntry(
     
     return true;
   } catch (err) {
-    console.error('[TimeTravel] Error deleting bookmark entry:', err);
+    logWarning(`Error deleting bookmark entry: ${err instanceof Error ? err.message : String(err)}`, {
+      module: 'time_travel',
+      operation: 'delete_bookmark',
+      metadata: { bookmarkId, error: err instanceof Error ? err.message : String(err) }
+    });
     return false;
   }
 }
@@ -194,12 +237,8 @@ export async function deleteBookmarkEntry(
 async function cleanupOldBookmarks(
   databaseId: string,
   env: Env,
-  keepCount: number = 50
+  keepCount = 50
 ): Promise<void> {
-  if (!env.METADATA) {
-    return;
-  }
-
   try {
     // Delete old bookmarks beyond the keep limit
     await env.METADATA.prepare(
@@ -213,7 +252,12 @@ async function cleanupOldBookmarks(
        )`
     ).bind(databaseId, databaseId, keepCount).run();
   } catch (err) {
-    console.error('[TimeTravel] Error cleaning up old bookmarks:', err);
+    logWarning(`Error cleaning up old bookmarks: ${err instanceof Error ? err.message : String(err)}`, {
+      module: 'time_travel',
+      operation: 'cleanup_bookmarks',
+      databaseId,
+      metadata: { keepCount, error: err instanceof Error ? err.message : String(err) }
+    });
   }
 }
 
