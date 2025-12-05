@@ -104,11 +104,11 @@ export async function handleMigrationRoutes(
       });
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
+      // Log detailed error server-side only
       logWarning(`Failed to get migration status: ${errorMessage}`, createContext('migrations', 'status', userEmail));
 
       return new Response(JSON.stringify({
         error: 'Failed to get migration status',
-        message: errorMessage,
         success: false
       }), {
         status: 500,
@@ -167,6 +167,7 @@ export async function handleMigrationRoutes(
       });
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
+      // Log detailed error server-side only
       void logError(
         env,
         `Failed to apply migrations: ${errorMessage}`,
@@ -176,7 +177,6 @@ export async function handleMigrationRoutes(
 
       return new Response(JSON.stringify({
         error: 'Failed to apply migrations',
-        message: errorMessage,
         success: false
       }), {
         status: 500,
@@ -243,11 +243,11 @@ export async function handleMigrationRoutes(
       });
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
+      // Log detailed error server-side only
       logWarning(`Failed to mark legacy migrations: ${errorMessage}`, createContext('migrations', 'mark_legacy', userEmail));
 
       return new Response(JSON.stringify({
         error: 'Failed to mark migrations',
-        message: errorMessage,
         success: false
       }), {
         status: 500,

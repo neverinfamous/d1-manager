@@ -171,8 +171,14 @@ export type NewUser = typeof users.$inferInsert;
       const introspectionResult: IntrospectionResult = await introspectDatabase(dbId, env);
       
       if (!introspectionResult.success) {
+        // Log detailed error server-side, return generic message to client
+        logWarning(`Introspection failed: ${introspectionResult.error ?? 'Unknown error'}`, {
+          module: 'drizzle',
+          operation: 'introspect',
+          databaseId: dbId
+        });
         return new Response(JSON.stringify({ 
-          error: introspectionResult.error ?? 'Introspection failed',
+          error: 'Introspection failed',
           success: false
         }), { 
           status: 400,
