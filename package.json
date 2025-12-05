@@ -1,7 +1,7 @@
 {
   "name": "d1-manager",
   "private": true,
-  "version": "1.1.1",
+  "version": "2.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -22,21 +22,28 @@
     "@radix-ui/react-slot": "^1.2.3",
     "class-variance-authority": "^0.7.1",
     "dagre": "^0.8.5",
+    "diff": "^8.0.2",
+    "drizzle-orm": "^0.44.0",
     "html2canvas": "^1.4.1",
     "jose": "^6.1.0",
     "jspdf": "^3.0.3",
     "jszip": "^3.10.1",
     "lucide-react": "^0.554.0",
+    "prismjs": "^1.30.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "reactflow": "^11.11.4"
+    "reactflow": "^11.11.4",
+    "sql-formatter": "^15.6.10"
   },
   "devDependencies": {
     "@babel/core": "^7.28.5",
     "@cloudflare/workers-types": "^4.20251014.0",
     "@eslint/js": "^9.13.0",
     "@types/dagre": "^0.7.53",
+    "@types/diff": "^7.0.2",
+    "drizzle-kit": "^0.30.0",
     "@types/node": "24.9.1",
+    "@types/prismjs": "^1.26.5",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
     "@vitejs/plugin-react": "^5.1.0",
@@ -54,7 +61,7 @@
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.46.2",
     "vite": "^7.2.4",
-    "wrangler": "^4.51.0"
+    "wrangler": "^4.53.0"
   },
   "overrides": {
     "esbuild": "^0.25.10",
