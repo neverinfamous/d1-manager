@@ -1,0 +1,38 @@
+{
+  "name": "d1-manager",
+  "main": "worker/index.ts",
+  "compatibility_date": "2025-10-30",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "placement": {
+    "mode": "off"
+  },
+  "build": {
+    "command": "npm run build"
+  },
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS"
+  },
+  "d1_databases": [
+    {
+      "binding": "METADATA",
+      "database_name": "d1-manager-metadata",
+      "database_id": "f762447a-db4a-449b-a70d-0c9d23324b89"
+    }
+  ],
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "enabled": true
+    }
+  },
+  "routes": [
+    {
+      "pattern": "d1.adamic.tech",
+      "custom_domain": true,
+      "zone_name": "adamic.tech"
+    }
+  ]
+}
+
