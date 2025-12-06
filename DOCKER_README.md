@@ -17,7 +17,7 @@ This Docker image provides a modern, full-featured web application for managing 
 
 ## Tech Stack
 
-**Frontend**: React 19.2.1 | Vite 7.2.4 | TypeScript 5.9.3 | Tailwind CSS | shadcn/ui
+**Frontend**: React 19.2.1 | Vite 7.2.6 | TypeScript 5.9.3 | Tailwind CSS | shadcn/ui
 
 **Backend**: Cloudflare Workers + KV + D1 + R2 + Durable Objects + Zero Trust
 

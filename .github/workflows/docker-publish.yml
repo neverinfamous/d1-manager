@@ -244,7 +244,7 @@ jobs:
         password: ${{ secrets.DOCKER_PASSWORD }}
         repository: ${{ env.IMAGE_NAME }}
         readme-filepath: ./DOCKER_README.md
-        short-description: "Cloudflare D1 Manager — Bulk Ops, SQL Console, Schema & Table Designer, ER/Visual Tools."
+        short-description: "Cloudflare D1 Manager- Full DB control with SQL Console, Visual Schema/ER tools, Scheduled Backups."
 
     - name: Deployment Summary
       if: github.ref == 'refs/heads/master'
