@@ -67,9 +67,13 @@ This major release transforms D1 Database Manager into an enterprise-ready solut
 - **FTS5 Conversion** - Creates undo snapshot when converting FTS5 tables
 - Deleted database backups persist and can be restored even after database deletion
 
-#### SQL Formatter & Autocomplete Toggle
+#### SQL Console Enhancements
 - **SQL Formatter** - One-click formatting with `sql-formatter` library using SQLite dialect
 - **SQL Autocomplete Toggle** - Turn suggestions on/off with preference persisted to localStorage
+- **Syntax Highlighting** - Real-time syntax highlighting powered by Prism.js with support for keywords, strings, numbers, comments, functions, and operators
+- **Word Wrap Toggle** - Toggle button above the editor to enable/disable line wrapping for long SQL statements
+- **Inline Error Squiggles** - Red wavy underlines appear at the exact position of syntax errors (unclosed parentheses, quotes, incomplete statements, trailing commas)
+- **SQL Diff Editor** - Compare two SQL queries side-by-side with diff highlighting, swap functionality, and load to editor integration
 - Dynamic placeholder text and help hints based on toggle state
 
 #### Table-Level R2 Backup & Restore

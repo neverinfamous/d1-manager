@@ -6,7 +6,7 @@ The D1 Database Manager changelog is maintained in the project wiki.
 
 **Wiki (recommended):** [Changelog](https://github.com/neverinfamous/d1-manager/wiki/Changelog)
 
-**GitHub Repository:** [neverinfamous/d1-manager](https://github.com/neverinfamous/d1-manager)
+**GitHub Repository:** [neverinfamous/d1-manager](https://github.com/neverinfamous/d1-manager
 
 ---
 
@@ -16,4 +16,4 @@ The wiki changelog includes:
 - Bug fixes and improvements
 - Breaking changes and migration guides
 
-For the latest updates, always refer to the wiki.
+For the latest updates, please refer to the wiki.

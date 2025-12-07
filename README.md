@@ -58,7 +58,7 @@ This Docker image provides a modern, full-featured web application for managing 
 - **Drizzle ORM Console** - Introspect schemas, view migration status/history, generate SQL, push changes (with dry-run), and export TypeScript schema
 - **SQL Formatter** - One-click formatting with SQLite-aware sql-formatter library
 - **SQL Autocomplete Toggle** - Turn suggestions on/off with preference persisted to localStorage
-- **Rich editor** - Syntax highlighting, line numbers, find/replace, hover docs, and inline error squiggles
+- **Rich editor** - Syntax highlighting, line numbers, find/replace, hover docs, inline error squiggles, and word wrap toggle
 - **SQL Diff Editor** - Compare queries side-by-side with syntax highlighting
 - **Visual Query Builder** - Build queries interactively with editable SQL output and "Send to Editor" integration
 - Query history and saved queries
