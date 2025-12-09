@@ -33,7 +33,6 @@ import {
 import { Progress } from '@/components/ui/progress'
 import { DatabaseView } from './components/DatabaseView'
 import { TableView } from './components/TableView'
-import { JobHistory } from './components/JobHistory'
 import { DatabaseSearchFilter } from './components/DatabaseSearchFilter'
 import { DatabaseColorPicker } from './components/DatabaseColorPicker'
 import { CloneDatabaseDialog } from './components/CloneDatabaseDialog'
@@ -45,6 +44,7 @@ const DatabaseComparison = lazy(() => import('./components/DatabaseComparison').
 const BackupRestoreHub = lazy(() => import('./components/BackupRestoreHub').then(m => ({ default: m.BackupRestoreHub })))
 const WebhookManager = lazy(() => import('./components/WebhookManager').then(m => ({ default: m.WebhookManager })))
 const MetricsDashboard = lazy(() => import('./components/MetricsDashboard').then(m => ({ default: m.MetricsDashboard })))
+const JobHistory = lazy(() => import('./components/JobHistory').then(m => ({ default: m.JobHistory })))
 import { R2BackupDialog } from './components/R2BackupDialog'
 import { R2RestoreDialog } from './components/R2RestoreDialog'
 import { BackupProgressDialog } from './components/BackupProgressDialog'
@@ -54,7 +54,7 @@ import { ErrorMessage } from '@/components/ui/error-message'
 import type { DatabaseActionHandlers } from './components/DatabaseActionButtons'
 import { getColorConfig } from './utils/databaseColors'
 
-type View = 
+type View =
   | { type: 'list' }
   | { type: 'search' }
   | { type: 'database'; databaseId: string; databaseName: string; initialTab?: string | undefined }
@@ -101,7 +101,7 @@ export default function App(): React.JSX.Element {
   const [dbGridSortField, setDbGridSortField] = useState<string>('name')
   const [dbGridSortDirection, setDbGridSortDirection] = useState<'asc' | 'desc'>('asc')
   const { theme, setTheme } = useTheme()
-  
+
   // Undo state
   const [showUndoHistory, setShowUndoHistory] = useState(false)
   const [undoCount, setUndoCount] = useState(0)
@@ -114,7 +114,7 @@ export default function App(): React.JSX.Element {
   const [undoSelectedDatabase, setUndoSelectedDatabase] = useState<{ id: string; name: string; isOrphaned?: boolean; preferR2Tab?: boolean } | null>(null)
   const [showUndoDatabasePicker, setShowUndoDatabasePicker] = useState(false)
   const [dataRefreshTrigger, setDataRefreshTrigger] = useState(0)
-  
+
   // Bulk operations state
   const [selectedDatabases, setSelectedDatabases] = useState<string[]>([])
   const [bulkDownloadProgress, setBulkDownloadProgress] = useState<{
@@ -241,21 +241,21 @@ export default function App(): React.JSX.Element {
   // Apply pending migrations
   const handleApplyMigrations = async (): Promise<void> => {
     if (!migrationStatus) return
-    
+
     setMigrationLoading(true)
     setMigrationError(null)
     setMigrationSuccess(false)
-    
+
     try {
       // Check if this is a legacy installation that needs marking
       if (migrationStatus.legacy?.isLegacy && migrationStatus.legacy.suggestedVersion > 0) {
         // Mark existing migrations as applied first
         await markLegacyMigrations(migrationStatus.legacy.suggestedVersion)
       }
-      
+
       // Apply any pending migrations
       const result = await applyMigrations()
-      
+
       if (result.success) {
         setMigrationSuccess(true)
         // Refresh migration status
@@ -287,11 +287,11 @@ export default function App(): React.JSX.Element {
       setUndoCounts({})
       return
     }
-    
+
     try {
       const counts: Record<string, number> = {}
       let total = 0
-      
+
       // Load undo history for each database in parallel
       const results = await Promise.allSettled(
         dbs.map(async (db) => {
@@ -299,14 +299,14 @@ export default function App(): React.JSX.Element {
           return { dbId: db.uuid, count: history.length }
         })
       )
-      
+
       for (const result of results) {
         if (result.status === 'fulfilled') {
           counts[result.value.dbId] = result.value.count
           total += result.value.count
         }
       }
-      
+
       setUndoCounts(counts)
       setUndoCount(total)
     } catch {
@@ -320,11 +320,11 @@ export default function App(): React.JSX.Element {
       setR2BackupCounts({})
       return
     }
-    
+
     setR2BackupCountsLoading(true)
     try {
       const counts: Record<string, number> = {}
-      
+
       // Load R2 backups for each database in parallel
       const results = await Promise.allSettled(
         dbs.map(async (db) => {
@@ -332,13 +332,13 @@ export default function App(): React.JSX.Element {
           return { dbId: db.uuid, count: backups.length }
         })
       )
-      
+
       for (const result of results) {
         if (result.status === 'fulfilled') {
           counts[result.value.dbId] = result.value.count
         }
       }
-      
+
       setR2BackupCounts(counts)
     } catch {
       setR2BackupCounts({})
@@ -352,7 +352,7 @@ export default function App(): React.JSX.Element {
       setOrphanedBackups([])
       return
     }
-    
+
     setOrphanedBackupsLoading(true)
     try {
       const orphaned = await listOrphanedR2Backups()
@@ -403,7 +403,7 @@ export default function App(): React.JSX.Element {
       }
       void loadOrphanedBackups()
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showUndoDatabasePicker, r2BackupStatus?.configured])
 
   const loadDatabases = async (): Promise<void> => {
@@ -595,29 +595,29 @@ export default function App(): React.JSX.Element {
 
   const handleBulkDownload = async (): Promise<void> => {
     if (selectedDatabases.length === 0) return
-    
+
     setError('')
     setSkippedExports(null)
     setBulkDownloadProgress({ progress: 0, status: 'preparing' })
-    
+
     try {
       const selectedDbData = databases.filter(db => selectedDatabases.includes(db.uuid))
-      
+
       const result = await api.exportDatabases(selectedDbData, (progress) => {
         setBulkDownloadProgress({
           progress,
           status: progress < 100 ? 'downloading' : 'complete'
         })
       })
-      
+
       // Show skipped databases notice if any
       if (result.skipped && result.skipped.length > 0) {
         setSkippedExports(result.skipped)
       }
-      
+
       // Clear selection after successful download
       setSelectedDatabases([])
-      
+
       setTimeout(() => {
         setBulkDownloadProgress(null)
       }, 2000)
@@ -633,9 +633,9 @@ export default function App(): React.JSX.Element {
 
   const handleBulkDelete = (): void => {
     if (selectedDatabases.length === 0) return
-    
+
     const selectedDbData = databases.filter(db => selectedDatabases.includes(db.uuid))
-    
+
     setDeleteConfirmState({
       databaseIds: selectedDatabases,
       databaseNames: selectedDbData.map(db => db.name),
@@ -660,7 +660,7 @@ export default function App(): React.JSX.Element {
     setError('')
     try {
       const result = await api.exportDatabases([{ uuid: db.uuid, name: db.name }])
-      
+
       // Check if export was skipped due to FTS5 tables
       const skippedDb = result.skipped?.[0]
       if (skippedDb) {
@@ -694,16 +694,16 @@ export default function App(): React.JSX.Element {
 
   const confirmBulkDelete = async (): Promise<void> => {
     if (!deleteConfirmState) return
-    
+
     // Require backup confirmation
     if (!deleteConfirmState.backupConfirmed) {
       setError('Please confirm you have backed up your database(s)')
       return
     }
-    
+
     setDeleteConfirmState(prev => prev ? { ...prev, isDeleting: true } : null)
     setError('')
-    
+
     try {
       const result = await api.deleteDatabases(deleteConfirmState.databaseIds, (current, total) => {
         setDeleteConfirmState(prev => prev ? {
@@ -711,15 +711,15 @@ export default function App(): React.JSX.Element {
           currentProgress: { current, total }
         } : null)
       })
-      
+
       // Show errors if any
       if (result.failed.length > 0) {
         setError(`Some databases failed to delete:\n${result.failed.map(f => `${f.id}: ${f.error}`).join('\n')}`)
       }
-      
+
       // Reload databases
       await loadDatabases()
-      
+
       // Clear selection
       setSelectedDatabases([])
       setDeleteConfirmState(null)
@@ -731,9 +731,9 @@ export default function App(): React.JSX.Element {
 
   const handleDeleteBackupDownload = async (): Promise<void> => {
     if (!deleteConfirmState) return
-    
+
     setDeleteConfirmState(prev => prev ? { ...prev, isBackingUp: true } : null)
-    
+
     try {
       const dbsToBackup = databases.filter(db => deleteConfirmState.databaseIds.includes(db.uuid))
       await api.exportDatabases(dbsToBackup.map(db => ({ uuid: db.uuid, name: db.name })))
@@ -747,20 +747,20 @@ export default function App(): React.JSX.Element {
   const handleImportDatabase = async (): Promise<void> => {
     const source = uploadInputSource === 'file' ? uploadFile : uploadSqlContent
     if (source === null || source === '') return
-    
+
     setUploading(true)
     setError('')
-    
+
     try {
       await api.importDatabase(source, {
         createNew: uploadMode === 'create',
         ...(uploadMode === 'create' && uploadDbName && { databaseName: uploadDbName }),
         ...(uploadMode === 'import' && uploadTargetDb && { targetDatabaseId: uploadTargetDb })
       })
-      
+
       // Reload databases
       await loadDatabases()
-      
+
       // Close dialog and reset
       setShowUploadDialog(false)
       setUploadFile(null)
@@ -805,7 +805,7 @@ export default function App(): React.JSX.Element {
 
   const handleRenameDatabase = async (): Promise<void> => {
     if (!renameDialogState) return
-    
+
     const validationError = validateDatabaseName(renameDialogState.newName)
     if (validationError) {
       setRenameDialogState(prev => prev ? { ...prev, error: validationError } : null)
@@ -845,17 +845,17 @@ export default function App(): React.JSX.Element {
       setRenameDialogState(null)
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to rename database'
-      setRenameDialogState(prev => prev ? { 
-        ...prev, 
-        isRenaming: false, 
-        error: errorMessage 
+      setRenameDialogState(prev => prev ? {
+        ...prev,
+        isRenaming: false,
+        error: errorMessage
       } : null)
     }
   }
 
   const handleDownloadBackup = async (): Promise<void> => {
     if (!renameDialogState) return
-    
+
     try {
       // Use the existing export functionality for a single database
       await api.exportDatabases([{
@@ -869,9 +869,9 @@ export default function App(): React.JSX.Element {
 
   const handleOptimizeClick = (): void => {
     if (selectedDatabases.length === 0) return
-    
+
     const selectedDbData = databases.filter(db => selectedDatabases.includes(db.uuid))
-    
+
     setOptimizeDialogState({
       databaseIds: selectedDatabases,
       databaseNames: selectedDbData.map(db => db.name),
@@ -881,7 +881,7 @@ export default function App(): React.JSX.Element {
 
   const confirmOptimize = async (): Promise<void> => {
     if (!optimizeDialogState) return
-    
+
     setOptimizeDialogState(prev => {
       if (!prev) return null
       const { error: _error, ...rest } = prev
@@ -889,7 +889,7 @@ export default function App(): React.JSX.Element {
       return { ...rest, isOptimizing: true }
     })
     setError('')
-    
+
     try {
       const result = await api.optimizeDatabases(
         optimizeDialogState.databaseIds,
@@ -900,12 +900,12 @@ export default function App(): React.JSX.Element {
           } : null)
         }
       )
-      
+
       // Show errors if any
       if (result.failed.length > 0) {
         setError(`Some databases failed to optimize:\n${result.failed.map(f => `${f.name}: ${f.error}`).join('\n')}`)
       }
-      
+
       // Clear selection and close dialog
       setSelectedDatabases([])
       setOptimizeDialogState(null)
@@ -920,7 +920,7 @@ export default function App(): React.JSX.Element {
       {/* Header - Sticky Navigation */}
       <header className="border-b sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <a 
+          <a
             href="https://d1.adamic.tech/"
             className="flex items-center gap-3 group transition-opacity hover:opacity-80 no-underline"
           >
@@ -1118,132 +1118,132 @@ export default function App(): React.JSX.Element {
               <div>
                 <h2 className="text-3xl font-bold">Databases</h2>
               </div>
-            <Button onClick={() => setShowCreateDialog(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Create Database
-            </Button>
-          </div>
+              <Button onClick={() => setShowCreateDialog(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Create Database
+              </Button>
+            </div>
 
-          {/* Database Comparison (shown when triggered from toolbar) */}
-          {showComparison && selectedDatabases.length === 2 && (
-            <Card>
-              <CardContent className="pt-6">
-                <Suspense fallback={<LazyLoadingFallback />}>
-                  <DatabaseComparison 
-                    databases={databases} 
-                    preSelectedDatabases={[selectedDatabases[0] ?? '', selectedDatabases[1] ?? '']}
-                    onClose={() => setShowComparison(false)}
-                  />
-                </Suspense>
-                <Button
-                  variant="outline"
-                  className="mt-4"
-                  onClick={() => setShowComparison(false)}
-                >
-                  Close Comparison
-                </Button>
-              </CardContent>
-            </Card>
-          )}
+            {/* Database Comparison (shown when triggered from toolbar) */}
+            {showComparison && selectedDatabases.length === 2 && (
+              <Card>
+                <CardContent className="pt-6">
+                  <Suspense fallback={<LazyLoadingFallback />}>
+                    <DatabaseComparison
+                      databases={databases}
+                      preSelectedDatabases={[selectedDatabases[0] ?? '', selectedDatabases[1] ?? '']}
+                      onClose={() => setShowComparison(false)}
+                    />
+                  </Suspense>
+                  <Button
+                    variant="outline"
+                    className="mt-4"
+                    onClick={() => setShowComparison(false)}
+                  >
+                    Close Comparison
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
 
-          {/* Database Search Filter and View Toggle */}
-          {databases.length > 0 && (
-            <div className="flex items-center justify-between gap-4 mb-6">
-              <DatabaseSearchFilter
-                searchQuery={databaseSearchQuery}
-                onSearchChange={setDatabaseSearchQuery}
-                filteredCount={filteredDatabases.length}
-                totalCount={databases.length}
-              />
-              <div className="flex items-center gap-2">
-                {databaseViewMode === 'grid' && (
-                  <GridSortSelect
-                    options={databaseSortOptions}
-                    value={dbGridSortField}
-                    direction={dbGridSortDirection}
-                    onValueChange={setDbGridSortField}
-                    onDirectionToggle={() => setDbGridSortDirection(d => d === 'asc' ? 'desc' : 'asc')}
-                  />
-                )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={toggleDatabaseViewMode}
-                  aria-label={databaseViewMode === 'grid' ? 'Switch to list view' : 'Switch to grid view'}
-                  title={databaseViewMode === 'grid' ? 'Switch to list view' : 'Switch to grid view'}
-                  className="flex items-center gap-2"
-                >
-                  {databaseViewMode === 'grid' ? (
+            {/* Database Search Filter and View Toggle */}
+            {databases.length > 0 && (
+              <div className="flex items-center justify-between gap-4 mb-6">
+                <DatabaseSearchFilter
+                  searchQuery={databaseSearchQuery}
+                  onSearchChange={setDatabaseSearchQuery}
+                  filteredCount={filteredDatabases.length}
+                  totalCount={databases.length}
+                />
+                <div className="flex items-center gap-2">
+                  {databaseViewMode === 'grid' && (
+                    <GridSortSelect
+                      options={databaseSortOptions}
+                      value={dbGridSortField}
+                      direction={dbGridSortDirection}
+                      onValueChange={setDbGridSortField}
+                      onDirectionToggle={() => setDbGridSortDirection(d => d === 'asc' ? 'desc' : 'asc')}
+                    />
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={toggleDatabaseViewMode}
+                    aria-label={databaseViewMode === 'grid' ? 'Switch to list view' : 'Switch to grid view'}
+                    title={databaseViewMode === 'grid' ? 'Switch to list view' : 'Switch to grid view'}
+                    className="flex items-center gap-2"
+                  >
+                    {databaseViewMode === 'grid' ? (
+                      <>
+                        <LayoutList className="h-4 w-4" />
+                        <span className="hidden sm:inline">List</span>
+                      </>
+                    ) : (
+                      <>
+                        <LayoutGrid className="h-4 w-4" />
+                        <span className="hidden sm:inline">Grid</span>
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Bulk Operations Toolbar */}
+            {(selectedDatabases.length > 0 || filteredDatabases.length > 0) && (
+              <div className="flex items-center justify-between mb-6 p-4 border rounded-lg bg-card">
+                <div className="flex items-center gap-4">
+                  <Button variant="outline" onClick={() => setShowUploadDialog(true)}>
+                    <Upload className="h-4 w-4 mr-2" />
+                    Import Database
+                  </Button>
+                  <Button variant="outline" onClick={selectAllDatabases}>
+                    Select All
+                  </Button>
+                  {selectedDatabases.length > 0 && (
                     <>
-                      <LayoutList className="h-4 w-4" />
-                      <span className="hidden sm:inline">List</span>
-                    </>
-                  ) : (
-                    <>
-                      <LayoutGrid className="h-4 w-4" />
-                      <span className="hidden sm:inline">Grid</span>
+                      <Button variant="outline" onClick={clearSelection}>
+                        Clear Selection
+                      </Button>
+                      <span className="text-sm text-muted-foreground">
+                        {selectedDatabases.length} database{selectedDatabases.length !== 1 ? 's' : ''} selected
+                      </span>
                     </>
                   )}
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {/* Bulk Operations Toolbar */}
-          {(selectedDatabases.length > 0 || filteredDatabases.length > 0) && (
-            <div className="flex items-center justify-between mb-6 p-4 border rounded-lg bg-card">
-              <div className="flex items-center gap-4">
-                <Button variant="outline" onClick={() => setShowUploadDialog(true)}>
-                  <Upload className="h-4 w-4 mr-2" />
-                  Import Database
-                </Button>
-                <Button variant="outline" onClick={selectAllDatabases}>
-                  Select All
-                </Button>
-                {selectedDatabases.length > 0 && (
-                  <>
-                    <Button variant="outline" onClick={clearSelection}>
-                      Clear Selection
-                    </Button>
-                    <span className="text-sm text-muted-foreground">
-                      {selectedDatabases.length} database{selectedDatabases.length !== 1 ? 's' : ''} selected
-                    </span>
-                  </>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                {selectedDatabases.length > 0 && (
-                  <>
-                    {selectedDatabases.length === 2 && (
-                      <Button variant="outline" onClick={() => setShowComparison(true)}>
-                        <GitCompare className="h-4 w-4 mr-2" />
-                        Compare
+                </div>
+                <div className="flex items-center gap-2">
+                  {selectedDatabases.length > 0 && (
+                    <>
+                      {selectedDatabases.length === 2 && (
+                        <Button variant="outline" onClick={() => setShowComparison(true)}>
+                          <GitCompare className="h-4 w-4 mr-2" />
+                          Compare
+                        </Button>
+                      )}
+                      <Button variant="outline" onClick={handleOptimizeClick}>
+                        <Zap className="h-4 w-4 mr-2" />
+                        Optimize Selected
                       </Button>
-                    )}
-                    <Button variant="outline" onClick={handleOptimizeClick}>
-                      <Zap className="h-4 w-4 mr-2" />
-                      Optimize Selected
-                    </Button>
-                    <Button onClick={() => void handleBulkDownload()} disabled={bulkDownloadProgress !== null}>
-                      <Download className="h-4 w-4 mr-2" />
-                      {bulkDownloadProgress ? (
-                        bulkDownloadProgress.status === 'error' ? 'Download Failed' :
-                        bulkDownloadProgress.status === 'complete' ? 'Download Complete' :
-                        bulkDownloadProgress.status === 'preparing' ? 'Preparing...' :
-                        `Downloading (${String(Math.round(bulkDownloadProgress.progress))}%)`
-                      ) : 'Download Selected'}
-                    </Button>
-                    <Button variant="destructive" onClick={handleBulkDelete}>
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete Selected
-                    </Button>
-                  </>
-                )}
+                      <Button onClick={() => void handleBulkDownload()} disabled={bulkDownloadProgress !== null}>
+                        <Download className="h-4 w-4 mr-2" />
+                        {bulkDownloadProgress ? (
+                          bulkDownloadProgress.status === 'error' ? 'Download Failed' :
+                            bulkDownloadProgress.status === 'complete' ? 'Download Complete' :
+                              bulkDownloadProgress.status === 'preparing' ? 'Preparing...' :
+                                `Downloading (${String(Math.round(bulkDownloadProgress.progress))}%)`
+                        ) : 'Download Selected'}
+                      </Button>
+                      <Button variant="destructive" onClick={handleBulkDelete}>
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete Selected
+                      </Button>
+                    </>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Error Message */}
+            {/* Error Message */}
             <ErrorMessage error={error} className="mb-6" />
 
             {/* Loading State */}
@@ -1325,234 +1325,234 @@ export default function App(): React.JSX.Element {
                         const isSelected = selectedDatabases.includes(db.uuid)
                         const colorConfig = getColorConfig(databaseColors[db.uuid] ?? null)
                         return (
-                        <Card 
-                          key={db.uuid} 
-                          className={`hover:shadow-lg transition-shadow relative overflow-hidden ${
-                            isSelected ? 'ring-2 ring-primary' : ''
-                          }`}
-                        >
-                          {/* Color indicator bar */}
-                          {colorConfig && (
-                            <div 
-                              className={`absolute left-0 top-0 bottom-0 w-1 ${colorConfig.bgClass}`}
-                              aria-hidden="true"
-                            />
-                          )}
-                          <div className={`absolute top-4 z-10 ${colorConfig ? 'left-5' : 'left-4'}`}>
-                            <Checkbox
-                              checked={isSelected}
-                              onCheckedChange={() => toggleDatabaseSelection(db.uuid)}
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                          </div>
-                          <CardHeader className={colorConfig ? 'pl-14' : 'pl-12'}>
-                            <div className="flex items-start justify-between">
-                              <Database className="h-8 w-8 text-primary" />
-                              <div className="flex items-center gap-1.5">
-                                <DatabaseColorPicker
-                                  value={databaseColors[db.uuid] ?? null}
-                                  onChange={(color) => handleColorChange(db.uuid, color)}
-                                />
-                                {db.fts5_count !== undefined && db.fts5_count > 0 && (
-                                  <span className="text-xs px-2 py-1 rounded-full bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 flex items-center gap-1">
-                                    <Sparkles className="h-3 w-3" />
-                                    FTS5
-                                  </span>
-                                )}
-                                {db.read_replication?.mode === 'auto' && (
-                                  <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 flex items-center gap-1">
-                                    <Globe className="h-3 w-3" />
-                                    Replicated
-                                  </span>
-                                )}
-                                {/* Production badge removed - D1 always returns "production" so it provides no useful information */}
-                              </div>
+                          <Card
+                            key={db.uuid}
+                            className={`hover:shadow-lg transition-shadow relative overflow-hidden ${isSelected ? 'ring-2 ring-primary' : ''
+                              }`}
+                          >
+                            {/* Color indicator bar */}
+                            {colorConfig && (
+                              <div
+                                className={`absolute left-0 top-0 bottom-0 w-1 ${colorConfig.bgClass}`}
+                                aria-hidden="true"
+                              />
+                            )}
+                            <div className={`absolute top-4 z-10 ${colorConfig ? 'left-5' : 'left-4'}`}>
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={() => toggleDatabaseSelection(db.uuid)}
+                                onClick={(e) => e.stopPropagation()}
+                              />
                             </div>
-                            <CardTitle className="mt-4">{db.name}</CardTitle>
-                            <CardDescription>
-                              <button
-                                onClick={(e) => void copyDatabaseId(db.uuid, e)}
-                                className="flex items-center gap-1.5 hover:text-foreground transition-colors group text-left"
-                                title="Click to copy database ID"
-                              >
-                                <span className="text-muted-foreground/70">ID:</span>
-                                <span className="font-mono">{db.uuid}</span>
-                                {copiedDbId === db.uuid ? (
-                                  <>
-                                    <Check className="h-3 w-3 text-green-500 flex-shrink-0" />
-                                    <span className="text-green-500 text-xs">Copied!</span>
-                                  </>
-                                ) : (
-                                  <Copy className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
-                                )}
-                              </button>
-                            </CardDescription>
-                          </CardHeader>
-                          <CardContent className={colorConfig ? 'pl-5' : ''}>
-                            <div className="space-y-2 text-sm mb-4">
-                              <div className="flex justify-between">
-                                <span className="text-muted-foreground">Created:</span>
-                                <span className="font-medium">{formatDate(db.created_at)}</span>
-                              </div>
-                              {db.file_size !== undefined && (
-                                <div className="flex justify-between">
-                                  <span className="text-muted-foreground">Size:</span>
-                                  <span className="font-medium">{formatSize(db.file_size)}</span>
+                            <CardHeader className={colorConfig ? 'pl-14' : 'pl-12'}>
+                              <div className="flex items-start justify-between">
+                                <Database className="h-8 w-8 text-primary" />
+                                <div className="flex items-center gap-1.5">
+                                  <DatabaseColorPicker
+                                    value={databaseColors[db.uuid] ?? null}
+                                    onChange={(color) => handleColorChange(db.uuid, color)}
+                                  />
+                                  {db.fts5_count !== undefined && db.fts5_count > 0 && (
+                                    <span className="text-xs px-2 py-1 rounded-full bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 flex items-center gap-1">
+                                      <Sparkles className="h-3 w-3" />
+                                      FTS5
+                                    </span>
+                                  )}
+                                  {db.read_replication?.mode === 'auto' && (
+                                    <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 flex items-center gap-1">
+                                      <Globe className="h-3 w-3" />
+                                      Replicated
+                                    </span>
+                                  )}
+                                  {/* Production badge removed - D1 always returns "production" so it provides no useful information */}
                                 </div>
-                              )}
-                              {db.num_tables !== undefined && (
+                              </div>
+                              <CardTitle className="mt-4">{db.name}</CardTitle>
+                              <CardDescription>
+                                <button
+                                  onClick={(e) => void copyDatabaseId(db.uuid, e)}
+                                  className="flex items-center gap-1.5 hover:text-foreground transition-colors group text-left"
+                                  title="Click to copy database ID"
+                                >
+                                  <span className="text-muted-foreground/70">ID:</span>
+                                  <span className="font-mono">{db.uuid}</span>
+                                  {copiedDbId === db.uuid ? (
+                                    <>
+                                      <Check className="h-3 w-3 text-green-500 flex-shrink-0" />
+                                      <span className="text-green-500 text-xs">Copied!</span>
+                                    </>
+                                  ) : (
+                                    <Copy className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                                  )}
+                                </button>
+                              </CardDescription>
+                            </CardHeader>
+                            <CardContent className={colorConfig ? 'pl-5' : ''}>
+                              <div className="space-y-2 text-sm mb-4">
                                 <div className="flex justify-between">
-                                  <span className="text-muted-foreground">Tables:</span>
-                                  <span className="font-medium">{db.num_tables}</span>
+                                  <span className="text-muted-foreground">Created:</span>
+                                  <span className="font-medium">{formatDate(db.created_at)}</span>
                                 </div>
-                              )}
-                            </div>
-                            <div className="grid grid-cols-4 gap-1.5">
-                              {/* Row 1: Browse, Query, Rename, Clone */}
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={() => handleDatabaseClick(db)}
-                                aria-label="Browse database"
-                                title="Browse"
-                              >
-                                <Database className="h-4 w-4" />
-                              </Button>
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={() => handleOpenQueryConsole(db)}
-                                aria-label="Open query console"
-                                title="Query"
-                              >
-                                <Code className="h-4 w-4" />
-                              </Button>
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleRenameClick(db)
-                                }}
-                                aria-label="Rename database"
-                                title="Rename"
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  setCloneDialogDatabase(db)
-                                }}
-                                aria-label="Clone database"
-                                title="Clone"
-                              >
-                                <Copy className="h-4 w-4" />
-                              </Button>
-                              {/* Row 2: Import, Download, Optimize, FTS5 */}
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleSingleImport(db)
-                                }}
-                                aria-label="Import into database"
-                                title="Import"
-                              >
-                                <Upload className="h-4 w-4" />
-                              </Button>
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  void handleSingleDownload(db)
-                                }}
-                                aria-label="Download database"
-                                title="Download"
-                              >
-                                <Download className="h-4 w-4" />
-                              </Button>
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleSingleOptimize(db)
-                                }}
-                                aria-label="Optimize database"
-                                title="Optimize"
-                              >
-                                <Zap className="h-4 w-4" />
-                              </Button>
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleFts5Click(db)
-                                }}
-                                aria-label="FTS5 search"
-                                title="FTS5 Search"
-                                className="hover:bg-purple-100 hover:text-purple-700 hover:border-purple-300 dark:hover:bg-purple-900/30 dark:hover:text-purple-300 dark:hover:border-purple-700"
-                              >
-                                <Sparkles className="h-4 w-4" />
-                              </Button>
-                              {/* Row 3: R2 Backup, R2 Restore, Delete (spanning) */}
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  setR2BackupDialog({
-                                    databaseId: db.uuid,
-                                    databaseName: db.name,
-                                    hasFts5Tables: (db.fts5_count ?? 0) > 0
-                                  })
-                                }}
-                                aria-label="Backup to R2"
-                                title="Backup to R2"
-                                className="hover:bg-blue-100 hover:text-blue-700 hover:border-blue-300 dark:hover:bg-blue-900/30 dark:hover:text-blue-300 dark:hover:border-blue-700"
-                              >
-                                <Cloud className="h-4 w-4" />
-                              </Button>
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  setR2RestoreDialog({
-                                    databaseId: db.uuid,
-                                    databaseName: db.name
-                                  })
-                                }}
-                                aria-label="Restore from R2"
-                                title="Restore from R2"
-                                className="hover:bg-green-100 hover:text-green-700 hover:border-green-300 dark:hover:bg-green-900/30 dark:hover:text-green-300 dark:hover:border-green-700"
-                              >
-                                <RefreshCw className="h-4 w-4" />
-                              </Button>
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleSingleDelete(db)
-                                }}
-                                aria-label="Delete database"
-                                title="Delete"
-                                className="hover:bg-destructive/10 hover:text-destructive hover:border-destructive col-span-2"
-                              >
-                                <Trash2 className="h-4 w-4 mr-1" />
-                                Delete
-                              </Button>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      )})}
+                                {db.file_size !== undefined && (
+                                  <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Size:</span>
+                                    <span className="font-medium">{formatSize(db.file_size)}</span>
+                                  </div>
+                                )}
+                                {db.num_tables !== undefined && (
+                                  <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Tables:</span>
+                                    <span className="font-medium">{db.num_tables}</span>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="grid grid-cols-4 gap-1.5">
+                                {/* Row 1: Browse, Query, Rename, Clone */}
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleDatabaseClick(db)}
+                                  aria-label="Browse database"
+                                  title="Browse"
+                                >
+                                  <Database className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleOpenQueryConsole(db)}
+                                  aria-label="Open query console"
+                                  title="Query"
+                                >
+                                  <Code className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleRenameClick(db)
+                                  }}
+                                  aria-label="Rename database"
+                                  title="Rename"
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setCloneDialogDatabase(db)
+                                  }}
+                                  aria-label="Clone database"
+                                  title="Clone"
+                                >
+                                  <Copy className="h-4 w-4" />
+                                </Button>
+                                {/* Row 2: Import, Download, Optimize, FTS5 */}
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleSingleImport(db)
+                                  }}
+                                  aria-label="Import into database"
+                                  title="Import"
+                                >
+                                  <Upload className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    void handleSingleDownload(db)
+                                  }}
+                                  aria-label="Download database"
+                                  title="Download"
+                                >
+                                  <Download className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleSingleOptimize(db)
+                                  }}
+                                  aria-label="Optimize database"
+                                  title="Optimize"
+                                >
+                                  <Zap className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleFts5Click(db)
+                                  }}
+                                  aria-label="FTS5 search"
+                                  title="FTS5 Search"
+                                  className="hover:bg-purple-100 hover:text-purple-700 hover:border-purple-300 dark:hover:bg-purple-900/30 dark:hover:text-purple-300 dark:hover:border-purple-700"
+                                >
+                                  <Sparkles className="h-4 w-4" />
+                                </Button>
+                                {/* Row 3: R2 Backup, R2 Restore, Delete (spanning) */}
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setR2BackupDialog({
+                                      databaseId: db.uuid,
+                                      databaseName: db.name,
+                                      hasFts5Tables: (db.fts5_count ?? 0) > 0
+                                    })
+                                  }}
+                                  aria-label="Backup to R2"
+                                  title="Backup to R2"
+                                  className="hover:bg-blue-100 hover:text-blue-700 hover:border-blue-300 dark:hover:bg-blue-900/30 dark:hover:text-blue-300 dark:hover:border-blue-700"
+                                >
+                                  <Cloud className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setR2RestoreDialog({
+                                      databaseId: db.uuid,
+                                      databaseName: db.name
+                                    })
+                                  }}
+                                  aria-label="Restore from R2"
+                                  title="Restore from R2"
+                                  className="hover:bg-green-100 hover:text-green-700 hover:border-green-300 dark:hover:bg-green-900/30 dark:hover:text-green-300 dark:hover:border-green-700"
+                                >
+                                  <RefreshCw className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleSingleDelete(db)
+                                  }}
+                                  aria-label="Delete database"
+                                  title="Delete"
+                                  className="hover:bg-destructive/10 hover:text-destructive hover:border-destructive col-span-2"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-1" />
+                                  Delete
+                                </Button>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        )
+                      })}
                     </div>
                   );
                 })()}
@@ -1598,11 +1598,11 @@ export default function App(): React.JSX.Element {
               // Add current table to navigation history
               const history = currentView.navigationHistory ?? [];
               const currentFkFilter = currentView.fkFilter;
-              const newHistoryEntry = currentFkFilter 
+              const newHistoryEntry = currentFkFilter
                 ? { tableName: currentView.tableName, fkFilter: currentFkFilter }
                 : { tableName: currentView.tableName };
               const newHistory = [...history, newHistoryEntry];
-              
+
               // Navigate to the referenced table with FK filter
               setCurrentView({
                 type: 'table',
@@ -1619,7 +1619,7 @@ export default function App(): React.JSX.Element {
               const targetEntry = history[index];
               if (index < history.length && targetEntry) {
                 const newHistory = history.slice(0, index);
-                
+
                 setCurrentView({
                   type: 'table',
                   databaseId: currentView.databaseId,
@@ -1636,8 +1636,8 @@ export default function App(): React.JSX.Element {
 
         {currentView.type === 'query' && (
           <div className="space-y-6">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => setCurrentView({ type: 'list' })}
             >
               ← Back to Databases
@@ -1654,8 +1654,8 @@ export default function App(): React.JSX.Element {
 
         {currentView.type === 'search' && (
           <Suspense fallback={<LazyLoadingFallback />}>
-            <CrossDatabaseSearch 
-              databases={databases} 
+            <CrossDatabaseSearch
+              databases={databases}
               onNavigateToDatabase={(databaseId: string, databaseName: string, initialTab?: string) => {
                 setCurrentView({
                   type: 'database',
@@ -1875,10 +1875,10 @@ export default function App(): React.JSX.Element {
             >
               Cancel
             </Button>
-            <Button 
-              onClick={() => void handleImportDatabase()} 
+            <Button
+              onClick={() => void handleImportDatabase()}
               disabled={
-                uploading || 
+                uploading ||
                 (uploadInputSource === 'file' && !uploadFile) ||
                 (uploadInputSource === 'paste' && !uploadSqlContent.trim()) ||
                 (uploadMode === 'create' && !uploadDbName.trim()) ||
@@ -1895,8 +1895,8 @@ export default function App(): React.JSX.Element {
       {/* Delete Confirmation Dialog */}
       {/* Delete Confirmation Dialog - hidden when R2 backup dialog or progress dialog is open from here */}
       {deleteConfirmState && (
-        <Dialog 
-          open={!r2BackupDialog?.returnTo && backupProgressDialog?.returnTo !== 'delete'} 
+        <Dialog
+          open={!r2BackupDialog?.returnTo && backupProgressDialog?.returnTo !== 'delete'}
           onOpenChange={(isOpen) => {
             if (!isOpen && !deleteConfirmState.isDeleting && !deleteConfirmState.isBackingUp) {
               setDeleteConfirmState(null)
@@ -2006,15 +2006,15 @@ export default function App(): React.JSX.Element {
                   </p>
                 </div>
               </div>
-              
+
               {/* Progress indicator */}
               {deleteConfirmState.isDeleting && deleteConfirmState.currentProgress && (
                 <div className="space-y-2">
                   <p className="text-sm text-muted-foreground">
                     Deleting database {deleteConfirmState.currentProgress.current} of {deleteConfirmState.currentProgress.total}...
                   </p>
-                  <Progress 
-                    value={(deleteConfirmState.currentProgress.current / deleteConfirmState.currentProgress.total) * 100} 
+                  <Progress
+                    value={(deleteConfirmState.currentProgress.current / deleteConfirmState.currentProgress.total) * 100}
                   />
                 </div>
               )}
@@ -2033,8 +2033,8 @@ export default function App(): React.JSX.Element {
                 disabled={deleteConfirmState.isDeleting || deleteConfirmState.isBackingUp || !deleteConfirmState.backupConfirmed}
               >
                 {deleteConfirmState.isDeleting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                {deleteConfirmState.isDeleting 
-                  ? 'Deleting...' 
+                {deleteConfirmState.isDeleting
+                  ? 'Deleting...'
                   : deleteConfirmState.databaseNames.length === 1
                     ? 'Delete Database'
                     : `Delete ${String(deleteConfirmState.databaseNames.length)} Databases`}
@@ -2098,8 +2098,8 @@ export default function App(): React.JSX.Element {
                   <p className="text-sm text-muted-foreground">
                     {optimizeDialogState.currentProgress.operation} (Database {optimizeDialogState.currentProgress.current} of {optimizeDialogState.currentProgress.total})
                   </p>
-                  <Progress 
-                    value={(optimizeDialogState.currentProgress.current / optimizeDialogState.currentProgress.total) * 100} 
+                  <Progress
+                    value={(optimizeDialogState.currentProgress.current / optimizeDialogState.currentProgress.total) * 100}
                   />
                 </div>
               )}
@@ -2120,8 +2120,8 @@ export default function App(): React.JSX.Element {
                 disabled={optimizeDialogState.isOptimizing}
               >
                 {optimizeDialogState.isOptimizing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                {optimizeDialogState.isOptimizing 
-                  ? 'Optimizing...' 
+                {optimizeDialogState.isOptimizing
+                  ? 'Optimizing...'
                   : optimizeDialogState.databaseNames.length === 1
                     ? 'Optimize Database'
                     : `Optimize ${String(optimizeDialogState.databaseNames.length)} Databases`}
@@ -2133,8 +2133,8 @@ export default function App(): React.JSX.Element {
 
       {/* Rename Database Dialog - hidden when R2 backup dialog or progress dialog is open from here */}
       {renameDialogState && (
-        <Dialog 
-          open={!r2BackupDialog?.returnTo && backupProgressDialog?.returnTo !== 'rename'} 
+        <Dialog
+          open={!r2BackupDialog?.returnTo && backupProgressDialog?.returnTo !== 'rename'}
           onOpenChange={(isOpen) => {
             if (!isOpen && !renameDialogState.isRenaming) {
               setRenameDialogState(null)
@@ -2168,7 +2168,7 @@ export default function App(): React.JSX.Element {
                   🚫 FTS5 Tables Not Supported
                 </h4>
                 <p className="text-xs text-red-700 dark:text-red-300">
-                  Databases containing <strong>FTS5 (Full-Text Search) virtual tables</strong> cannot be renamed or backed up via the D1 export API. 
+                  Databases containing <strong>FTS5 (Full-Text Search) virtual tables</strong> cannot be renamed or backed up via the D1 export API.
                   If your database has FTS5 tables, this operation will fail. You must drop FTS5 tables before renaming, then recreate them afterward.
                 </p>
               </div>
@@ -2412,11 +2412,10 @@ export default function App(): React.JSX.Element {
                       <div className="flex items-center gap-1.5">
                         {r2BackupStatus?.configured && (
                           <button
-                            className={`text-xs px-2 py-1 rounded-md transition-colors ${
-                              r2CountValue > 0 
-                                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/50' 
+                            className={`text-xs px-2 py-1 rounded-md transition-colors ${r2CountValue > 0
+                                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/50'
                                 : 'text-muted-foreground hover:bg-muted'
-                            }`}
+                              }`}
                             onClick={() => {
                               setUndoSelectedDatabase({ id: db.uuid, name: db.name, preferR2Tab: true })
                               setShowUndoDatabasePicker(false)
@@ -2435,11 +2434,10 @@ export default function App(): React.JSX.Element {
                           </button>
                         )}
                         <button
-                          className={`text-xs px-2 py-1 rounded-md transition-colors ${
-                            undoCountValue > 0 
-                              ? 'bg-primary/10 text-primary hover:bg-primary/20' 
+                          className={`text-xs px-2 py-1 rounded-md transition-colors ${undoCountValue > 0
+                              ? 'bg-primary/10 text-primary hover:bg-primary/20'
                               : 'text-muted-foreground hover:bg-muted'
-                          }`}
+                            }`}
                           onClick={() => {
                             setUndoSelectedDatabase({ id: db.uuid, name: db.name })
                             setShowUndoDatabasePicker(false)
@@ -2480,34 +2478,34 @@ export default function App(): React.JSX.Element {
                       const oldestBackup = group.backups[group.backups.length - 1]
                       const newestDate = newestBackup ? new Date(newestBackup.timestamp).toLocaleDateString() : ''
                       const oldestDate = oldestBackup ? new Date(oldestBackup.timestamp).toLocaleDateString() : ''
-                      const dateLabel = group.backups.length === 1 
-                        ? `Created: ${newestDate}` 
+                      const dateLabel = group.backups.length === 1
+                        ? `Created: ${newestDate}`
                         : `Created: ${oldestDate} → ${newestDate}`
-                      
+
                       // Count database vs table backups and get unique table names
                       const databaseBackups = group.backups.filter(b => b.backupType === 'database')
                       const tableBackups = group.backups.filter(b => b.backupType === 'table')
                       const uniqueTableNames = [...new Set(tableBackups.map(b => b.tableName).filter(Boolean))]
-                      
+
                       // Determine display name - backend now provides looked-up name in group.databaseName
                       // Priority: group.databaseName (from METADATA lookup) > table names > generic label
-                      const hasValidGroupName = group.databaseName !== 'Deleted Database' && 
-                                                group.databaseName !== 'Unknown Name' && 
-                                                group.databaseName !== ''
-                      
+                      const hasValidGroupName = group.databaseName !== 'Deleted Database' &&
+                        group.databaseName !== 'Unknown Name' &&
+                        group.databaseName !== ''
+
                       let displayName: string
                       if (hasValidGroupName) {
                         displayName = group.databaseName
                       } else if (uniqueTableNames.length > 0) {
-                        displayName = uniqueTableNames.length === 1 
-                          ? `Table: ${uniqueTableNames[0]}` 
+                        displayName = uniqueTableNames.length === 1
+                          ? `Table: ${uniqueTableNames[0]}`
                           : `Tables: ${uniqueTableNames.slice(0, 2).join(', ')}${uniqueTableNames.length > 2 ? ` +${uniqueTableNames.length - 2} more` : ''}`
                       } else if (databaseBackups.length > 0) {
                         displayName = 'Database Backup'
                       } else {
                         displayName = 'Unknown'
                       }
-                      
+
                       // Build backup type summary
                       const backupTypeParts: string[] = []
                       if (databaseBackups.length > 0) {
@@ -2517,7 +2515,7 @@ export default function App(): React.JSX.Element {
                         backupTypeParts.push(`${tableBackups.length} table`)
                       }
                       const backupTypeSummary = backupTypeParts.join(', ')
-                      
+
                       return (
                         <div
                           key={group.databaseId}
@@ -2607,7 +2605,7 @@ export default function App(): React.JSX.Element {
                         </span>
                       )}
                       <p className="text-xs mt-2 text-muted-foreground">
-                        D1's export API does not support databases with FTS5 full-text search tables. 
+                        D1's export API does not support databases with FTS5 full-text search tables.
                         To export this database, first drop the FTS5 tables, export, then recreate them.
                       </p>
                     </>
@@ -2654,7 +2652,7 @@ export default function App(): React.JSX.Element {
                 The database "{fts5ExportError.database.name}" contains FTS5 (Full-Text Search) virtual tables which cannot be exported using D1's export API.
               </DialogDescription>
             </DialogHeader>
-            
+
             <div className="py-4 space-y-4">
               <div className="space-y-2">
                 <p className="text-sm font-medium">FTS5 Tables Found:</p>
@@ -2667,7 +2665,7 @@ export default function App(): React.JSX.Element {
                   ))}
                 </div>
               </div>
-              
+
               <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
                 <p className="text-sm text-blue-800 dark:text-blue-200">
                   <strong>Options:</strong>
@@ -2678,7 +2676,7 @@ export default function App(): React.JSX.Element {
                 </ul>
               </div>
             </div>
-            
+
             <DialogFooter className="flex-col sm:flex-row gap-2">
               <Button
                 variant="outline"

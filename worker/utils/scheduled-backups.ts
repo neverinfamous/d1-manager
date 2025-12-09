@@ -26,13 +26,13 @@ export function calculateNextRunAt(
 ): string {
   const now = fromDate ?? new Date();
   const next = new Date(now);
-  
+
   // Set to the target hour, minute 0, second 0
   next.setUTCMinutes(0);
   next.setUTCSeconds(0);
   next.setUTCMilliseconds(0);
   next.setUTCHours(hour);
-  
+
   switch (schedule) {
     case 'daily': {
       // If we're past today's scheduled time, schedule for tomorrow
@@ -41,32 +41,32 @@ export function calculateNextRunAt(
       }
       break;
     }
-    
+
     case 'weekly': {
       const targetDay = dayOfWeek ?? 0; // Default to Sunday
       const currentDay = next.getUTCDay();
       let daysUntilTarget = targetDay - currentDay;
-      
+
       // If today is the target day but we're past the scheduled time,
       // or if the target day is earlier in the week, schedule next week
       if (daysUntilTarget < 0 || (daysUntilTarget === 0 && next <= now)) {
         daysUntilTarget += 7;
       }
-      
+
       next.setUTCDate(next.getUTCDate() + daysUntilTarget);
       break;
     }
-    
+
     case 'monthly': {
       const targetDayOfMonth = dayOfMonth ?? 1; // Default to 1st
       next.setUTCDate(targetDayOfMonth);
-      
+
       // If we're past this month's scheduled time, schedule for next month
       if (next <= now) {
         next.setUTCMonth(next.getUTCMonth() + 1);
         next.setUTCDate(targetDayOfMonth);
       }
-      
+
       // Handle months with fewer days than the target (e.g., Feb 30 -> Feb 28)
       const maxDay = new Date(next.getUTCFullYear(), next.getUTCMonth() + 1, 0).getUTCDate();
       if (targetDayOfMonth > maxDay) {
@@ -75,7 +75,7 @@ export function calculateNextRunAt(
       break;
     }
   }
-  
+
   return next.toISOString();
 }
 
@@ -88,10 +88,10 @@ export function calculateNextRunAt(
  */
 export function isDue(nextRunAt: string | null, now?: Date): boolean {
   if (!nextRunAt) return false;
-  
+
   const scheduledTime = new Date(nextRunAt);
   const currentTime = now ?? new Date();
-  
+
   return scheduledTime <= currentTime;
 }
 
@@ -112,17 +112,17 @@ export function getScheduleDescription(
 ): string {
   const hourStr = hour.toString().padStart(2, '0');
   const timeStr = `${hourStr}:00 UTC`;
-  
+
   switch (schedule) {
     case 'daily':
       return `Daily at ${timeStr}`;
-    
+
     case 'weekly': {
       const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
       const dayName = days[dayOfWeek ?? 0];
       return `Every ${dayName} at ${timeStr}`;
     }
-    
+
     case 'monthly': {
       const day = dayOfMonth ?? 1;
       const suffix = getOrdinalSuffix(day);
@@ -137,7 +137,7 @@ export function getScheduleDescription(
 function getOrdinalSuffix(n: number): string {
   const s = ['th', 'st', 'nd', 'rd'];
   const v = n % 100;
-  return s[(v - 20) % 10] ?? s[v] ?? s[0];
+  return s[(v - 20) % 10] ?? s[v] ?? 'th';
 }
 
 /**
@@ -155,21 +155,21 @@ export function validateScheduleParams(
   if (hour !== undefined && (hour < 0 || hour > 23)) {
     return 'Hour must be between 0 and 23';
   }
-  
+
   // Validate day of week for weekly (0-6)
   if (schedule === 'weekly' && dayOfWeek !== null && dayOfWeek !== undefined) {
     if (dayOfWeek < 0 || dayOfWeek > 6) {
       return 'Day of week must be between 0 (Sunday) and 6 (Saturday)';
     }
   }
-  
+
   // Validate day of month for monthly (1-28)
   if (schedule === 'monthly' && dayOfMonth !== null && dayOfMonth !== undefined) {
     if (dayOfMonth < 1 || dayOfMonth > 28) {
       return 'Day of month must be between 1 and 28';
     }
   }
-  
+
   return null;
 }
 
