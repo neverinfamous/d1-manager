@@ -37,9 +37,9 @@ export function MetricsChart({
     const minValue = Math.min(...values, 0);
     const range = maxValue - minValue || 1;
 
-    const width = 100;
-    const chartHeight = height - 40; // Leave room for labels
-    const padding = { top: 10, right: 10, bottom: 30, left: 10 };
+    const width = 140;
+    const chartHeight = height - 50; // Leave room for labels
+    const padding = { top: 10, right: 10, bottom: 45, left: 40 };
 
     const points = data.map((d, i) => ({
       x: padding.left + (i / Math.max(data.length - 1, 1)) * (width - padding.left - padding.right),
@@ -58,9 +58,9 @@ export function MetricsChart({
     // Generate grid lines
     const gridLines = showGrid
       ? Array.from({ length: 5 }, (_, i) => ({
-          y: padding.top + (i / 4) * (chartHeight - padding.top),
-          value: maxValue - (i / 4) * range
-        }))
+        y: padding.top + (i / 4) * (chartHeight - padding.top),
+        value: maxValue - (i / 4) * range
+      }))
       : [];
 
     return {
@@ -78,8 +78,8 @@ export function MetricsChart({
 
   if (!chartData || data.length === 0) {
     return (
-      <div 
-        className="flex items-center justify-center bg-muted/30 rounded-lg" 
+      <div
+        className="flex items-center justify-center bg-muted/30 rounded-lg"
         style={{ height }}
         role="img"
         aria-label={ariaLabel ?? `${title} chart - no data available`}
@@ -89,100 +89,123 @@ export function MetricsChart({
     );
   }
 
-  const { points, linePath, areaPath, gridLines, maxValue, chartHeight, padding, width } = chartData;
+  const { points, gridLines, maxValue, chartHeight, padding, width } = chartData;
 
   // Calculate which x-axis labels to show (max 7 labels)
   const labelInterval = Math.ceil(points.length / 7);
   const xLabels = points.filter((_, i) => i % labelInterval === 0 || i === points.length - 1);
 
+  // Calculate label positions as percentages for HTML overlay
+  const yLabelPositions = gridLines.map((line) => ({
+    top: (line.y / height) * 100,
+    value: line.value
+  }));
+
+  const xLabelPositions = xLabels.map((point) => ({
+    left: (point.x / width) * 100,
+    label: point.label
+  }));
+
   return (
     <div className="w-full">
       <h4 className="text-sm font-medium mb-2 text-foreground">{title}</h4>
-      <div 
+      <div
         className="relative"
         role="img"
         aria-label={ariaLabel ?? `${title} chart showing ${data.length} data points. Maximum value: ${formatValue(maxValue)}`}
       >
-        <svg
-          viewBox={`0 0 ${String(width)} ${String(height)}`}
-          className="w-full"
-          preserveAspectRatio="none"
-          style={{ height }}
-        >
-          {/* Grid lines */}
-          {gridLines.map((line, i) => (
-            <g key={i}>
+        {/* Y-axis labels as HTML overlay */}
+        <div className="absolute left-0 top-0 h-full flex flex-col pointer-events-none" style={{ width: '50px' }}>
+          {yLabelPositions.map((pos, i) => (
+            <span
+              key={i}
+              className="absolute text-[10px] text-muted-foreground text-right pr-1 select-none"
+              style={{
+                top: `${pos.top}%`,
+                transform: 'translateY(-50%)',
+                right: 0,
+                width: '48px'
+              }}
+            >
+              {formatValue(pos.value)}
+            </span>
+          ))}
+        </div>
+
+        {/* Chart container with left margin for Y-axis labels */}
+        <div style={{ marginLeft: '50px' }}>
+          <svg
+            viewBox={`0 0 100 ${String(height)}`}
+            className="w-full"
+            preserveAspectRatio="none"
+            style={{ height }}
+          >
+            {/* Grid lines */}
+            {gridLines.map((line, i) => (
               <line
-                x1={padding.left}
+                key={i}
+                x1={0}
                 y1={line.y}
-                x2={width - padding.right}
+                x2={100}
                 y2={line.y}
                 stroke="currentColor"
                 strokeOpacity={0.1}
                 strokeDasharray="2,2"
               />
-              <text
-                x={padding.left - 2}
-                y={line.y}
-                fontSize="3"
-                fill="currentColor"
-                fillOpacity={0.5}
-                textAnchor="end"
-                dominantBaseline="middle"
-                className="select-none"
-              >
-                {formatValue(line.value)}
-              </text>
-            </g>
-          ))}
+            ))}
 
-          {/* Area fill */}
-          <path
-            d={areaPath}
-            fill={color}
-            fillOpacity={0.1}
-          />
-
-          {/* Line */}
-          <path
-            d={linePath}
-            fill="none"
-            stroke={color}
-            strokeWidth={0.5}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-
-          {/* Data points */}
-          {points.map((point, i) => (
-            <circle
-              key={i}
-              cx={point.x}
-              cy={point.y}
-              r={0.8}
+            {/* Area fill */}
+            <path
+              d={points
+                .map((p, i) => `${i === 0 ? 'M' : 'L'} ${((p.x - padding.left) / (width - padding.left - padding.right)) * 100} ${p.y}`)
+                .join(' ') + ` L 100 ${chartHeight} L 0 ${chartHeight} Z`}
               fill={color}
-              className="hover:r-[1.2] transition-all"
-            >
-              <title>{point.tooltip ?? `${point.label}: ${formatValue(point.value)}`}</title>
-            </circle>
-          ))}
+              fillOpacity={0.1}
+            />
 
-          {/* X-axis labels */}
-          {xLabels.map((point, i) => (
-            <text
-              key={i}
-              x={point.x}
-              y={chartHeight + 8}
-              fontSize="2.5"
-              fill="currentColor"
-              fillOpacity={0.6}
-              textAnchor="middle"
-              className="select-none"
-            >
-              {point.label}
-            </text>
-          ))}
-        </svg>
+            {/* Line */}
+            <path
+              d={points
+                .map((p, i) => `${i === 0 ? 'M' : 'L'} ${((p.x - padding.left) / (width - padding.left - padding.right)) * 100} ${p.y}`)
+                .join(' ')}
+              fill="none"
+              stroke={color}
+              strokeWidth={0.5}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+
+            {/* Data points */}
+            {points.map((point, i) => (
+              <circle
+                key={i}
+                cx={((point.x - padding.left) / (width - padding.left - padding.right)) * 100}
+                cy={point.y}
+                r={0.8}
+                fill={color}
+                className="hover:r-[1.2] transition-all"
+              >
+                <title>{point.tooltip ?? `${point.label}: ${formatValue(point.value)}`}</title>
+              </circle>
+            ))}
+          </svg>
+
+          {/* X-axis labels as HTML overlay */}
+          <div className="relative h-6 mt-1">
+            {xLabelPositions.map((pos, i) => (
+              <span
+                key={i}
+                className="absolute text-[10px] text-muted-foreground text-center select-none"
+                style={{
+                  left: `${((xLabels[i]?.x ?? 0) - padding.left) / (width - padding.left - padding.right) * 100}%`,
+                  transform: 'translateX(-50%)'
+                }}
+              >
+                {pos.label}
+              </span>
+            ))}
+          </div>
+        </div>
       </div>
       {/* Screen reader accessible data table */}
       <table className="sr-only">
@@ -230,8 +253,8 @@ export function MetricsBarChart({
 }: BarChartProps): React.JSX.Element {
   if (data.length === 0) {
     return (
-      <div 
-        className="flex items-center justify-center bg-muted/30 rounded-lg" 
+      <div
+        className="flex items-center justify-center bg-muted/30 rounded-lg"
         style={{ height }}
         role="img"
         aria-label={ariaLabel ?? `${title} chart - no data available`}
@@ -248,15 +271,15 @@ export function MetricsBarChart({
   return (
     <div className="w-full">
       <h4 className="text-sm font-medium mb-3 text-foreground">{title}</h4>
-      <div 
+      <div
         className="space-y-1"
         role="img"
         aria-label={ariaLabel ?? `${title} bar chart with ${data.length} items`}
       >
         {data.slice(0, 10).map((item, i) => (
           <div key={i} className="flex items-center gap-2" style={{ height: barHeight + gap }}>
-            <span 
-              className="text-xs text-muted-foreground w-24 truncate" 
+            <span
+              className="text-xs text-muted-foreground w-24 truncate"
               title={item.label}
             >
               {item.label}
