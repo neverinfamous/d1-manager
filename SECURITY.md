@@ -150,6 +150,38 @@ This project follows:
 - Zero Trust security model
 - Principle of least privilege
 
+## Addressed Vulnerabilities
+
+### CVE-2025-64756: glob CLI Command Injection (December 2025)
+
+**Status**: ✅ Mitigated (Proactive Fix)
+
+**Severity**: High
+
+**Description**: The `glob` npm package (versions 10.2.0-10.4.x and 11.0.0-11.0.3) contained a command injection vulnerability in its CLI's `-c/--cmd` option. Malicious filenames with shell metacharacters could execute arbitrary commands when processed.
+
+**Impact on D1 Manager**: 
+- D1 Manager does not directly use the glob CLI
+- No current dependencies use vulnerable glob versions
+- Risk was theoretical/future-facing
+
+**Mitigation**: 
+- Added `"glob": "^11.1.0"` to `package.json` overrides section
+- Forces all dependencies (current and future) to use patched version 11.1.0
+- Provides defense-in-depth protection against transitive dependencies
+
+**References**:
+- [GitHub Advisory GHSA-xj72-wvfv-8985](https://github.com/advisories/GHSA-xj72-wvfv-8985)
+- [CVE-2025-64756](https://nvd.nist.gov/vuln/detail/CVE-2025-64756)
+
+**Verification**:
+```bash
+# Verify no vulnerable glob versions in dependency tree
+npm ls glob --all
+```
+
+---
+
 ## Security Updates
 
 Security updates are released as soon as possible after validation. Subscribe to:

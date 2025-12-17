@@ -1,6 +1,6 @@
 # D1 Database Manager
 
-Last Updated December 6, 2025 - Production/Stable v2.0.0
+Last Updated December 17, 2025 - Production/Stable v2.0.0
 
 [![GitHub](https://img.shields.io/badge/GitHub-neverinfamous/d1--manager-blue?logo=github)](https://github.com/neverinfamous/d1-manager)
 [![Docker Pulls](https://img.shields.io/docker/pulls/writenotenow/d1-manager)](https://hub.docker.com/r/writenotenow/d1-manager)
@@ -17,7 +17,7 @@ This Docker image provides a modern, full-featured web application for managing 
 
 ## Tech Stack
 
-**Frontend**: React 19.2.1 | Vite 7.2.6 | TypeScript 5.9.3 | Tailwind CSS | shadcn/ui
+**Frontend**: React 19.2.3 | Vite 7.3.0 | TypeScript 5.9.3 | Tailwind CSS 3.4.19 | shadcn/ui
 
 **Backend**: Cloudflare Workers + KV + D1 + R2 + Durable Objects + Zero Trust
 
