@@ -33,10 +33,10 @@ const REPLICA_LOCATIONS = [
   { code: 'OC', name: 'Oceania' }
 ];
 
-export function ReadReplicationInfo({ 
-  databaseId, 
+export function ReadReplicationInfo({
+  databaseId,
   initialReplicationMode,
-  onReplicationChange 
+  onReplicationChange
 }: ReadReplicationInfoProps): React.JSX.Element {
   const [replicationMode, setReplicationMode] = useState<ReadReplicationMode | undefined>(initialReplicationMode);
   const [loading, setLoading] = useState(!initialReplicationMode);
@@ -44,11 +44,11 @@ export function ReadReplicationInfo({
   const [updating, setUpdating] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  const loadData = useCallback(async (skipCache = false) => {
+  const loadData = useCallback(async (skipCache?: boolean) => {
     try {
       setLoading(true);
       setError(null);
-      
+
       // Use cache on initial load for instant tab switching
       const dbInfo: D1Database = await api.getDatabaseInfo(databaseId, skipCache);
       setReplicationMode(dbInfo.read_replication?.mode || 'disabled');
@@ -82,13 +82,13 @@ export function ReadReplicationInfo({
 
   const handleToggleReplication = async (): Promise<void> => {
     if (!replicationMode) return;
-    
+
     const newMode: ReadReplicationMode = replicationMode === 'auto' ? 'disabled' : 'auto';
-    
+
     try {
       setUpdating(true);
       setError(null);
-      
+
       await api.setReadReplication(databaseId, newMode);
       setReplicationMode(newMode);
       onReplicationChange?.(newMode);
@@ -171,7 +171,7 @@ export function ReadReplicationInfo({
                   {isEnabled ? 'Enabled' : 'Disabled'}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  {isEnabled 
+                  {isEnabled
                     ? 'Reads may be served by global replicas'
                     : 'All queries go to the primary database'}
                 </p>
@@ -260,17 +260,17 @@ export function ReadReplicationInfo({
             <Info className="h-4 w-4 text-blue-500 mt-0.5 shrink-0" />
             <div className="text-sm text-muted-foreground space-y-2">
               <p>
-                <strong>For your own applications:</strong> Use the Sessions API 
-                with D1 bindings to ensure sequential consistency when read 
+                <strong>For your own applications:</strong> Use the Sessions API
+                with D1 bindings to ensure sequential consistency when read
                 replication is enabled.
               </p>
               <p>
-                The Sessions API uses bookmarks to track database state, 
+                The Sessions API uses bookmarks to track database state,
                 ensuring reads see at least the data from your previous writes.
               </p>
             </div>
           </div>
-          
+
           <div className="bg-zinc-900 dark:bg-zinc-950 rounded-md p-3">
             <p className="text-xs text-muted-foreground mb-2">Example usage:</p>
             <code className="text-xs text-green-400 font-mono block whitespace-pre">{`const session = env.DB.withSession('first-primary');
@@ -300,12 +300,12 @@ const bookmark = session.getBookmark();`}</code>
             <AlertCircle className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
             <div className="text-sm text-muted-foreground space-y-2">
               <p>
-                <strong>Note:</strong> D1 Manager accesses databases via REST API, 
-                which does not support the Sessions API. Query results shown here 
+                <strong>Note:</strong> D1 Manager accesses databases via REST API,
+                which does not support the Sessions API. Query results shown here
                 may not reflect the full benefits of read replication.
               </p>
               <p>
-                Sessions API is only available via D1 Worker bindings in your 
+                Sessions API is only available via D1 Worker bindings in your
                 own Cloudflare Workers applications.
               </p>
             </div>

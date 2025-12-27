@@ -41,7 +41,7 @@ export function TimeTravelInfo({ databaseId, databaseName }: TimeTravelInfoProps
   const [historyExpanded, setHistoryExpanded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  const loadData = useCallback(async (skipCache = false) => {
+  const loadData = useCallback(async (skipCache?: boolean) => {
     try {
       setLoading(true);
       setError(null);

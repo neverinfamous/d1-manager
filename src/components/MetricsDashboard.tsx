@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { 
-  BarChart3, 
-  Database, 
-  Clock, 
-  HardDrive, 
-  RefreshCw, 
+import {
+  BarChart3,
+  Database,
+  Clock,
+  HardDrive,
+  RefreshCw,
   Loader2,
   TrendingUp,
   TrendingDown,
@@ -21,9 +21,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { MetricsChart, MetricsBarChart } from './MetricsChart';
-import { 
-  getMetrics, 
-  type MetricsResponse, 
+import {
+  getMetrics,
+  type MetricsResponse,
   type MetricsTimeRange,
   type MetricsDataPoint
 } from '@/services/api';
@@ -65,7 +65,7 @@ function formatLatency(ms: number | undefined): string {
  */
 function aggregateByDate(data: MetricsDataPoint[]): { date: string; reads: number; writes: number }[] {
   const byDate = new Map<string, { reads: number; writes: number }>();
-  
+
   for (const point of data) {
     const existing = byDate.get(point.date);
     if (existing) {
@@ -78,7 +78,7 @@ function aggregateByDate(data: MetricsDataPoint[]): { date: string; reads: numbe
       });
     }
   }
-  
+
   return Array.from(byDate.entries())
     .map(([date, values]) => ({ date, ...values }))
     .sort((a, b) => a.date.localeCompare(b.date));
@@ -98,10 +98,10 @@ export function MetricsDashboard(): React.JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [timeRange, setTimeRange] = useState<MetricsTimeRange>('7d');
 
-  const loadMetrics = useCallback(async (skipCache = false) => {
+  const loadMetrics = useCallback(async (skipCache: boolean) => {
     setLoading(true);
     setError(null);
-    
+
     try {
       // Use cache on initial load for instant revisits
       const data = await getMetrics(timeRange, skipCache);
@@ -167,13 +167,13 @@ export function MetricsDashboard(): React.JSX.Element {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Select 
-            value={timeRange} 
+          <Select
+            value={timeRange}
             onValueChange={handleTimeRangeChange}
             disabled={loading}
           >
-            <SelectTrigger 
-              className="w-[140px]" 
+            <SelectTrigger
+              className="w-[140px]"
               aria-label="Select time range"
             >
               <SelectValue placeholder="Time range" />
@@ -184,9 +184,9 @@ export function MetricsDashboard(): React.JSX.Element {
               <SelectItem value="30d">Last 30 days</SelectItem>
             </SelectContent>
           </Select>
-          <Button 
-            variant="outline" 
-            onClick={() => void loadMetrics(true)} 
+          <Button
+            variant="outline"
+            onClick={() => void loadMetrics(true)}
             disabled={loading}
             aria-label="Refresh metrics"
           >
