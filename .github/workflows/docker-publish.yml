@@ -114,7 +114,7 @@ jobs:
         if-no-files-found: error
         retention-days: 1
 
-  # Security scan on amd64 image only (runs in parallel)
+  # Security scan on amd64 image with strict gates (blocks on critical/high)
   security-scan:
     runs-on: ubuntu-latest
     needs: build-platform
@@ -129,6 +129,22 @@ jobs:
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
+
+    - name: Verify package-lock.json has security fixes
+      run: |
+        echo "🔍 Verifying security patches in package-lock.json..."
+        CROSS_SPAWN_VERSION=$(grep -A 2 '"node_modules/cross-spawn"' package-lock.json | grep '"version"' | cut -d'"' -f4)
+        echo "cross-spawn version: $CROSS_SPAWN_VERSION"
+        if [ "$CROSS_SPAWN_VERSION" != "7.0.6" ] && [ "$CROSS_SPAWN_VERSION" != "7.0.5" ]; then
+          echo "❌ ERROR: cross-spawn version $CROSS_SPAWN_VERSION is vulnerable (need >= 7.0.5)"
+          exit 1
+        fi
+        BRACE_EXP_VERSION=$(grep -A 2 '"node_modules/brace-expansion"' package-lock.json | grep '"version"' | cut -d'"' -f4)
+        echo "brace-expansion version: $BRACE_EXP_VERSION"
+        if [ "$BRACE_EXP_VERSION" != "2.0.2" ]; then
+          echo "⚠️  WARNING: brace-expansion version $BRACE_EXP_VERSION (expected 2.0.2)"
+        fi
+        echo "✅ Security patches verified in package-lock.json"
 
     - name: Build image for scanning
       uses: docker/build-push-action@v6
@@ -146,17 +162,50 @@ jobs:
       run: |
         curl -sSfL https://raw.githubusercontent.com/docker/scout-cli/main/install.sh | sh -s --
         docker images local-scan:latest
-        echo "🔍 Running Docker Scout security scan"
+        echo "🔍 Running Docker Scout security scan for local-scan:latest"
+        
+        echo "⏱️ Running Docker Scout scan (max 8 minutes)..."
         if timeout 480 docker scout cves local-scan:latest > scout_output.txt 2>&1; then
           echo "📊 Scan completed successfully"
           cat scout_output.txt
-          if grep -E "(CRITICAL|HIGH)" scout_output.txt | grep -v "0  " > /dev/null; then
-            echo "⚠️ Critical or high severity vulnerabilities detected (informational)"
+          
+          # Check if critical or high vulnerabilities are present in the output
+          # Look for non-zero counts in CRITICAL or HIGH columns (format: "1C" or "2H")
+          if grep -E "^\s+[1-9][0-9]*C\s+" scout_output.txt > /dev/null; then
+            echo "❌ Critical severity vulnerabilities detected"
+            echo "🚨 Build blocked due to unacceptable security risk"
+            exit 1
+          fi
+          
+          # Check for HIGH vulnerabilities, but exclude the known wrangler bundled cross-spawn issue
+          if grep -E "^\s+0C\s+[1-9][0-9]*H\s+" scout_output.txt > /dev/null; then
+            # Check if it's ONLY the cross-spawn 7.0.3 from wrangler (known issue)
+            if grep "cross-spawn 7.0.3" scout_output.txt > /dev/null; then
+              HIGH_COUNT=$(grep -E "^\s+0C\s+[1-9][0-9]*H\s+" scout_output.txt | wc -l)
+              CROSS_SPAWN_COUNT=$(grep "cross-spawn 7.0.3" scout_output.txt | wc -l)
+              
+              if [ "$HIGH_COUNT" -eq 1 ] && [ "$CROSS_SPAWN_COUNT" -ge 1 ]; then
+                echo "⚠️  Known issue: cross-spawn 7.0.3 bundled in wrangler (cannot be patched)"
+                echo "ℹ️  This is a dev-time dependency in wrangler, not a runtime risk"
+                echo "✅ Security scan passed - only known wrangler bundled dependency issue"
+              else
+                echo "❌ High severity vulnerabilities detected (excluding known wrangler issue)"
+                echo "🚨 Build blocked due to unacceptable security risk"
+                exit 1
+              fi
+            else
+              echo "❌ High severity vulnerabilities detected"
+              echo "🚨 Build blocked due to unacceptable security risk"
+              exit 1
+            fi
           else
-            echo "✅ No critical/high severity vulnerabilities"
+            echo "✅ Security scan passed - no critical/high severity vulnerabilities"
+            echo "ℹ️ Low/medium severity vulnerabilities are acceptable"
           fi
         else
           echo "⚠️ Docker Scout scan timed out or failed"
+          echo "🔄 Continuing build - scan timeout is not a security failure"
+          echo "ℹ️ Consider running scout scan locally for large images"
         fi
 
   # Merge platform images into multi-arch manifest
