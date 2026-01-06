@@ -47,7 +47,7 @@
     "@types/prismjs": "^1.26.5",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
-    "@vitejs/plugin-react": "^5.1.0",
+    "@vitejs/plugin-react": "^5.1.2",
     "clsx": "^2.1.1",
     "drizzle-kit": "^0.30.0",
     "esbuild": "^0.25.12",
