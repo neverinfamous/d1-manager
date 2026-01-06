@@ -1,0 +1,73 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "America/New_York"
+    open-pull-requests-limit: 10
+    groups:
+      # Vitest testing framework - critical for peer dependency harmony
+      vitest:
+        patterns:
+          - "vitest"
+          - "@vitest/*"
+      # ESLint ecosystem - keeps linting stack aligned
+      eslint:
+        patterns:
+          - "eslint"
+          - "eslint-*"
+          - "@eslint/*"
+          - "typescript-eslint"
+          - "globals"
+      # TypeScript types - update together to avoid interface drift
+      types:
+        patterns:
+          - "@types/*"
+      # UI frameworks - Radix + Tailwind ecosystem
+      ui-frameworks:
+        patterns:
+          - "@radix-ui/*"
+          - "tailwindcss"
+          - "@tailwindcss/*"
+      # Cloudflare ecosystem - wrangler and types
+      cloudflare:
+        patterns:
+          - "wrangler"
+          - "@cloudflare/*"
+      # React ecosystem
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+      # Vite build tooling
+      vite:
+        patterns:
+          - "vite"
+          - "@vitejs/*"
+          - "vite-*"
+      # Tanstack ecosystem
+      tanstack:
+        patterns:
+          - "@tanstack/*"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    groups:
+      actions:
+        patterns:
+          - "actions/*"
+          - "github/*"
+
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
