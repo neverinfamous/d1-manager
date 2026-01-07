@@ -105,7 +105,6 @@ RUN npm ci --omit=dev && \
 # Copy built application from builder
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/worker ./worker
-COPY --from=builder /app/wrangler.toml.example ./wrangler.toml.example
 
 # Set ownership to non-root user
 RUN chown -R app:app /app
