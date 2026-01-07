@@ -1,0 +1,63 @@
+# Cloudflare D1 Database Manager - Production Configuration
+
+name = "d1-manager"
+main = "worker/index.ts"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = false
+preview_urls = false
+
+[build]
+command = "npm run build"
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+
+# D1 METADATA DATABASE
+[[d1_databases]]
+binding = "METADATA"
+database_name = "d1-manager-metadata"
+database_id = "f762447a-db4a-449b-a70d-0c9d23324b89"
+
+# R2 bucket for backups
+[[r2_buckets]]
+binding = "BACKUP_BUCKET"
+bucket_name = "d1-manager-backups"
+
+# Durable Objects bindings
+[[durable_objects.bindings]]
+name = "BACKUP_DO"
+class_name = "BackupDO"
+script_name = "d1-manager"
+
+# Durable Object migrations
+[[migrations]]
+tag = "v1"
+new_classes = ["BackupDO"]
+
+# Scheduled Backups - Cron trigger
+[triggers]
+crons = ["0 * * * *"]  # Every hour at minute 0
+
+# AI Search Integration
+[ai]
+binding = "AI"
+
+# Custom domain configuration
+[[routes]]
+pattern = "d1.adamic.tech"
+custom_domain = true
+zone_name = "adamic.tech"
+
+[observability]
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+persist = true
+invocation_logs = true
+
+[observability.traces]
+enabled = true
+head_sampling_rate = 1
+persist = true
