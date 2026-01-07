@@ -22,7 +22,15 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { Progress } from '@/components/ui/progress'
+import { DatabaseView } from './components/DatabaseView'
+import { TableView } from './components/TableView'
+import { DatabaseSearchFilter } from './components/DatabaseSearchFilter'
+import { DatabaseColorPicker } from './components/DatabaseColorPicker'
+import { CloneDatabaseDialog } from './components/CloneDatabaseDialog'
+import { ExportDatabaseDialog } from './components/ExportDatabaseDialog'
+import { ImportDatabaseDialog } from './components/ImportDatabaseDialog'
+import { exportAndDownloadMultipleDatabases, type ExportFormat } from './services/exportApi'
 import {
   Select,
   SelectContent,
@@ -30,12 +38,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Progress } from '@/components/ui/progress'
-import { DatabaseView } from './components/DatabaseView'
-import { TableView } from './components/TableView'
-import { DatabaseSearchFilter } from './components/DatabaseSearchFilter'
-import { DatabaseColorPicker } from './components/DatabaseColorPicker'
-import { CloneDatabaseDialog } from './components/CloneDatabaseDialog'
 
 // Lazy load heavy feature components for better code splitting
 const QueryConsole = lazy(() => import('./components/QueryConsole').then(m => ({ default: m.QueryConsole })))
@@ -123,6 +125,9 @@ export default function App(): React.JSX.Element {
     progress: number
     status: 'preparing' | 'downloading' | 'complete' | 'error'
     error?: string
+    currentDatabase?: string
+    completed?: number
+    total?: number
   } | null>(null)
   const [skippedExports, setSkippedExports] = useState<{
     databaseId: string
@@ -130,14 +135,8 @@ export default function App(): React.JSX.Element {
     reason: string
     details?: string[]
   }[] | null>(null)
+  const [batchExportFormat, setBatchExportFormat] = useState<ExportFormat>('sql')
   const [showUploadDialog, setShowUploadDialog] = useState(false)
-  const [uploadFile, setUploadFile] = useState<File | null>(null)
-  const [uploadSqlContent, setUploadSqlContent] = useState('')
-  const [uploadInputSource, setUploadInputSource] = useState<'file' | 'paste'>('file')
-  const [uploadMode, setUploadMode] = useState<'create' | 'import'>('create')
-  const [uploadDbName, setUploadDbName] = useState('')
-  const [uploadTargetDb, setUploadTargetDb] = useState('')
-  const [uploading, setUploading] = useState(false)
   const [deleteConfirmState, setDeleteConfirmState] = useState<{
     databaseIds: string[]
     databaseNames: string[]
@@ -185,6 +184,9 @@ export default function App(): React.JSX.Element {
 
   // Clone database state
   const [cloneDialogDatabase, setCloneDialogDatabase] = useState<D1Database | null>(null)
+
+  // Export database state
+  const [exportDialogDatabase, setExportDialogDatabase] = useState<D1Database | null>(null)
 
   // R2 Backup/Restore state
   const [r2BackupStatus, setR2BackupStatus] = useState<R2BackupStatus | null>(null)
@@ -605,16 +607,27 @@ export default function App(): React.JSX.Element {
     try {
       const selectedDbData = databases.filter(db => selectedDatabases.includes(db.uuid))
 
-      const result = await api.exportDatabases(selectedDbData, (progress) => {
-        setBulkDownloadProgress({
-          progress,
-          status: progress < 100 ? 'downloading' : 'complete'
-        })
-      })
+      const result = await exportAndDownloadMultipleDatabases(
+        selectedDbData.map(db => ({ uuid: db.uuid, name: db.name })),
+        batchExportFormat,
+        (progress) => {
+          setBulkDownloadProgress({
+            progress: progress.overallProgress,
+            status: progress.overallProgress < 100 ? 'downloading' : 'complete',
+            currentDatabase: progress.currentDatabase,
+            completed: progress.databasesCompleted,
+            total: progress.totalDatabases
+          })
+        }
+      )
 
       // Show skipped databases notice if any
-      if (result.skipped && result.skipped.length > 0) {
-        setSkippedExports(result.skipped)
+      if (result.skipped.length > 0) {
+        setSkippedExports(result.skipped.map(s => ({
+          databaseId: '',
+          name: s.name,
+          reason: s.reason
+        })))
       }
 
       // Clear selection after successful download
@@ -688,9 +701,8 @@ export default function App(): React.JSX.Element {
     })
   }
 
-  const handleSingleImport = (db: D1Database): void => {
-    setUploadMode('import')
-    setUploadTargetDb(db.uuid)
+  const handleSingleImport = (_db: D1Database): void => {
+    // New ImportDatabaseDialog handles target database selection internally
     setShowUploadDialog(true)
   }
 
@@ -743,37 +755,6 @@ export default function App(): React.JSX.Element {
       setError(err instanceof Error ? err.message : 'Failed to download backup')
     } finally {
       setDeleteConfirmState(prev => prev ? { ...prev, isBackingUp: false } : null)
-    }
-  }
-
-  const handleImportDatabase = async (): Promise<void> => {
-    const source = uploadInputSource === 'file' ? uploadFile : uploadSqlContent
-    if (source === null || source === '') return
-
-    setUploading(true)
-    setError('')
-
-    try {
-      await api.importDatabase(source, {
-        createNew: uploadMode === 'create',
-        ...(uploadMode === 'create' && uploadDbName && { databaseName: uploadDbName }),
-        ...(uploadMode === 'import' && uploadTargetDb && { targetDatabaseId: uploadTargetDb })
-      })
-
-      // Reload databases
-      await loadDatabases()
-
-      // Close dialog and reset
-      setShowUploadDialog(false)
-      setUploadFile(null)
-      setUploadSqlContent('')
-      setUploadInputSource('file')
-      setUploadDbName('')
-      setUploadTargetDb('')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to import database')
-    } finally {
-      setUploading(false)
     }
   }
 
@@ -1233,15 +1214,27 @@ export default function App(): React.JSX.Element {
                         <Zap className="h-4 w-4 mr-2" />
                         Optimize Selected
                       </Button>
-                      <Button onClick={() => void handleBulkDownload()} disabled={bulkDownloadProgress !== null}>
-                        <Download className="h-4 w-4 mr-2" />
-                        {bulkDownloadProgress ? (
-                          bulkDownloadProgress.status === 'error' ? 'Download Failed' :
-                            bulkDownloadProgress.status === 'complete' ? 'Download Complete' :
-                              bulkDownloadProgress.status === 'preparing' ? 'Preparing...' :
-                                `Downloading (${String(Math.round(bulkDownloadProgress.progress))}%)`
-                        ) : 'Download Selected'}
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Select value={batchExportFormat} onValueChange={(v: ExportFormat) => setBatchExportFormat(v)}>
+                          <SelectTrigger className="w-[80px] h-9">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="sql">SQL</SelectItem>
+                            <SelectItem value="json">JSON</SelectItem>
+                            <SelectItem value="csv">CSV</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Button onClick={() => void handleBulkDownload()} disabled={bulkDownloadProgress !== null}>
+                          <Download className="h-4 w-4 mr-2" />
+                          {bulkDownloadProgress ? (
+                            bulkDownloadProgress.status === 'error' ? 'Download Failed' :
+                              bulkDownloadProgress.status === 'complete' ? 'Download Complete' :
+                                bulkDownloadProgress.status === 'preparing' ? 'Preparing...' :
+                                  `Downloading (${String(Math.round(bulkDownloadProgress.progress))}%)`
+                          ) : 'Download Selected'}
+                        </Button>
+                      </div>
                       <Button variant="destructive" onClick={handleBulkDelete}>
                         <Trash2 className="h-4 w-4 mr-2" />
                         Delete Selected
@@ -1249,6 +1242,24 @@ export default function App(): React.JSX.Element {
                     </>
                   )}
                 </div>
+              </div>
+            )}
+
+            {/* Batch Download Progress Indicator */}
+            {bulkDownloadProgress?.status === 'downloading' && (
+              <div className="bg-muted/50 rounded-lg p-4 mb-6">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                    <span className="text-sm font-medium">
+                      Exporting {bulkDownloadProgress.currentDatabase || '...'}
+                    </span>
+                  </div>
+                  <span className="text-sm text-muted-foreground">
+                    {bulkDownloadProgress.completed ?? 0} / {bulkDownloadProgress.total ?? 0} databases
+                  </span>
+                </div>
+                <Progress value={bulkDownloadProgress.progress} className="h-2" />
               </div>
             )}
 
@@ -1301,6 +1312,7 @@ export default function App(): React.JSX.Element {
                     onClone: (db) => setCloneDialogDatabase(db),
                     onImport: handleSingleImport,
                     onDownload: handleSingleDownload,
+                    onExport: (db) => setExportDialogDatabase(db),
                     onOptimize: handleSingleOptimize,
                     onFts5: handleFts5Click,
                     onBackup: (db) => setR2BackupDialog({
@@ -1763,149 +1775,19 @@ export default function App(): React.JSX.Element {
       </Dialog>
 
       {/* Import Database Dialog */}
-      <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Import Database</DialogTitle>
-            <DialogDescription>
-              Import SQL to create a new database or add to an existing one.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            {/* Input Source Selection */}
-            <fieldset className="grid gap-3">
-              <legend className="text-sm font-medium leading-none mb-2">SQL Source</legend>
-              <RadioGroup value={uploadInputSource} onValueChange={(v) => setUploadInputSource(v as 'file' | 'paste')}>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="file" id="source-file" />
-                  <Label htmlFor="source-file" className="font-normal">Upload SQL file</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="paste" id="source-paste" />
-                  <Label htmlFor="source-paste" className="font-normal">Paste SQL content</Label>
-                </div>
-              </RadioGroup>
-            </fieldset>
-
-            {/* File Input */}
-            {uploadInputSource === 'file' && (
-              <div className="grid gap-2">
-                <Label htmlFor="sql-file">SQL File</Label>
-                <div className="relative">
-                  <Input
-                    id="sql-file"
-                    type="file"
-                    accept=".sql"
-                    onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
-                    disabled={uploading}
-                    className="file:mr-4 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-primary file:text-primary-foreground hover:file:bg-primary/90 file:cursor-pointer cursor-pointer"
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Maximum file size: 5GB
-                </p>
-              </div>
-            )}
-
-            {/* Paste Input */}
-            {uploadInputSource === 'paste' && (
-              <div className="grid gap-2">
-                <Label htmlFor="sql-content">SQL Content</Label>
-                <textarea
-                  id="sql-content"
-                  className="flex min-h-[150px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 font-mono"
-                  placeholder="CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT);&#10;INSERT INTO users VALUES (1, 'Alice');"
-                  value={uploadSqlContent}
-                  onChange={(e) => setUploadSqlContent(e.target.value)}
-                  disabled={uploading}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Paste your SQL statements (CREATE TABLE, INSERT, etc.)
-                </p>
-              </div>
-            )}
-
-            {/* Show import options when source is provided */}
-            {((uploadInputSource === 'file' && uploadFile !== null) || (uploadInputSource === 'paste' && uploadSqlContent.trim() !== '')) && (
-              <>
-                <fieldset className="grid gap-3">
-                  <legend className="text-sm font-medium leading-none mb-2">Import Mode</legend>
-                  <RadioGroup value={uploadMode} onValueChange={(v) => setUploadMode(v as 'create' | 'import')}>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="create" id="import-create" />
-                      <Label htmlFor="import-create" className="font-normal">Create new database</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="import" id="import-existing" />
-                      <Label htmlFor="import-existing" className="font-normal">Import into existing database</Label>
-                    </div>
-                  </RadioGroup>
-                </fieldset>
-
-                {uploadMode === 'create' && (
-                  <div className="grid gap-2">
-                    <Label htmlFor="new-db-name">New Database Name</Label>
-                    <Input
-                      id="new-db-name"
-                      placeholder="my-database"
-                      value={uploadDbName}
-                      onChange={(e) => setUploadDbName(e.target.value)}
-                      disabled={uploading}
-                    />
-                  </div>
-                )}
-
-                {uploadMode === 'import' && (
-                  <div className="grid gap-2">
-                    <Label htmlFor="import-target-db">Target Database</Label>
-                    <Select value={uploadTargetDb} onValueChange={setUploadTargetDb} disabled={uploading}>
-                      <SelectTrigger id="import-target-db">
-                        <SelectValue placeholder="Select a database" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {databases.map((db) => (
-                          <SelectItem key={db.uuid} value={db.uuid}>
-                            {db.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowUploadDialog(false)
-                setUploadFile(null)
-                setUploadSqlContent('')
-                setUploadInputSource('file')
-                setUploadDbName('')
-                setUploadTargetDb('')
-              }}
-              disabled={uploading}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={() => void handleImportDatabase()}
-              disabled={
-                uploading ||
-                (uploadInputSource === 'file' && !uploadFile) ||
-                (uploadInputSource === 'paste' && !uploadSqlContent.trim()) ||
-                (uploadMode === 'create' && !uploadDbName.trim()) ||
-                (uploadMode === 'import' && !uploadTargetDb)
-              }
-            >
-              {uploading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              {uploading ? 'Importing...' : 'Import'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ImportDatabaseDialog
+        open={showUploadDialog}
+        databases={databases}
+        onClose={() => setShowUploadDialog(false)}
+        onImport={async (options) => {
+          await api.importDatabase(options.sqlContent, {
+            createNew: options.createNew,
+            ...(options.databaseName ? { databaseName: options.databaseName } : {}),
+            ...(options.targetDatabaseId ? { targetDatabaseId: options.targetDatabaseId } : {})
+          })
+          await loadDatabases()
+        }}
+      />
 
       {/* Delete Confirmation Dialog */}
       {/* Delete Confirmation Dialog - hidden when R2 backup dialog or progress dialog is open from here */}
@@ -2651,6 +2533,15 @@ export default function App(): React.JSX.Element {
           existingDatabaseNames={databases.map(db => db.name)}
           onClone={api.cloneDatabase.bind(api)}
           onSuccess={() => void loadDatabases()}
+        />
+      )}
+
+      {/* Export Database Dialog */}
+      {exportDialogDatabase && (
+        <ExportDatabaseDialog
+          open={true}
+          database={exportDialogDatabase}
+          onClose={() => setExportDialogDatabase(null)}
         />
       )}
 

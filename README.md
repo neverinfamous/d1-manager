@@ -1,11 +1,11 @@
 # D1 Database Manager for Cloudflare
 
-Last Updated January 7, 2026 - Production/Stable v2.1.0
+Last Updated January 7, 2026 - Production/Stable v2.2.0
 
 [![GitHub](https://img.shields.io/badge/GitHub-neverinfamous/d1--manager-blue?logo=github)](https://github.com/neverinfamous/d1-manager)
 [![Docker Pulls](https://img.shields.io/docker/pulls/writenotenow/d1-manager)](https://hub.docker.com/r/writenotenow/d1-manager)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-![Version](https://img.shields.io/badge/version-v2.1.0-green)
+![Version](https://img.shields.io/badge/version-v2.2.0-green)
 ![Status](https://img.shields.io/badge/status-Production%2FStable-brightgreen)
 [![Security](https://img.shields.io/badge/Security-Enhanced-green.svg)](https://github.com/neverinfamous/d1-manager/blob/main/SECURITY.md)
 [![CodeQL](https://img.shields.io/badge/CodeQL-Passing-brightgreen.svg)](https://github.com/neverinfamous/d1-manager/security/code-scanning)
@@ -17,7 +17,7 @@ This Docker image provides a modern, full-featured web application for managing 
 
 ## Tech Stack
 
-**Frontend**: React 19.2.3 | Vite 7.3.0 | TypeScript 5.9.3 | Tailwind CSS 4.1.17 | shadcn/ui
+**Frontend**: React 19.2.3 | Vite 7.3.1 | TypeScript 5.9.3 | Tailwind CSS 4.1.17 | shadcn/ui
 
 **Backend**: Cloudflare Workers + KV + D1 + R2 + Durable Objects + Zero Trust
 
@@ -26,10 +26,11 @@ This Docker image provides a modern, full-featured web application for managing 
 ## 🎯 Features
 
 ### Database Management
-- Create, rename, clone, delete, download, and optimize databases
+- Create, rename, clone, delete, and optimize databases
+- **Export Database** - SQL/JSON/CSV formats with portable schema + data
+- **Import Database** - SQL/JSON/CSV/ZIP with create new or update existing
 - **Quick Actions** - Icon buttons on each database card for instant access to all operations
-- **Bulk Operations** - Multi-select for batch download, optimize, and delete
-- **Import Database** - Upload SQL files or paste SQL content directly
+- **Bulk Operations** - Multi-select for batch export (SQL/JSON/CSV), optimize, and delete
 - **Clone Database** - Multi-step wizard with selective table cloning and granular options
 - **Grid/List View Toggle** - Switch between card grid and compact sortable table view
 - **Copyable Database IDs** - Click to copy database IDs with visual feedback
@@ -129,10 +130,6 @@ git clone https://github.com/neverinfamous/d1-manager.git
 
    ```bash
    npm install
-   ```
-
-   ```bash
-   cp .env.example .env
    ```
 
 **Start the servers (2 terminals):**

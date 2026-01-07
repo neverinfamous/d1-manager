@@ -29,7 +29,7 @@ async function parseErrorResponse(response: Response): Promise<ApiErrorResponse>
   if (response.status === 504) {
     return { error: 'Request timeout (504). The operation took too long.' }
   }
-  
+
   try {
     const data = await response.json() as ApiErrorResponse
     // Prefer message over error for more detailed error info
@@ -61,7 +61,7 @@ export interface D1Database {
 export type ReadReplicationMode = 'auto' | 'disabled'
 
 // Database color types for visual organization
-export type DatabaseColor = 
+export type DatabaseColor =
   | 'red' | 'red-light' | 'red-dark'
   | 'orange' | 'orange-light' | 'amber'
   | 'yellow' | 'yellow-light' | 'lime'
@@ -107,9 +107,9 @@ export interface IndexInfo {
 
 // Filter types for row-level filtering
 export interface FilterCondition {
-  type: 'contains' | 'equals' | 'notEquals' | 'gt' | 'gte' | 'lt' | 'lte' | 
-        'isNull' | 'isNotNull' | 'startsWith' | 'endsWith' | 
-        'between' | 'notBetween' | 'in' | 'notIn'
+  type: 'contains' | 'equals' | 'notEquals' | 'gt' | 'gte' | 'lt' | 'lte' |
+  'isNull' | 'isNotNull' | 'startsWith' | 'endsWith' |
+  'between' | 'notBetween' | 'in' | 'notIn'
   value?: string | number
   value2?: string | number // For BETWEEN operators
   values?: (string | number)[] // For IN operators
@@ -246,28 +246,28 @@ class APIService {
       // Clear any cached data
       localStorage.clear();
       sessionStorage.clear();
-      
+
       // Throw error with status to trigger logout in app
       throw new Error(`Authentication error: ${String(response.status)}`);
     }
-    
+
     // Provide user-friendly error messages for common issues
     if (response.status === 429) {
       throw new Error('Rate limit exceeded. Cloudflare limits API requests - please wait a moment and try again.');
     }
-    
+
     if (response.status === 503) {
       throw new Error('Service temporarily unavailable. Cloudflare may be experiencing issues - please try again shortly.');
     }
-    
+
     if (response.status === 504) {
       throw new Error('Request timed out. The database may be under heavy load - please try again.');
     }
-    
+
     if (!response.ok) {
       throw new Error(`API error: ${String(response.status)} ${response.statusText}`);
     }
-    
+
     return response;
   }
 
@@ -283,18 +283,18 @@ class APIService {
       }
     }
 
-    const response = await fetch(`${WORKER_API}/api/databases`, 
+    const response = await fetch(`${WORKER_API}/api/databases`,
       this.getFetchOptions()
     )
-    
+
     this.handleResponse(response);
-    
+
     const data = await response.json() as ApiResponse<D1Database[]>
     const result = data.result ?? []
-    
+
     // Cache the result
     setCachedDatabaseList(result)
-    
+
     return result
   }
 
@@ -309,11 +309,11 @@ class APIService {
         return cached
       }
     }
-    
+
     const response = await fetch(`${WORKER_API}/api/databases/${databaseId}/info`, {
       credentials: 'include'
     })
-    
+
     if (!response.ok) {
       // Provide user-friendly error messages for common issues
       if (response.status === 429) {
@@ -327,13 +327,13 @@ class APIService {
       }
       throw new Error(`Failed to get database info: ${response.statusText}`)
     }
-    
+
     const data = await response.json() as ApiResponse<D1Database>
     if (!data.result) throw new Error('No result in response')
-    
+
     // Cache the result
     setDatabaseInfoCache(databaseId, data.result)
-    
+
     return data.result
   }
 
@@ -351,19 +351,19 @@ class APIService {
       credentials: 'include',
       body: JSON.stringify({ mode })
     })
-    
+
     if (!response.ok) {
       const error = await parseErrorResponse(response)
       throw new Error(error.error ?? error.message ?? `Failed to set read replication: ${response.statusText}`)
     }
-    
+
     const data = await response.json() as ApiResponse<D1Database>
     if (!data.result) throw new Error('No result in response')
-    
+
     // Invalidate and update cache with new data
     invalidateDatabaseInfoCache(databaseId)
     setDatabaseInfoCache(databaseId, data.result)
-    
+
     return data.result
   }
 
@@ -379,17 +379,17 @@ class APIService {
       credentials: 'include',
       body: JSON.stringify({ name, location })
     })
-    
+
     if (!response.ok) {
       throw new Error(`Failed to create database: ${response.statusText}`)
     }
-    
+
     const data = await response.json() as ApiResponse<D1Database>
     if (!data.result) throw new Error('No result in response')
-    
+
     // Invalidate database list cache after creation
     invalidateDatabaseListCache()
-    
+
     return data.result
   }
 
@@ -401,11 +401,11 @@ class APIService {
       method: 'DELETE',
       credentials: 'include'
     })
-    
+
     if (!response.ok) {
       throw new Error(`Failed to delete database: ${response.statusText}`)
     }
-    
+
     // Invalidate caches after deletion
     invalidateDatabaseListCache()
     invalidateDatabaseInfoCache(databaseId)
@@ -420,7 +420,7 @@ class APIService {
   ): Promise<{ succeeded: string[], failed: { id: string, error: string }[] }> {
     const succeeded: string[] = []
     const failed: { id: string, error: string }[] = []
-    
+
     for (let i = 0; i < databaseIds.length; i++) {
       const dbId = databaseIds[i]
       if (!dbId) continue
@@ -435,7 +435,7 @@ class APIService {
       }
       onProgress?.(i + 1, databaseIds.length)
     }
-    
+
     return { succeeded, failed }
   }
 
@@ -448,7 +448,7 @@ class APIService {
   ): Promise<{ skipped?: { databaseId: string; name: string; reason: string; details?: string[] }[] }> {
     try {
       onProgress?.(10)
-      
+
       // Call the export endpoint
       const response = await fetch(`${WORKER_API}/api/databases/export`, {
         method: 'POST',
@@ -460,29 +460,29 @@ class APIService {
           databaseIds: databases.map(db => db.uuid)
         })
       })
-      
+
       if (!response.ok) {
         throw new Error(`Failed to export databases: ${response.statusText}`)
       }
-      
+
       onProgress?.(50)
-      
-      const data = await response.json() as { 
+
+      const data = await response.json() as {
         result: Record<string, string>
         skipped?: { databaseId: string; name: string; reason: string; details?: string[] }[]
-        success: boolean 
+        success: boolean
       }
-      
+
       if (!data.success) {
         throw new Error('Export operation failed')
       }
-      
+
       onProgress?.(70)
-      
+
       // Create a ZIP file using JSZip
       const JSZip = (await import('jszip')).default
       const zip = new JSZip()
-      
+
       // Add each database's SQL export to the ZIP
       const exports = data.result
       let fileCount = 0
@@ -493,14 +493,14 @@ class APIService {
           fileCount++
         }
       }
-      
+
       onProgress?.(90)
-      
+
       // Only generate ZIP if we have files
       if (fileCount > 0) {
         // Generate the ZIP file
         const blob = await zip.generateAsync({ type: 'blob' })
-        
+
         // Download the ZIP file
         const url = window.URL.createObjectURL(blob)
         const link = document.createElement('a')
@@ -512,9 +512,9 @@ class APIService {
         document.body.removeChild(link)
         window.URL.revokeObjectURL(url)
       }
-      
+
       onProgress?.(100)
-      
+
       return data.skipped ? { skipped: data.skipped } : {}
     } catch (error) {
       throw new Error(error instanceof Error ? error.message : 'Failed to export databases')
@@ -534,11 +534,11 @@ class APIService {
   ): Promise<D1Database | undefined> {
     try {
       let sqlContent: string
-      
+
       if (typeof source === 'string') {
         // Direct SQL content
         sqlContent = source
-        
+
         // Basic validation for SQL content
         if (!sqlContent.trim()) {
           throw new Error('SQL content cannot be empty')
@@ -549,17 +549,17 @@ class APIService {
         if (!source.name.endsWith('.sql')) {
           throw new Error('Only .sql files are supported')
         }
-        
+
         // Check file size (5GB limit)
         const maxSize = 5 * 1024 * 1024 * 1024 // 5GB
         if (source.size > maxSize) {
           throw new Error('File size exceeds 5GB limit')
         }
-        
+
         // Read the SQL file content
         sqlContent = await source.text()
       }
-      
+
       // Call the import endpoint
       const response = await fetch(`${WORKER_API}/api/databases/import`, {
         method: 'POST',
@@ -574,13 +574,17 @@ class APIService {
           targetDatabaseId: options.targetDatabaseId
         })
       })
-      
+
       if (!response.ok) {
         const error = await parseErrorResponse(response)
         throw new Error(error.error ?? `Import failed: ${response.statusText}`)
       }
-      
+
       const data = await response.json() as ApiResponse<D1Database>
+
+      // Invalidate cache so database list refreshes automatically
+      invalidateDatabaseListCache()
+
       return data.result
     } catch (error) {
       throw new Error(error instanceof Error ? error.message : 'Failed to import database')
@@ -600,7 +604,7 @@ class APIService {
   ): Promise<D1Database> {
     try {
       onProgress?.('validating', 10)
-      
+
       // Call the rename endpoint
       const response = await fetch(`${WORKER_API}/api/databases/${databaseId}/rename`, {
         method: 'POST',
@@ -610,26 +614,26 @@ class APIService {
         credentials: 'include',
         body: JSON.stringify({ newName })
       })
-      
+
       if (!response.ok) {
         const error = await parseErrorResponse(response)
         // Use details field if available (e.g., for FTS5 errors), otherwise use error field
         const errorMessage = error.details ?? error.error ?? error.message ?? `Rename failed: ${response.statusText}`
         throw new Error(errorMessage)
       }
-      
+
       onProgress?.('completed', 100)
-      
+
       const data = await response.json() as { result: D1Database & { oldId: string }, success: boolean }
-      
+
       if (!data.success) {
         throw new Error('Rename operation failed')
       }
-      
+
       // Invalidate caches after rename
       invalidateDatabaseListCache()
       invalidateDatabaseInfoCache(databaseId)
-      
+
       return data.result
     } catch (error) {
       throw new Error(error instanceof Error ? error.message : 'Failed to rename database')
@@ -642,12 +646,12 @@ class APIService {
   async optimizeDatabases(
     databaseIds: string[],
     onProgress?: (completed: number, total: number, operation: string) => void
-  ): Promise<{ 
-    succeeded: { id: string; name: string }[], 
-    failed: { id: string; name: string; error: string }[] 
+  ): Promise<{
+    succeeded: { id: string; name: string }[],
+    failed: { id: string; name: string; error: string }[]
   }> {
     onProgress?.(0, databaseIds.length, 'Starting optimization...')
-    
+
     const response = await fetch(`${WORKER_API}/api/databases/optimize`, {
       method: 'POST',
       headers: {
@@ -656,12 +660,12 @@ class APIService {
       credentials: 'include',
       body: JSON.stringify({ databaseIds })
     })
-    
+
     if (!response.ok) {
       const error = await parseErrorResponse(response)
       throw new Error(error.message ?? error.error ?? `Failed to optimize databases: ${String(response.status)}`)
     }
-    
+
     const data = await response.json() as {
       result: {
         succeeded: { id: string; name: string }[];
@@ -669,9 +673,9 @@ class APIService {
       };
       success: boolean;
     }
-    
+
     onProgress?.(databaseIds.length, databaseIds.length, 'Optimization complete')
-    
+
     return data.result
   }
 
@@ -689,7 +693,7 @@ class APIService {
   ): Promise<D1Database> {
     try {
       onProgress?.('exporting', 10)
-      
+
       // Step 1: Export the source database
       const exportResponse = await fetch(`${WORKER_API}/api/databases/export`, {
         method: 'POST',
@@ -701,18 +705,18 @@ class APIService {
           databaseIds: [sourceDatabaseId]
         })
       })
-      
+
       if (!exportResponse.ok) {
         const error = await parseErrorResponse(exportResponse)
         throw new Error(error.message ?? error.error ?? `Export failed: ${String(exportResponse.status)}`)
       }
-      
-      const exportData = await exportResponse.json() as { 
+
+      const exportData = await exportResponse.json() as {
         result: Record<string, string>
         skipped?: { databaseId: string; name: string; reason: string; details?: string[] }[]
-        success: boolean 
+        success: boolean
       }
-      
+
       // Check if database was skipped (e.g., FTS5 tables)
       if (exportData.skipped?.length) {
         const skipped = exportData.skipped[0]
@@ -723,14 +727,14 @@ class APIService {
           throw new Error(`Cannot export database: ${skipped.reason}`)
         }
       }
-      
+
       const sqlContent = exportData.result[sourceDatabaseId]
       if (!sqlContent) {
         throw new Error('Export returned no data')
       }
-      
+
       onProgress?.('creating', 40)
-      
+
       // Step 2: Create new database
       const createResponse = await fetch(`${WORKER_API}/api/databases`, {
         method: 'POST',
@@ -742,17 +746,17 @@ class APIService {
           name: newDatabaseName
         })
       })
-      
+
       if (!createResponse.ok) {
         const error = await parseErrorResponse(createResponse)
         throw new Error(error.message ?? error.error ?? `Failed to create database: ${String(createResponse.status)}`)
       }
-      
+
       const createData = await createResponse.json() as { result: D1Database }
       const newDatabase = createData.result
-      
+
       onProgress?.('importing', 60)
-      
+
       // Step 3: Import SQL content into the new database
       const importResponse = await fetch(`${WORKER_API}/api/databases/import`, {
         method: 'POST',
@@ -766,7 +770,7 @@ class APIService {
           targetDatabaseId: newDatabase.uuid
         })
       })
-      
+
       if (!importResponse.ok) {
         // Try to delete the created database if import fails
         await fetch(`${WORKER_API}/api/databases/${newDatabase.uuid}`, {
@@ -775,13 +779,13 @@ class APIService {
         }).catch(() => {
           // Ignore cleanup errors
         })
-        
+
         const error = await parseErrorResponse(importResponse)
         throw new Error(error.message ?? error.error ?? `Import failed: ${String(importResponse.status)}`)
       }
-      
+
       onProgress?.('completed', 100)
-      
+
       return newDatabase
     } catch (error) {
       throw new Error(error instanceof Error ? error.message : 'Failed to clone database')
@@ -800,21 +804,21 @@ class APIService {
         return cached
       }
     }
-    
+
     const response = await fetch(`${WORKER_API}/api/tables/${databaseId}/list`, {
       credentials: 'include'
     })
-    
+
     if (!response.ok) {
       throw new Error(`Failed to list tables: ${response.statusText}`)
     }
-    
+
     const data = await response.json() as ApiResponse<TableInfo[]>
     const result = data.result ?? []
-    
+
     // Cache the result
     setTableListCache(databaseId, result)
-    
+
     return result
   }
 
@@ -834,17 +838,17 @@ class APIService {
       `${WORKER_API}/api/tables/${databaseId}/schema/${encodeURIComponent(tableName)}`,
       { credentials: 'include' }
     )
-    
+
     if (!response.ok) {
       throw new Error(`Failed to get table schema: ${response.statusText}`)
     }
-    
+
     const data = await response.json() as ApiResponse<ColumnInfo[]>
     const result = data.result ?? []
-    
+
     // Cache the result
     setCachedTableSchema(databaseId, tableName, result)
-    
+
     return result
   }
 
@@ -862,7 +866,7 @@ class APIService {
     const params = new URLSearchParams()
     params.set('limit', String(limit))
     params.set('offset', String(offset))
-    
+
     // Add filter parameters if provided
     if (filters) {
       for (const [columnName, filter] of Object.entries(filters)) {
@@ -877,16 +881,16 @@ class APIService {
         }
       }
     }
-    
+
     const response = await fetch(
       `${WORKER_API}/api/tables/${databaseId}/data/${encodeURIComponent(tableName)}?${params.toString()}`,
       { credentials: 'include' }
     )
-    
+
     if (!response.ok) {
       throw new Error(`Failed to get table data: ${response.statusText}`)
     }
-    
+
     interface TableDataResponse {
       result?: T[]
       meta?: QueryResult<T>['meta']
@@ -911,11 +915,11 @@ class APIService {
       `${WORKER_API}/api/tables/${databaseId}/indexes/${encodeURIComponent(tableName)}`,
       { credentials: 'include' }
     )
-    
+
     if (!response.ok) {
       throw new Error(`Failed to get table indexes: ${response.statusText}`)
     }
-    
+
     const data = await response.json() as ApiResponse<IndexInfo[]>
     return data.result ?? []
   }
@@ -946,18 +950,18 @@ class APIService {
       `${WORKER_API}/api/tables/${databaseId}/foreign-keys/${encodeURIComponent(tableName)}`,
       { credentials: 'include' }
     )
-    
+
     if (!response.ok) {
       throw new Error(`Failed to get table foreign keys: ${response.statusText}`)
     }
-    
+
     interface ForeignKeyResult { foreignKeys: { column: string; refTable: string; refColumn: string; onDelete: string | null; onUpdate: string | null }[] }
     const data = await response.json() as ApiResponse<ForeignKeyResult>
     const result = data.result?.foreignKeys ?? []
-    
+
     // Cache the result
     setCachedTableFK(databaseId, tableName, result)
-    
+
     return result
   }
 
@@ -982,17 +986,17 @@ class APIService {
       `${WORKER_API}/api/tables/${databaseId}/dependencies?tables=${tablesParam}`,
       { credentials: 'include' }
     )
-    
+
     if (!response.ok) {
       throw new Error(`Failed to get table dependencies: ${response.statusText}`)
     }
-    
+
     const data = await response.json() as ApiResponse<TableDependenciesResponse>
     const result = data.result ?? {}
-    
+
     // Cache the result
     setCachedTableDependencies(databaseId, tableNames, result)
-    
+
     return result
   }
 
@@ -1011,18 +1015,18 @@ class APIService {
         body: JSON.stringify({ newName })
       }
     )
-    
+
     if (!response.ok) {
       const error = await parseErrorResponse(response)
       throw new Error(error.error ?? `Failed to rename table: ${response.statusText}`)
     }
-    
+
     const data = await response.json() as ApiResponse<TableInfo>
     if (!data.result) throw new Error('No result in response')
-    
+
     // Invalidate cache since table list changed
     invalidateTableListCache(databaseId)
-    
+
     return data.result
   }
 
@@ -1037,11 +1041,11 @@ class APIService {
         credentials: 'include'
       }
     )
-    
+
     if (!response.ok) {
       throw new Error(`Failed to delete table: ${response.statusText}`)
     }
-    
+
     // Invalidate caches since table list and relationships changed
     invalidateTableListCache(databaseId)
     invalidateCascadeCache(databaseId)
@@ -1077,17 +1081,17 @@ class APIService {
         body: JSON.stringify(columnDef)
       }
     )
-    
+
     if (!response.ok) {
       const error = await parseErrorResponse(response)
       throw new Error(error.error ?? `Failed to add column: ${response.statusText}`)
     }
-    
+
     const data = await response.json() as ApiResponse<ColumnInfo[]>
-    
+
     // Invalidate schema cache
     invalidateTableSchemaCache(databaseId, tableName)
-    
+
     return data.result ?? []
   }
 
@@ -1111,12 +1115,12 @@ class APIService {
         body: JSON.stringify({ newName })
       }
     )
-    
+
     if (!response.ok) {
       const error = await parseErrorResponse(response)
       throw new Error(error.error ?? `Failed to rename column: ${response.statusText}`)
     }
-    
+
     // Invalidate schema cache
     invalidateTableSchemaCache(databaseId, tableName)
   }
@@ -1145,17 +1149,17 @@ class APIService {
         body: JSON.stringify(updates)
       }
     )
-    
+
     if (!response.ok) {
       const error = await parseErrorResponse(response)
       throw new Error(error.error ?? `Failed to modify column: ${response.statusText}`)
     }
-    
+
     const data = await response.json() as ApiResponse<ColumnInfo[]>
-    
+
     // Invalidate schema cache
     invalidateTableSchemaCache(databaseId, tableName)
-    
+
     return data.result ?? []
   }
 
@@ -1174,12 +1178,12 @@ class APIService {
         credentials: 'include'
       }
     )
-    
+
     if (!response.ok) {
       const error = await parseErrorResponse(response)
       throw new Error(error.error ?? `Failed to delete column: ${response.statusText}`)
     }
-    
+
     // Invalidate schema cache
     invalidateTableSchemaCache(databaseId, tableName)
   }
@@ -1194,7 +1198,7 @@ class APIService {
   ): Promise<{ succeeded: string[], failed: { name: string, error: string }[] }> {
     const succeeded: string[] = []
     const failed: { name: string, error: string }[] = []
-    
+
     for (let i = 0; i < tableNames.length; i++) {
       const tableName = tableNames[i]
       if (!tableName) continue
@@ -1209,7 +1213,7 @@ class APIService {
       }
       onProgress?.(i + 1, tableNames.length)
     }
-    
+
     return { succeeded, failed }
   }
 
@@ -1228,18 +1232,18 @@ class APIService {
         body: JSON.stringify({ newName })
       }
     )
-    
+
     if (!response.ok) {
       const error = await parseErrorResponse(response)
       throw new Error(error.error ?? `Failed to clone table: ${response.statusText}`)
     }
-    
+
     const data = await response.json() as ApiResponse<TableInfo>
     if (!data.result) throw new Error('No result in response')
-    
+
     // Invalidate cache since table list changed
     invalidateTableListCache(databaseId)
-    
+
     return data.result
   }
 
@@ -1253,7 +1257,7 @@ class APIService {
   ): Promise<{ succeeded: { oldName: string, newName: string }[], failed: { name: string, error: string }[] }> {
     const succeeded: { oldName: string, newName: string }[] = []
     const failed: { name: string, error: string }[] = []
-    
+
     for (let i = 0; i < tables.length; i++) {
       const table = tables[i]
       if (!table) continue
@@ -1268,7 +1272,7 @@ class APIService {
       }
       onProgress?.(i + 1, tables.length)
     }
-    
+
     return { succeeded, failed }
   }
 
@@ -1294,12 +1298,12 @@ class APIService {
         credentials: 'include'
       }
     )
-    
+
     if (!response.ok) {
       const error = await parseErrorResponse(response)
       throw new Error(error.error ?? `Failed to check STRICT compatibility: ${response.statusText}`)
     }
-    
+
     const data = await response.json() as ApiResponse<{
       compatible: boolean
       isAlreadyStrict: boolean
@@ -1312,7 +1316,7 @@ class APIService {
       blockers: string[]
     }>
     if (!data.result) throw new Error('No result in response')
-    
+
     return data.result
   }
 
@@ -1331,18 +1335,18 @@ class APIService {
         credentials: 'include'
       }
     )
-    
+
     if (!response.ok) {
       const error = await parseErrorResponse(response)
       throw new Error(error.error ?? `Failed to convert table to STRICT: ${response.statusText}`)
     }
-    
+
     const data = await response.json() as ApiResponse<TableInfo>
     if (!data.result) throw new Error('No result in response')
-    
+
     // Invalidate cache since table metadata changed
     invalidateTableListCache(databaseId)
-    
+
     return data.result
   }
 
@@ -1355,17 +1359,17 @@ class APIService {
         `${WORKER_API}/api/tables/${databaseId}/${encodeURIComponent(tableName)}/export?format=${format}`,
         { credentials: 'include' }
       )
-      
+
       if (!response.ok) {
         throw new Error(`Failed to export table: ${response.statusText}`)
       }
-      
+
       const data = await response.json() as { result: { content: string, filename: string }, success: boolean }
-      
+
       if (!data.success) {
         throw new Error('Export operation failed')
       }
-      
+
       // Download the file
       const mimeType = format === 'csv' ? 'text/csv' : format === 'json' ? 'application/json' : 'text/plain'
       const blob = new Blob([data.result.content], { type: mimeType })
@@ -1393,10 +1397,10 @@ class APIService {
   ): Promise<void> {
     try {
       onProgress?.(10)
-      
+
       // Fetch all table exports
       const exports: { name: string, content: string }[] = []
-      
+
       for (let i = 0; i < tableNames.length; i++) {
         const tableName = tableNames[i]
         if (!tableName) continue
@@ -1404,41 +1408,41 @@ class APIService {
           `${WORKER_API}/api/tables/${databaseId}/${encodeURIComponent(tableName)}/export?format=${format}`,
           { credentials: 'include' }
         )
-        
+
         if (!response.ok) {
           throw new Error(`Failed to export table ${tableName}: ${response.statusText}`)
         }
-        
+
         const data = await response.json() as { result: { content: string, filename: string }, success: boolean }
-        
+
         if (!data.success) {
           throw new Error(`Export operation failed for table ${tableName}`)
         }
-        
+
         exports.push({
           name: data.result.filename,
           content: data.result.content
         })
-        
+
         onProgress?.(10 + (i + 1) / tableNames.length * 60)
       }
-      
+
       onProgress?.(70)
-      
+
       // Create a ZIP file using JSZip
       const JSZip = (await import('jszip')).default
       const zip = new JSZip()
-      
+
       // Add each table's export to the ZIP
       for (const exp of exports) {
         zip.file(exp.name, exp.content)
       }
-      
+
       onProgress?.(90)
-      
+
       // Generate the ZIP file
       const blob = await zip.generateAsync({ type: 'blob' })
-      
+
       // Download the ZIP file
       const url = window.URL.createObjectURL(blob)
       const link = document.createElement('a')
@@ -1449,7 +1453,7 @@ class APIService {
       link.click()
       document.body.removeChild(link)
       window.URL.revokeObjectURL(url)
-      
+
       onProgress?.(100)
     } catch (error) {
       throw new Error(error instanceof Error ? error.message : 'Failed to export tables')
@@ -1473,11 +1477,11 @@ class APIService {
       credentials: 'include',
       body: JSON.stringify({ query, params, skipValidation })
     })
-    
+
     if (!response.ok) {
       // Handle cases where response might not be JSON (e.g., Cloudflare WAF blocking)
       let errorMessage = 'Query execution failed'
-      
+
       // Check for specific HTTP status codes first
       if (response.status === 403) {
         errorMessage = 'Request blocked by security rules. If you\'re testing SQL injection, this is expected - Cloudflare WAF is protecting your database.'
@@ -1510,7 +1514,7 @@ class APIService {
       }
       throw new Error(errorMessage)
     }
-    
+
     const data = await response.json() as ApiResponse<QueryResult<T>>
     if (!data.result) throw new Error('No result in response')
     return data.result
@@ -1531,11 +1535,11 @@ class APIService {
       credentials: 'include',
       body: JSON.stringify({ queries })
     })
-    
+
     if (!response.ok) {
       throw new Error(`Batch query failed: ${response.statusText}`)
     }
-    
+
     const data = await response.json() as ApiResponse<QueryResult[]>
     return data.result ?? []
   }
@@ -1548,11 +1552,11 @@ class APIService {
       `${WORKER_API}/api/query/${databaseId}/history?limit=${String(limit)}`,
       { credentials: 'include' }
     )
-    
+
     if (!response.ok) {
       throw new Error(`Failed to get query history: ${response.statusText}`)
     }
-    
+
     const data = await response.json() as ApiResponse<QueryHistoryEntry[]>
     return data.result ?? []
   }
@@ -1565,9 +1569,9 @@ class APIService {
       `${WORKER_API}/api/databases/colors`,
       this.getFetchOptions()
     )
-    
+
     this.handleResponse(response)
-    
+
     const data = await response.json() as ApiResponse<Record<string, DatabaseColor>>
     return data.result ?? {}
   }
@@ -1586,15 +1590,15 @@ class APIService {
         body: JSON.stringify({ color })
       })
     )
-    
+
     if (!response.ok) {
       const data = await parseErrorResponse(response) as ApiErrorResponse & { requiresUpgrade?: boolean }
-      
+
       // Check if upgrade is required
       if (data.requiresUpgrade) {
         throw new Error('Database colors feature requires a schema upgrade. See the upgrade instructions in the README.')
       }
-      
+
       throw new Error(data.message ?? data.error ?? `Failed to update color: ${String(response.status)}`)
     }
   }
@@ -1607,9 +1611,9 @@ class APIService {
       `${WORKER_API}/api/tables/${databaseId}/colors`,
       this.getFetchOptions()
     )
-    
+
     this.handleResponse(response)
-    
+
     const data = await response.json() as ApiResponse<Record<string, DatabaseColor>>
     return data.result ?? {}
   }
@@ -1628,15 +1632,15 @@ class APIService {
         body: JSON.stringify({ color })
       })
     )
-    
+
     if (!response.ok) {
       const data = await parseErrorResponse(response) as ApiErrorResponse & { requiresUpgrade?: boolean }
-      
+
       // Check if upgrade is required
       if (data.requiresUpgrade) {
         throw new Error('Table colors feature requires a schema upgrade. See the upgrade instructions in the README.')
       }
-      
+
       throw new Error(data.message ?? data.error ?? `Failed to update table color: ${String(response.status)}`)
     }
   }
@@ -1649,16 +1653,16 @@ export const listTables = (databaseId: string, skipCache = false): Promise<Table
 export const getTableSchema = (databaseId: string, tableName: string, skipCache = false): Promise<ColumnInfo[]> => api.getTableSchema(databaseId, tableName, skipCache)
 export const getTableForeignKeys = (databaseId: string, tableName: string, skipCache = false): Promise<{ column: string; refTable: string; refColumn: string; onDelete: string | null; onUpdate: string | null }[]> => api.getTableForeignKeys(databaseId, tableName, skipCache)
 export const getTableData = <T = Record<string, unknown>>(
-  databaseId: string, 
-  tableName: string, 
-  limit?: number, 
+  databaseId: string,
+  tableName: string,
+  limit?: number,
   offset?: number,
   filters?: Record<string, FilterCondition>
 ): Promise<QueryResult<T>> => api.getTableData<T>(databaseId, tableName, limit, offset, filters)
 export const executeQuery = <T = Record<string, unknown>>(
-  databaseId: string, 
-  query: string, 
-  params?: unknown[], 
+  databaseId: string,
+  query: string,
+  params?: unknown[],
   skipValidation?: boolean
 ): Promise<QueryResult<T>> => api.executeQuery<T>(databaseId, query, params, skipValidation)
 export const createDatabase = (name: string, location?: string): Promise<D1Database> => api.createDatabase(name, location)
@@ -1676,19 +1680,19 @@ export interface SavedQuery {
 }
 
 export const getSavedQueries = async (databaseId?: string): Promise<SavedQuery[]> => {
-  const url = databaseId 
+  const url = databaseId
     ? `${WORKER_API}/api/saved-queries?database_id=${encodeURIComponent(databaseId)}`
     : `${WORKER_API}/api/saved-queries`
-  
+
   const response = await fetch(url, {
     method: 'GET',
     credentials: 'include'
   })
-  
+
   if (!response.ok) {
     throw new Error(`Failed to fetch saved queries: ${String(response.status)}`)
   }
-  
+
   const data = await response.json() as { result: SavedQuery[], success: boolean }
   return data.result
 }
@@ -1712,12 +1716,12 @@ export const createSavedQuery = async (
       database_id: databaseId
     })
   })
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response) as { error?: string; message?: string }
     throw new Error(error.message ?? error.error ?? `Failed to save query: ${String(response.status)}`)
   }
-  
+
   const data = await response.json() as { result: SavedQuery, success: boolean }
   return data.result
 }
@@ -1738,12 +1742,12 @@ export const updateSavedQuery = async (
     credentials: 'include',
     body: JSON.stringify(updates)
   })
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response)
     throw new Error(error.error ?? `Failed to update query: ${String(response.status)}`)
   }
-  
+
   const data = await response.json() as { result: SavedQuery, success: boolean }
   return data.result
 }
@@ -1753,7 +1757,7 @@ export const deleteSavedQuery = async (id: number): Promise<void> => {
     method: 'DELETE',
     credentials: 'include'
   })
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response)
     throw new Error(error.error ?? `Failed to delete query: ${String(response.status)}`)
@@ -1765,12 +1769,12 @@ export const getUndoHistory = async (databaseId: string): Promise<UndoHistoryEnt
   const response = await fetch(`${WORKER_API}/api/undo/${databaseId}/history`, {
     credentials: 'include'
   })
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response)
     throw new Error(error.error ?? `Failed to get undo history: ${String(response.status)}`)
   }
-  
+
   const data = await response.json() as { history: UndoHistoryEntry[], success: boolean }
   return data.history
 }
@@ -1780,12 +1784,12 @@ export const restoreUndo = async (databaseId: string, undoId: number): Promise<s
     method: 'POST',
     credentials: 'include'
   })
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response)
     throw new Error(error.details ?? error.error ?? `Failed to restore: ${String(response.status)}`)
   }
-  
+
   const data = await response.json() as { message: string, success: boolean }
   return data.message
 }
@@ -1795,12 +1799,12 @@ export const clearUndoHistory = async (databaseId: string): Promise<number> => {
     method: 'DELETE',
     credentials: 'include'
   })
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response)
     throw new Error(error.error ?? `Failed to clear undo history: ${String(response.status)}`)
   }
-  
+
   const data = await response.json() as { cleared: number, success: boolean }
   return data.cleared
 }
@@ -1820,12 +1824,12 @@ export const deleteRowsWithUndo = async (
     credentials: 'include',
     body: JSON.stringify({ whereClause, description })
   })
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response)
     throw new Error(error.error ?? `Failed to delete rows: ${String(response.status)}`)
   }
-  
+
   const data = await response.json() as { rowsDeleted: number, success: boolean }
   return data.rowsDeleted
 }
@@ -1900,17 +1904,17 @@ export const simulateCascadeImpact = async (
     credentials: 'include',
     body: JSON.stringify({ targetTable, whereClause })
   })
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response)
     throw new Error(error.error ?? `Failed to simulate cascade: ${String(response.status)}`)
   }
-  
+
   const data = await response.json() as { result: CascadeSimulationResult, success: boolean }
-  
+
   // Cache the result
   setCachedCascadeSimulation(databaseId, targetTable, whereClause, data.result)
-  
+
   return data.result
 }
 
@@ -1918,7 +1922,7 @@ export const simulateCascadeImpact = async (
 export interface ForeignKeyGraphNode {
   id: string
   label: string
-  columns: {name: string; type: string; isPK: boolean}[]
+  columns: { name: string; type: string; isPK: boolean }[]
   rowCount: number
 }
 
@@ -2045,7 +2049,7 @@ function delay(ms: number): Promise<void> {
  * @param includeSchemas - Include full column schemas for each table (for ER Diagram - avoids N+1 queries)
  */
 export const getAllForeignKeys = async (
-  databaseId: string, 
+  databaseId: string,
   includeCycles = false,
   includeSchemas = false
 ): Promise<ForeignKeyGraphWithCycles> => {
@@ -2054,49 +2058,49 @@ export const getAllForeignKeys = async (
   if (cached) {
     return cached
   }
-  
+
   // Build query params
   const params = new URLSearchParams()
   if (includeCycles) params.set('includeCycles', 'true')
   if (includeSchemas) params.set('includeSchemas', 'true')
   const queryString = params.toString()
   const url = `${WORKER_API}/api/tables/${databaseId}/foreign-keys${queryString ? `?${queryString}` : ''}`
-  
+
   // Retry with exponential backoff for rate limits
   const maxRetries = 3
   let lastError: Error | null = null
-  
+
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     if (attempt > 0) {
       // Exponential backoff: 2s, 4s, 8s
       const backoffMs = Math.min(2000 * Math.pow(2, attempt - 1), 8000)
       await delay(backoffMs)
     }
-    
+
     const response = await fetch(url, {
       method: 'GET',
       credentials: 'include'
     })
-    
+
     // Handle rate limit with retry
     if (response.status === 429) {
       lastError = new Error('Rate limited (429). Please wait a moment and try again.')
       continue // Retry after backoff
     }
-    
+
     if (!response.ok) {
       const error = await parseErrorResponse(response)
       throw new Error(error.error ?? `Failed to get foreign keys: ${String(response.status)}`)
     }
-    
+
     const data = await response.json() as { result: ForeignKeyGraphWithCycles, success: boolean }
-    
+
     // Cache the result
     setCachedFkData(databaseId, includeCycles, includeSchemas, data.result)
-    
+
     return data.result
   }
-  
+
   // All retries exhausted
   throw lastError ?? new Error('Failed to get foreign keys after multiple retries')
 }
@@ -2116,17 +2120,17 @@ export const getCircularDependencies = async (databaseId: string): Promise<Circu
   if (cachedWithoutSchemas?.cycles) {
     return cachedWithoutSchemas.cycles
   }
-  
+
   const response = await fetch(`${WORKER_API}/api/tables/${databaseId}/circular-dependencies`, {
     method: 'GET',
     credentials: 'include'
   })
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response)
     throw new Error(error.error ?? `Failed to get circular dependencies: ${String(response.status)}`)
   }
-  
+
   const data = await response.json() as { result: CircularDependencyCycle[], success: boolean }
   return data.result
 }
@@ -2147,12 +2151,12 @@ export const simulateAddForeignKey = async (
     credentials: 'include',
     body: JSON.stringify({ sourceTable, targetTable })
   })
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response)
     throw new Error(error.error ?? `Failed to simulate foreign key: ${String(response.status)}`)
   }
-  
+
   const data = await response.json() as { result: SimulateForeignKeyResult, success: boolean }
   return data.result
 }
@@ -2180,12 +2184,12 @@ export const addForeignKey = async (
     credentials: 'include',
     body: JSON.stringify(params)
   })
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response) as { error?: string; message?: string }
     throw new Error(error.message ?? error.error ?? `Failed to add foreign key: ${String(response.status)}`)
   }
-  
+
   // Invalidate all FK-related caches after modification
   invalidateFkCache(databaseId)
   invalidateCascadeCache(databaseId)
@@ -2211,12 +2215,12 @@ export const modifyForeignKey = async (
     credentials: 'include',
     body: JSON.stringify(params)
   })
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response) as { error?: string; message?: string }
     throw new Error(error.message ?? error.error ?? `Failed to modify foreign key: ${String(response.status)}`)
   }
-  
+
   // Invalidate all FK-related caches after modification
   invalidateFkCache(databaseId)
   invalidateCascadeCache(databaseId)
@@ -2234,12 +2238,12 @@ export const deleteForeignKey = async (
     method: 'DELETE',
     credentials: 'include'
   })
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response) as { error?: string; message?: string }
     throw new Error(error.message ?? error.error ?? `Failed to delete foreign key: ${String(response.status)}`)
   }
-  
+
   // Invalidate all FK-related caches after modification
   invalidateFkCache(databaseId)
   invalidateCascadeCache(databaseId)
@@ -2267,22 +2271,22 @@ export const listFTS5Tables = async (databaseId: string, skipCache = false): Pro
       return cached
     }
   }
-  
+
   const response = await fetch(`${WORKER_API}/api/fts5/${databaseId}/list`, {
     method: 'GET',
     credentials: 'include'
   })
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response)
     throw new Error(error.error ?? `Failed to list FTS5 tables: ${String(response.status)}`)
   }
-  
+
   const data = await response.json() as { result: FTS5TableInfo[], success: boolean }
-  
+
   // Cache the result
   setFTS5Cache(databaseId, data.result)
-  
+
   return data.result
 }
 
@@ -2301,17 +2305,17 @@ export const createFTS5Table = async (
     credentials: 'include',
     body: JSON.stringify(config)
   })
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response)
     throw new Error(error.error ?? `Failed to create FTS5 table: ${String(response.status)}`)
   }
-  
+
   const data = await response.json() as { result: { tableName: string; created: boolean }, success: boolean }
-  
+
   // Invalidate FTS5 cache
   invalidateFTS5Cache(databaseId)
-  
+
   return data.result
 }
 
@@ -2330,20 +2334,20 @@ export const createFTS5FromTable = async (
     credentials: 'include',
     body: JSON.stringify(params)
   })
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response)
     throw new Error(error.error ?? `Failed to create FTS5 from table: ${String(response.status)}`)
   }
-  
-  const data = await response.json() as { 
-    result: { ftsTableName: string; created: boolean; triggersCreated: boolean }, 
-    success: boolean 
+
+  const data = await response.json() as {
+    result: { ftsTableName: string; created: boolean; triggersCreated: boolean },
+    success: boolean
   }
-  
+
   // Invalidate FTS5 cache
   invalidateFTS5Cache(databaseId)
-  
+
   return data.result
 }
 
@@ -2358,12 +2362,12 @@ export const getFTS5Config = async (
     method: 'GET',
     credentials: 'include'
   })
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response)
     throw new Error(error.error ?? `Failed to get FTS5 config: ${String(response.status)}`)
   }
-  
+
   const data = await response.json() as { result: Partial<FTS5TableConfig>, success: boolean }
   return data.result
 }
@@ -2379,12 +2383,12 @@ export const deleteFTS5Table = async (
     method: 'DELETE',
     credentials: 'include'
   })
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response)
     throw new Error(error.error ?? `Failed to delete FTS5 table: ${String(response.status)}`)
   }
-  
+
   // Invalidate FTS5 cache
   invalidateFTS5Cache(databaseId)
 }
@@ -2408,20 +2412,20 @@ export const convertFTS5ToTable = async (
     credentials: 'include',
     body: JSON.stringify(options)
   })
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response)
     throw new Error(error.error ?? `Failed to convert FTS5 to table: ${String(response.status)}`)
   }
-  
-  const data = await response.json() as { 
-    result: { tableName: string; rowsCopied: number; originalDeleted: boolean }, 
-    success: boolean 
+
+  const data = await response.json() as {
+    result: { tableName: string; rowsCopied: number; originalDeleted: boolean },
+    success: boolean
   }
-  
+
   // Invalidate cache since table list changed (new table created, possibly original deleted)
   invalidateTableListCache(databaseId)
-  
+
   return data.result
 }
 
@@ -2436,12 +2440,12 @@ export const rebuildFTS5Index = async (
     method: 'POST',
     credentials: 'include'
   })
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response)
     throw new Error(error.error ?? `Failed to rebuild FTS5 index: ${String(response.status)}`)
   }
-  
+
   const data = await response.json() as { result: { rebuilt: boolean }, success: boolean }
   return data.result
 }
@@ -2457,12 +2461,12 @@ export const optimizeFTS5 = async (
     method: 'POST',
     credentials: 'include'
   })
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response)
     throw new Error(error.error ?? `Failed to optimize FTS5 index: ${String(response.status)}`)
   }
-  
+
   const data = await response.json() as { result: { optimized: boolean }, success: boolean }
   return data.result
 }
@@ -2483,12 +2487,12 @@ export const searchFTS5 = async (
     credentials: 'include',
     body: JSON.stringify(params)
   })
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response)
     throw new Error(error.error ?? `Failed to search FTS5 table: ${String(response.status)}`)
   }
-  
+
   const data = await response.json() as { result: FTS5SearchResponse, success: boolean }
   return data.result
 }
@@ -2504,12 +2508,12 @@ export const getFTS5Stats = async (
     method: 'GET',
     credentials: 'include'
   })
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response)
     throw new Error(error.error ?? `Failed to get FTS5 stats: ${String(response.status)}`)
   }
-  
+
   const data = await response.json() as { result: FTS5Stats, success: boolean }
   return data.result
 }
@@ -2650,27 +2654,27 @@ export const analyzeIndexes = async (databaseId: string, skipCache = false): Pro
       return cached.data
     }
   }
-  
+
   const response = await fetch(`${WORKER_API}/api/indexes/${databaseId}/analyze`, {
     method: 'GET',
     credentials: 'include'
   })
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response)
     throw new Error(error.error ?? `Failed to analyze indexes: ${String(response.status)}`)
   }
-  
+
   const data = await response.json() as IndexAnalysisResult & { success: boolean }
   const result = {
     recommendations: data.recommendations,
     existingIndexes: data.existingIndexes,
     statistics: data.statistics
   }
-  
+
   // Cache the result
   indexAnalysisCache.set(databaseId, { data: result, timestamp: Date.now() })
-  
+
   return result
 }
 
@@ -2678,7 +2682,7 @@ export const analyzeIndexes = async (databaseId: string, skipCache = false): Pro
  * Create an index using the suggested SQL
  */
 export const createIndex = async (
-  databaseId: string, 
+  databaseId: string,
   sql: string,
   metadata?: {
     tableName?: string;
@@ -2692,19 +2696,19 @@ export const createIndex = async (
       'Content-Type': 'application/json'
     },
     credentials: 'include',
-    body: JSON.stringify({ 
-      sql, 
+    body: JSON.stringify({
+      sql,
       tableName: metadata?.tableName,
       indexName: metadata?.indexName,
       columns: metadata?.columns
     })
   })
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response) as { error?: string; message?: string }
     throw new Error(error.message ?? error.error ?? `Failed to create index: ${String(response.status)}`)
   }
-  
+
   // Invalidate cache after creating an index
   invalidateIndexAnalysisCache(databaseId)
 }
@@ -2793,12 +2797,12 @@ export const getJobList = async (options?: {
       cache: 'no-store'
     }
   )
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response)
     throw new Error(error.error ?? `Failed to get job list: ${String(response.status)}`)
   }
-  
+
   const data = await response.json() as { result: JobListResponse, success: boolean }
   return data.result
 }
@@ -2815,12 +2819,12 @@ export const getJobEvents = async (jobId: string): Promise<JobEventsResponse> =>
       cache: 'no-store'
     }
   )
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response)
     throw new Error(error.error ?? `Failed to get job events: ${String(response.status)}`)
   }
-  
+
   const data = await response.json() as { result: JobEventsResponse, success: boolean }
   return data.result
 }
@@ -2837,12 +2841,12 @@ export const getJobStatus = async (jobId: string): Promise<JobListItem> => {
       cache: 'no-store'
     }
   )
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response)
     throw new Error(error.error ?? `Failed to get job status: ${String(response.status)}`)
   }
-  
+
   const data = await response.json() as { result: JobListItem, success: boolean }
   return data.result
 }
@@ -2889,7 +2893,7 @@ export const getCurrentBookmark = async (databaseId: string, skipCache = false):
       return cached.bookmark
     }
   }
-  
+
   const response = await fetch(
     `${WORKER_API}/api/time-travel/${databaseId}/bookmark`,
     {
@@ -2898,20 +2902,20 @@ export const getCurrentBookmark = async (databaseId: string, skipCache = false):
       cache: 'no-store'
     }
   )
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response)
     throw new Error(error.error ?? `Failed to get bookmark: ${String(response.status)}`)
   }
-  
+
   const data = await response.json() as { result: BookmarkInfo, success: boolean }
-  
+
   // Update cache with bookmark data
   setTimeTravelCache(databaseId, {
     bookmark: data.result,
     bookmarkLoaded: true
   })
-  
+
   return data.result
 }
 
@@ -2931,31 +2935,31 @@ export const getBookmarkHistory = async (
       return cached.history
     }
   }
-  
+
   const params = new URLSearchParams()
   if (limit) params.set('limit', limit.toString())
-  
+
   const url = `${WORKER_API}/api/time-travel/${databaseId}/history${params.toString() ? `?${params.toString()}` : ''}`
-  
+
   const response = await fetch(url, {
     method: 'GET',
     credentials: 'include',
     cache: 'no-store'
   })
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response)
     throw new Error(error.error ?? `Failed to get bookmark history: ${String(response.status)}`)
   }
-  
+
   const data = await response.json() as BookmarkHistoryResponse
-  
+
   // Update cache with history data
   setTimeTravelCache(databaseId, {
     history: data.result,
     historyLoaded: true
   })
-  
+
   return data.result
 }
 
@@ -2977,17 +2981,17 @@ export const captureBookmark = async (
       body: JSON.stringify({ description })
     }
   )
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response)
     throw new Error(error.error ?? `Failed to capture bookmark: ${String(response.status)}`)
   }
-  
+
   const data = await response.json() as { result: BookmarkInfo, success: boolean }
-  
+
   // Invalidate Time Travel cache since new bookmark was captured
   invalidateTimeTravelCache(databaseId)
-  
+
   return data.result
 }
 
@@ -3005,12 +3009,12 @@ export const deleteBookmarkEntry = async (
       credentials: 'include'
     }
   )
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response)
     throw new Error(error.error ?? `Failed to delete bookmark: ${String(response.status)}`)
   }
-  
+
   // Invalidate Time Travel cache since history changed
   invalidateTimeTravelCache(databaseId)
 }
@@ -3036,7 +3040,7 @@ export const generateTimeTravelInfoCommand = (databaseName: string): string => {
 /**
  * Source of the R2 backup - tracks what operation triggered the backup
  */
-export type R2BackupSource = 
+export type R2BackupSource =
   | 'manual'           // User-initiated from database card
   | 'rename_database'  // Before database rename operation
   | 'strict_mode'      // Before enabling STRICT mode on table
@@ -3092,18 +3096,18 @@ export const getR2BackupStatus = async (skipCache = false): Promise<R2BackupStat
     `${WORKER_API}/api/r2-backup/status`,
     { credentials: 'include' }
   )
-  
+
   if (!response.ok) {
     const result = { configured: false, bucketAvailable: false, doAvailable: false }
     r2BackupStatusCache = { data: result, timestamp: Date.now() }
     return result
   }
-  
+
   const data = await response.json() as { result: R2BackupStatus, success: boolean }
-  
+
   // Cache the result
   r2BackupStatusCache = { data: data.result, timestamp: Date.now() }
-  
+
   return data.result
 }
 
@@ -3122,12 +3126,12 @@ export const listR2Backups = async (databaseId: string): Promise<R2BackupListIte
     `${WORKER_API}/api/r2-backup/${databaseId}/list`,
     { credentials: 'include' }
   )
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response)
     throw new Error(error.error ?? `Failed to list R2 backups: ${String(response.status)}`)
   }
-  
+
   const data = await response.json() as { result: R2BackupListItem[], success: boolean }
   return data.result
 }
@@ -3149,12 +3153,12 @@ export const listOrphanedR2Backups = async (): Promise<OrphanedBackupGroup[]> =>
     `${WORKER_API}/api/r2-backup/orphaned`,
     { credentials: 'include' }
   )
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response)
     throw new Error(error.error ?? `Failed to list orphaned backups: ${String(response.status)}`)
   }
-  
+
   const data = await response.json() as { result: OrphanedBackupGroup[], success: boolean }
   return data.result
 }
@@ -3165,17 +3169,17 @@ export const listOrphanedR2Backups = async (): Promise<OrphanedBackupGroup[]> =>
 export const deleteAllR2Backups = async (databaseId: string): Promise<{ deleted: number; failed: number }> => {
   const response = await fetch(
     `${WORKER_API}/api/r2-backup/${databaseId}/all`,
-    { 
+    {
       method: 'DELETE',
-      credentials: 'include' 
+      credentials: 'include'
     }
   )
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response)
     throw new Error(error.error ?? `Failed to delete backups: ${String(response.status)}`)
   }
-  
+
   const data = await response.json() as { result: { deleted: number; failed: number }, success: boolean }
   return data.result
 }
@@ -3197,12 +3201,12 @@ export const backupToR2 = async (
       body: JSON.stringify({ source, databaseName })
     }
   )
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response)
     throw new Error(error.error ?? `Failed to start R2 backup: ${String(response.status)}`)
   }
-  
+
   const data = await response.json() as { result: R2BackupJobResponse, success: boolean }
   return data.result
 }
@@ -3226,12 +3230,12 @@ export const backupTableToR2 = async (
       body: JSON.stringify({ tableName, format, source, databaseName })
     }
   )
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response)
     throw new Error(error.error ?? `Failed to start table backup: ${String(response.status)}`)
   }
-  
+
   const data = await response.json() as { result: R2BackupJobResponse, success: boolean }
   return data.result
 }
@@ -3252,12 +3256,12 @@ export const restoreFromR2 = async (
       body: JSON.stringify({ backupPath })
     }
   )
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response)
     throw new Error(error.error ?? `Failed to start restore: ${String(response.status)}`)
   }
-  
+
   const data = await response.json() as { result: R2BackupJobResponse, success: boolean }
   return data.result
 }
@@ -3278,7 +3282,7 @@ export const deleteR2Backup = async (
   if (path) {
     url += `?path=${encodeURIComponent(path)}`
   }
-  
+
   const response = await fetch(
     url,
     {
@@ -3286,7 +3290,7 @@ export const deleteR2Backup = async (
       credentials: 'include'
     }
   )
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response)
     throw new Error(error.error ?? `Failed to delete backup: ${String(response.status)}`)
@@ -3315,12 +3319,12 @@ export const bulkDeleteR2Backups = async (
       body: JSON.stringify({ timestamps })
     }
   )
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response)
     throw new Error(error.error ?? `Failed to bulk delete backups: ${String(response.status)}`)
   }
-  
+
   const data = await response.json() as { result: BulkDeleteResult, success: boolean }
   return data.result
 }
@@ -3340,7 +3344,7 @@ export const downloadR2Backup = async (
       credentials: 'include'
     }
   )
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response)
     throw new Error(error.error ?? `Failed to download backup: ${String(response.status)}`)
@@ -3422,12 +3426,12 @@ export const listScheduledBackups = async (): Promise<ScheduledBackup[]> => {
     `${WORKER_API}/api/scheduled-backups`,
     { credentials: 'include' }
   )
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response)
     throw new Error(error.error ?? `Failed to list scheduled backups: ${String(response.status)}`)
   }
-  
+
   const data = await response.json() as { result: ScheduledBackup[], success: boolean }
   return data.result
 }
@@ -3440,12 +3444,12 @@ export const getScheduledBackup = async (databaseId: string): Promise<ScheduledB
     `${WORKER_API}/api/scheduled-backups/${databaseId}`,
     { credentials: 'include' }
   )
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response)
     throw new Error(error.error ?? `Failed to get scheduled backup: ${String(response.status)}`)
   }
-  
+
   const data = await response.json() as { result: ScheduledBackup | null, success: boolean }
   return data.result
 }
@@ -3463,12 +3467,12 @@ export const saveScheduledBackup = async (input: ScheduledBackupInput): Promise<
       body: JSON.stringify(input)
     }
   )
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response)
     throw new Error(error.error ?? `Failed to save scheduled backup: ${String(response.status)}`)
   }
-  
+
   const data = await response.json() as { result: ScheduledBackup, success: boolean }
   return data.result
 }
@@ -3484,7 +3488,7 @@ export const deleteScheduledBackup = async (databaseId: string): Promise<void> =
       credentials: 'include'
     }
   )
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response)
     throw new Error(error.error ?? `Failed to delete scheduled backup: ${String(response.status)}`)
@@ -3502,12 +3506,12 @@ export const toggleScheduledBackup = async (databaseId: string): Promise<Schedul
       credentials: 'include'
     }
   )
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response)
     throw new Error(error.error ?? `Failed to toggle scheduled backup: ${String(response.status)}`)
   }
-  
+
   const data = await response.json() as { result: ScheduledBackup, success: boolean }
   return data.result
 }
@@ -3565,12 +3569,12 @@ export const getMigrationStatus = async (): Promise<MigrationStatus> => {
       credentials: 'include'
     }
   )
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response)
     throw new Error(error.error ?? `Failed to get migration status: ${String(response.status)}`)
   }
-  
+
   const data = await response.json() as ApiResponse<MigrationStatus>
   if (!data.result) {
     throw new Error('Invalid response from migration status endpoint')
@@ -3589,12 +3593,12 @@ export const applyMigrations = async (): Promise<MigrationResult> => {
       credentials: 'include'
     }
   )
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response)
     throw new Error(error.error ?? `Failed to apply migrations: ${String(response.status)}`)
   }
-  
+
   const data = await response.json() as ApiResponse<MigrationResult>
   if (!data.result) {
     throw new Error('Invalid response from migration apply endpoint')
@@ -3615,12 +3619,12 @@ export const markLegacyMigrations = async (version: number): Promise<{ markedUpT
       body: JSON.stringify({ version })
     }
   )
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response)
     throw new Error(error.error ?? `Failed to mark legacy migrations: ${String(response.status)}`)
   }
-  
+
   const data = await response.json() as ApiResponse<{ markedUpTo: number }>
   if (!data.result) {
     throw new Error('Invalid response from mark-legacy endpoint')
@@ -3893,7 +3897,7 @@ export const getMetrics = async (timeRange: MetricsTimeRange = '7d', skipCache =
       return cached
     }
   }
-  
+
   const response = await fetch(
     `${WORKER_API}/api/metrics?range=${timeRange}`,
     {
@@ -3901,20 +3905,20 @@ export const getMetrics = async (timeRange: MetricsTimeRange = '7d', skipCache =
       credentials: 'include'
     }
   )
-  
+
   if (!response.ok) {
     const error = await parseErrorResponse(response)
     throw new Error(error.error ?? `Failed to get metrics: ${String(response.status)}`)
   }
-  
+
   const data = await response.json() as ApiResponse<MetricsResponse>
   if (!data.result) {
     throw new Error('Invalid response from metrics endpoint')
   }
-  
+
   // Cache the result
   setMetricsCache(timeRange, data.result)
-  
+
   return data.result
 }
 

@@ -1,4 +1,4 @@
-import { Database, Code, Pencil, Copy, Upload, Download, Zap, Sparkles, Cloud, RefreshCw, Trash2 } from 'lucide-react';
+import { Database, Code, Pencil, Copy, Upload, Download, Package, Zap, Sparkles, Cloud, RefreshCw, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { D1Database } from '../services/api';
 
@@ -9,6 +9,7 @@ export interface DatabaseActionHandlers {
   onClone: (db: D1Database) => void;
   onImport: (db: D1Database) => void;
   onDownload: (db: D1Database) => Promise<void>;
+  onExport: (db: D1Database) => void;
   onOptimize: (db: D1Database) => void;
   onFts5: (db: D1Database) => void;
   onBackup: (db: D1Database) => void;
@@ -123,10 +124,25 @@ export function DatabaseActionButtons({
           void handlers.onDownload(database);
         }}
         aria-label="Download database"
-        title="Download"
+        title="Download (SQL)"
         className={compact ? 'h-7 w-7 p-0' : undefined}
       >
         <Download className={iconSize} />
+      </Button>
+
+      {/* Export (Multi-format) */}
+      <Button
+        variant="outline"
+        size={buttonSize}
+        onClick={(e) => {
+          e.stopPropagation();
+          handlers.onExport(database);
+        }}
+        aria-label="Export database"
+        title="Export (SQL/JSON/CSV)"
+        className={`hover:bg-emerald-100 hover:text-emerald-700 hover:border-emerald-300 dark:hover:bg-emerald-900/30 dark:hover:text-emerald-300 dark:hover:border-emerald-700 ${compact ? 'h-7 w-7 p-0' : ''}`}
+      >
+        <Package className={iconSize} />
       </Button>
 
       {/* Optimize */}
