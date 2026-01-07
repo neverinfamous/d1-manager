@@ -77,21 +77,18 @@ RUN cd /tmp && \
     mv package /usr/local/lib/node_modules/npm/node_modules/tar && \
     rm -rf /tmp/*
 
-# Upgrade Alpine base packages to fix CVEs
-# - busybox 1.37.0-r30: CVE-2025-60876 (wget CRLF injection) - awaiting patch from Alpine
-#   NOTE: D1 Manager uses curl, not wget - not exploitable in this application
-# - curl 8.18.0-r0: CVE-2025-14819, CVE-2025-14017, CVE-2025-14524 (various curl vulnerabilities)
-# - When Alpine releases newer patches, this upgrade will pull the fixes automatically
-RUN apk upgrade --no-cache busybox busybox-binsh curl libcurl
-
-# Install runtime dependencies only
+# Install runtime dependencies and upgrade to fix CVEs
 # Security Notes:
 # - Application dependencies: glob@11.1.0, tar@7.5.2 (patched via package.json overrides)
 # - npm CLI dependencies: glob@11.1.0, tar@7.5.2 (manually patched in npm's installation)
-# - curl: upgraded to latest available in Alpine repos (8.18.0-r0+)
-RUN apk add --no-cache \
-    curl \
-    ca-certificates
+# - curl 8.18.0-r0 (from edge): CVE-2025-14819, CVE-2025-14017, CVE-2025-14524 (curl vulnerabilities)
+# - busybox: CVE-2025-60876 (wget CRLF injection) - not exploitable (D1 Manager uses curl, not wget)
+# curl 8.18.0 is only available in Alpine edge, so we add edge/main repo temporarily
+RUN apk update && \
+    echo "http://dl-cdn.alpinelinux.org/alpine/edge/main" >> /etc/apk/repositories && \
+    apk add --no-cache ca-certificates && \
+    apk add --no-cache curl --repository=http://dl-cdn.alpinelinux.org/alpine/edge/main && \
+    apk upgrade --no-cache busybox busybox-binsh
 
 # Create non-root user for security
 # Note: Alpine Linux uses GID 1000 for 'users' group, so we use a different GID
