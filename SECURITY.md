@@ -180,6 +180,33 @@ This project follows:
 npm ls glob --all
 ```
 
+### CVE-2025-60876: BusyBox wget CRLF Injection (January 2026)
+
+**Status**: ⏳ Awaiting Alpine Patch
+
+**Severity**: Medium (6.5)
+
+**Description**: CRLF Injection vulnerability in BusyBox's `wget` utility (versions through 1.37.0). Attackers can inject arbitrary HTTP headers by including control characters in the request path/query.
+
+**Impact on D1 Manager**:
+- **Not exploitable** - D1 Manager uses `curl` for health checks, not `wget`
+- BusyBox is included in Alpine Linux base image but `wget` is not used
+- Risk is theoretical only for this application
+
+**Mitigation**:
+- Waiting for Alpine Linux to release patched busybox (1.37.0-r31+)
+- CVE was published 6 days ago; Alpine typically patches within 1-2 weeks
+- Docker builds will automatically pick up the fix when available
+
+**Why not switch base images?**
+- Switching to Debian Slim would increase image size from ~150MB to ~250MB+
+- Distroless would require significant refactoring and lose debugging capabilities
+- The vulnerable component (`wget`) is not used by this application
+
+**References**:
+- [CVE-2025-60876](https://nvd.nist.gov/vuln/detail/CVE-2025-60876)
+- [Alpine Security Tracker](https://security.alpinelinux.org/)
+
 ---
 
 ## Security Updates

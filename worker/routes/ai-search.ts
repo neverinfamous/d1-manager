@@ -256,12 +256,12 @@ async function exportDatabaseToR2(
                 for (const row of rows) {
                     const values = Object.values(row).map(v => {
                         if (v === null || v === undefined) return '*null*';
-                        if (typeof v === 'string') return v.replace(/\|/g, '\\|').replace(/\n/g, ' ');
+                        if (typeof v === 'string') return v.replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\n/g, ' ');
                         if (typeof v === 'number' || typeof v === 'boolean' || typeof v === 'bigint') {
                             return String(v);
                         }
                         // For objects and arrays, stringify
-                        return JSON.stringify(v).replace(/\|/g, '\\|').replace(/\n/g, ' ');
+                        return JSON.stringify(v).replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\n/g, ' ');
                     });
                     dataContent += '| ' + values.join(' | ') + ' |\n';
                 }

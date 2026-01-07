@@ -68,6 +68,7 @@ jobs:
       uses: github/codeql-action/analyze@v4
       with:
         upload: always
+        fail-on: error
 
   # Build each platform on native architecture (avoids QEMU emulation issues)
   build-platform:

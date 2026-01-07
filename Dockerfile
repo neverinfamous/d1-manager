@@ -8,7 +8,7 @@
 # -----------------
 # Stage 1: Builder
 # -----------------
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
@@ -53,7 +53,7 @@ RUN npm run build
 # -----------------
 # Stage 2: Runtime
 # -----------------
-FROM node:20-alpine AS runtime
+FROM node:22-alpine AS runtime
 
 WORKDIR /app
 
@@ -78,7 +78,9 @@ RUN cd /tmp && \
     rm -rf /tmp/*
 
 # Upgrade Alpine base packages to fix CVEs
-# - busybox 1.37.0-r19 -> 1.37.0-r20 fixes CVE-2025-46394 & CVE-2024-58251 (LOW)
+# - busybox 1.37.0-r30: CVE-2025-60876 (wget CRLF injection) - awaiting patch from Alpine
+#   NOTE: D1 Manager uses curl, not wget - not exploitable in this application
+# - When Alpine releases busybox 1.37.0-r31+, this upgrade will pull the fix automatically
 RUN apk upgrade --no-cache busybox busybox-binsh
 
 # Install runtime dependencies only
