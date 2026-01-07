@@ -43,7 +43,7 @@ This Docker image provides a modern, full-featured web application for managing 
 
 ### Table Operations
 - Visual schema designer with STRICT mode and generated column support
-- Clone, export (SQL/CSV/JSON), import (CSV/JSON/SQL), and bulk operations
+- NEW! Clone, export (SQL/CSV/JSON), import (CSV/JSON/SQL), and bulk operations
 - Column management (add, modify, rename, delete) with UNIQUE constraint support
 - Foreign key dependency analysis
 - **Quick Actions** - Icon buttons on each table card for instant access to all operations
@@ -89,23 +89,6 @@ This Docker image provides a modern, full-featured web application for managing 
 - **HMAC signatures** - Optional secret-based request signing for security
 - **Test webhooks** - Verify endpoint connectivity before going live
 - **Centralized Error Logging** - Structured logging with module-prefixed error codes, automatic webhook notifications for critical errors
-
-### User Experience
-- Dark/Light/System themes
-- Responsive design
-- **Sticky Navigation** - Main navigation stays fixed at top with backdrop blur
-- **Jump to Top Button** - Floating button on long pages (Job History, Search)
-- **Header Quick Links** - Direct access to Cloudflare Dashboard, D1 Docs, Wiki, and SQLite Docs
-- **Error Support Links** - All error messages include "Report this error" mailto link
-- **Enhanced Input Validation** - SQLite reserved word checking, constraint validation, and helpful suggestions
-
-### Performance
-- **Dramatically improved load times** - ER Diagram loads with single API call instead of N+1 calls
-- **Client-side caching** - 5-minute TTL for tables, schemas, FKs, indexes, FTS5, Time Travel, and Replication data
-- **Unified cache** - All relationship views share single cache entry for instant tab switching
-- **Metrics caching** - 2-minute TTL per time range for instant dashboard revisits
-- **Parallel batch processing** - Index Analyzer processes 5 tables at a time with parallel queries
-- **Smart cache invalidation** - Caches automatically cleared on data modifications
 
 ---
 

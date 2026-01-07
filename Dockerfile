@@ -80,14 +80,15 @@ RUN cd /tmp && \
 # Upgrade Alpine base packages to fix CVEs
 # - busybox 1.37.0-r30: CVE-2025-60876 (wget CRLF injection) - awaiting patch from Alpine
 #   NOTE: D1 Manager uses curl, not wget - not exploitable in this application
-# - When Alpine releases busybox 1.37.0-r31+, this upgrade will pull the fix automatically
-RUN apk upgrade --no-cache busybox busybox-binsh
+# - curl 8.18.0-r0: CVE-2025-14819, CVE-2025-14017, CVE-2025-14524 (various curl vulnerabilities)
+# - When Alpine releases newer patches, this upgrade will pull the fixes automatically
+RUN apk upgrade --no-cache busybox busybox-binsh curl libcurl
 
 # Install runtime dependencies only
 # Security Notes:
 # - Application dependencies: glob@11.1.0, tar@7.5.2 (patched via package.json overrides)
 # - npm CLI dependencies: glob@11.1.0, tar@7.5.2 (manually patched in npm's installation)
-# - curl: using latest available in Alpine repos
+# - curl: upgraded to latest available in Alpine repos (8.18.0-r0+)
 RUN apk add --no-cache \
     curl \
     ca-certificates
