@@ -1,11 +1,11 @@
 # D1 Database Manager
 
-Last Updated January 7, 2026 - Production/Stable v2.2.0
+Last Updated January 7, 2026 - Production/Stable v2.3.0
 
 [![GitHub](https://img.shields.io/badge/GitHub-neverinfamous/d1--manager-blue?logo=github)](https://github.com/neverinfamous/d1-manager)
 [![Docker Pulls](https://img.shields.io/docker/pulls/writenotenow/d1-manager)](https://hub.docker.com/r/writenotenow/d1-manager)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-![Version](https://img.shields.io/badge/version-v2.2.0-green)
+![Version](https://img.shields.io/badge/version-v2.3.0-green)
 ![Status](https://img.shields.io/badge/status-Production%2FStable-brightgreen)
 [![Security](https://img.shields.io/badge/Security-Enhanced-green.svg)](https://github.com/neverinfamous/d1-manager/blob/main/SECURITY.md)
 [![CodeQL](https://img.shields.io/badge/CodeQL-Passing-brightgreen.svg)](https://github.com/neverinfamous/d1-manager/security/code-scanning)
@@ -78,6 +78,9 @@ This Docker image provides a modern, full-featured web application for managing 
 - **FTS5 Full-Text Search** - Manage virtual tables, convert to/from regular tables, dedicated FTS5 search mode in main Search tab, and quick actions on FTS5 table cards
 - **Index Analyzer** - Smart index recommendations plus "Create All Indexes" one-click apply with progress tracking
 - **Metrics Dashboard** - Query volume (reads/writes), P90 latency, rows read, and storage trends via GraphQL Analytics with time range selector (24h/7d/30d)
+- NEW! **Health Dashboard** - System health score, backup coverage alerts, failed backup tracking, and replication status overview
+- **Metrics Dashboard** - Query volume, P90 latency, rows read, and storage trends via GraphQL Analytics.
+- NEW! **Query Insights** Tab for slow query analysis with performance badges and sortable table
 - NEW! **Health Dashboard** - System health score, backup coverage alerts, failed backup tracking, and replication status overview
 - **Time Travel** - View bookmarks, checkpoint history, manual checkpoint capture, and CLI restore commands
 - **Read Replication** - Enable/disable global read replicas with D1 Sessions API info
@@ -307,8 +310,8 @@ docker-compose pull && docker-compose up -d
 | Tag | Description |
 |-----|-------------|
 | `latest` | Latest stable release |
-| `v2.2.0` | Specific version (recommended for production) |
-| `v2.1.0` | Previous stable release |
+| `v2.3.0` | Specific version (recommended for production) |
+| `v2.2.0` | Previous stable release |
 | `sha-XXXXXX` | Commit SHA for reproducible builds |
 
 ---

@@ -9,7 +9,8 @@ import {
   TrendingUp,
   TrendingDown,
   FileText,
-  Zap
+  Zap,
+  Search
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,7 +21,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MetricsChart, MetricsBarChart } from './MetricsChart';
+import { QueryInsightsTab } from './QueryInsightsTab';
 import {
   getMetrics,
   type MetricsResponse,
@@ -97,6 +100,7 @@ export function MetricsDashboard(): React.JSX.Element {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [timeRange, setTimeRange] = useState<MetricsTimeRange>('7d');
+  const [activeTab, setActiveTab] = useState<'overview' | 'insights'>('overview');
 
   const loadMetrics = useCallback(async (skipCache: boolean) => {
     setLoading(true);
@@ -211,234 +215,258 @@ export function MetricsDashboard(): React.JSX.Element {
 
       {/* Summary Cards */}
       {metrics && (
-        <>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Queries</CardTitle>
-                <BarChart3 className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {formatNumber(metrics.summary.totalReadQueries + metrics.summary.totalWriteQueries)}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  <span className="text-blue-500">{formatNumber(metrics.summary.totalReadQueries)} reads</span>
-                  {' / '}
-                  <span className="text-green-500">{formatNumber(metrics.summary.totalWriteQueries)} writes</span>
-                </p>
-              </CardContent>
-            </Card>
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'overview' | 'insights')} className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="overview" className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4" />
+              Overview
+            </TabsTrigger>
+            <TabsTrigger value="insights" className="flex items-center gap-2">
+              <Search className="h-4 w-4" />
+              Query Insights
+              {metrics.queryInsights && metrics.queryInsights.length > 0 && (
+                <span className="ml-1 bg-primary/10 text-primary text-xs px-1.5 py-0.5 rounded-full">
+                  {metrics.queryInsights.length}
+                </span>
+              )}
+            </TabsTrigger>
+          </TabsList>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Rows Read</CardTitle>
-                <FileText className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {formatNumber(metrics.summary.totalRowsRead)}
-                </div>
-                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  <TrendingUp className="h-3 w-3 text-amber-500" />
-                  Used for billing calculations
-                </p>
-              </CardContent>
-            </Card>
+          {/* Overview Tab */}
+          <TabsContent value="overview" className="space-y-6">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Queries</CardTitle>
+                  <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {formatNumber(metrics.summary.totalReadQueries + metrics.summary.totalWriteQueries)}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    <span className="text-blue-500">{formatNumber(metrics.summary.totalReadQueries)} reads</span>
+                    {' / '}
+                    <span className="text-green-500">{formatNumber(metrics.summary.totalWriteQueries)} writes</span>
+                  </p>
+                </CardContent>
+              </Card>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Avg Latency (P90)</CardTitle>
-                <Clock className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {formatLatency(metrics.summary.avgLatencyMs)}
-                </div>
-                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  {metrics.summary.avgLatencyMs && metrics.summary.avgLatencyMs < 50 ? (
-                    <>
-                      <Zap className="h-3 w-3 text-green-500" />
-                      Good performance
-                    </>
-                  ) : metrics.summary.avgLatencyMs && metrics.summary.avgLatencyMs < 200 ? (
-                    <>
-                      <Clock className="h-3 w-3 text-yellow-500" />
-                      Acceptable latency
-                    </>
-                  ) : (
-                    <>
-                      <TrendingDown className="h-3 w-3 text-red-500" />
-                      Consider optimizing
-                    </>
-                  )}
-                </p>
-              </CardContent>
-            </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Rows Read</CardTitle>
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {formatNumber(metrics.summary.totalRowsRead)}
+                  </div>
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <TrendingUp className="h-3 w-3 text-amber-500" />
+                    Used for billing calculations
+                  </p>
+                </CardContent>
+              </Card>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Storage</CardTitle>
-                <HardDrive className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {formatBytes(metrics.summary.totalStorageBytes)}
-                </div>
-                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Database className="h-3 w-3" />
-                  {metrics.summary.databaseCount} database{metrics.summary.databaseCount !== 1 ? 's' : ''}
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Charts */}
-          <div className="grid gap-6 lg:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Query Volume</CardTitle>
-                <CardDescription>
-                  Total read and write queries over time
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <MetricsChart
-                  data={queryChartData}
-                  title=""
-                  color="#3b82f6"
-                  height={250}
-                  formatValue={formatNumber}
-                  ariaLabel="Query volume over time chart"
-                />
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Rows Read</CardTitle>
-                <CardDescription>
-                  Rows scanned across all queries (affects billing)
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <MetricsChart
-                  data={rowsChartData}
-                  title=""
-                  color="#f59e0b"
-                  height={250}
-                  formatValue={formatNumber}
-                  ariaLabel="Rows read over time chart"
-                />
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Per-Database Breakdown */}
-          <div className="grid gap-6 lg:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Queries by Database</CardTitle>
-                <CardDescription>
-                  Query distribution across databases
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <MetricsBarChart
-                  data={databaseBarData}
-                  title=""
-                  height={300}
-                  formatValue={formatNumber}
-                  ariaLabel="Queries per database bar chart"
-                />
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Storage by Database</CardTitle>
-                <CardDescription>
-                  Current storage usage per database
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <MetricsBarChart
-                  data={storageBarData}
-                  title=""
-                  height={300}
-                  formatValue={formatBytes}
-                  ariaLabel="Storage per database bar chart"
-                />
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Detailed Table */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Database Details</CardTitle>
-              <CardDescription>
-                Detailed metrics for each database
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm" role="table" aria-label="Database metrics details">
-                  <thead>
-                    <tr className="border-b">
-                      <th scope="col" className="text-left py-3 px-2 font-medium">Database</th>
-                      <th scope="col" className="text-right py-3 px-2 font-medium">Read Queries</th>
-                      <th scope="col" className="text-right py-3 px-2 font-medium">Write Queries</th>
-                      <th scope="col" className="text-right py-3 px-2 font-medium">Rows Read</th>
-                      <th scope="col" className="text-right py-3 px-2 font-medium">Rows Written</th>
-                      <th scope="col" className="text-right py-3 px-2 font-medium">P90 Latency</th>
-                      <th scope="col" className="text-right py-3 px-2 font-medium">Storage</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {metrics.byDatabase.map((db) => (
-                      <tr key={db.databaseId} className="border-b hover:bg-muted/50">
-                        <td className="py-3 px-2">
-                          <div className="flex items-center gap-2">
-                            <Database className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                            <span className="font-medium truncate max-w-[200px]" title={db.databaseName ?? db.databaseId}>
-                              {db.databaseName ?? db.databaseId.slice(0, 12) + '...'}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="text-right py-3 px-2 text-blue-600 dark:text-blue-400">
-                          {formatNumber(db.totalReadQueries)}
-                        </td>
-                        <td className="text-right py-3 px-2 text-green-600 dark:text-green-400">
-                          {formatNumber(db.totalWriteQueries)}
-                        </td>
-                        <td className="text-right py-3 px-2">
-                          {formatNumber(db.totalRowsRead)}
-                        </td>
-                        <td className="text-right py-3 px-2">
-                          {formatNumber(db.totalRowsWritten)}
-                        </td>
-                        <td className="text-right py-3 px-2">
-                          {formatLatency(db.p90LatencyMs)}
-                        </td>
-                        <td className="text-right py-3 px-2">
-                          {db.currentSizeBytes ? formatBytes(db.currentSizeBytes) : 'N/A'}
-                        </td>
-                      </tr>
-                    ))}
-                    {metrics.byDatabase.length === 0 && (
-                      <tr>
-                        <td colSpan={7} className="text-center py-8 text-muted-foreground">
-                          No database metrics available for this time period
-                        </td>
-                      </tr>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Avg Latency (P90)</CardTitle>
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {formatLatency(metrics.summary.avgLatencyMs)}
+                  </div>
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    {metrics.summary.avgLatencyMs && metrics.summary.avgLatencyMs < 50 ? (
+                      <>
+                        <Zap className="h-3 w-3 text-green-500" />
+                        Good performance
+                      </>
+                    ) : metrics.summary.avgLatencyMs && metrics.summary.avgLatencyMs < 200 ? (
+                      <>
+                        <Clock className="h-3 w-3 text-yellow-500" />
+                        Acceptable latency
+                      </>
+                    ) : (
+                      <>
+                        <TrendingDown className="h-3 w-3 text-red-500" />
+                        Consider optimizing
+                      </>
                     )}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        </>
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Storage</CardTitle>
+                  <HardDrive className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {formatBytes(metrics.summary.totalStorageBytes)}
+                  </div>
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Database className="h-3 w-3" />
+                    {metrics.summary.databaseCount} database{metrics.summary.databaseCount !== 1 ? 's' : ''}
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Charts */}
+            <div className="grid gap-6 lg:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Query Volume</CardTitle>
+                  <CardDescription>
+                    Total read and write queries over time
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <MetricsChart
+                    data={queryChartData}
+                    title=""
+                    color="#3b82f6"
+                    height={250}
+                    formatValue={formatNumber}
+                    ariaLabel="Query volume over time chart"
+                  />
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Rows Read</CardTitle>
+                  <CardDescription>
+                    Rows scanned across all queries (affects billing)
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <MetricsChart
+                    data={rowsChartData}
+                    title=""
+                    color="#f59e0b"
+                    height={250}
+                    formatValue={formatNumber}
+                    ariaLabel="Rows read over time chart"
+                  />
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Per-Database Breakdown */}
+            <div className="grid gap-6 lg:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Queries by Database</CardTitle>
+                  <CardDescription>
+                    Query distribution across databases
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <MetricsBarChart
+                    data={databaseBarData}
+                    title=""
+                    height={300}
+                    formatValue={formatNumber}
+                    ariaLabel="Queries per database bar chart"
+                  />
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Storage by Database</CardTitle>
+                  <CardDescription>
+                    Current storage usage per database
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <MetricsBarChart
+                    data={storageBarData}
+                    title=""
+                    height={300}
+                    formatValue={formatBytes}
+                    ariaLabel="Storage per database bar chart"
+                  />
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Detailed Table */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Database Details</CardTitle>
+                <CardDescription>
+                  Detailed metrics for each database
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm" role="table" aria-label="Database metrics details">
+                    <thead>
+                      <tr className="border-b">
+                        <th scope="col" className="text-left py-3 px-2 font-medium">Database</th>
+                        <th scope="col" className="text-right py-3 px-2 font-medium">Read Queries</th>
+                        <th scope="col" className="text-right py-3 px-2 font-medium">Write Queries</th>
+                        <th scope="col" className="text-right py-3 px-2 font-medium">Rows Read</th>
+                        <th scope="col" className="text-right py-3 px-2 font-medium">Rows Written</th>
+                        <th scope="col" className="text-right py-3 px-2 font-medium">P90 Latency</th>
+                        <th scope="col" className="text-right py-3 px-2 font-medium">Storage</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {metrics.byDatabase.map((db) => (
+                        <tr key={db.databaseId} className="border-b hover:bg-muted/50">
+                          <td className="py-3 px-2">
+                            <div className="flex items-center gap-2">
+                              <Database className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                              <span className="font-medium truncate max-w-[200px]" title={db.databaseName ?? db.databaseId}>
+                                {db.databaseName ?? db.databaseId.slice(0, 12) + '...'}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="text-right py-3 px-2 text-blue-600 dark:text-blue-400">
+                            {formatNumber(db.totalReadQueries)}
+                          </td>
+                          <td className="text-right py-3 px-2 text-green-600 dark:text-green-400">
+                            {formatNumber(db.totalWriteQueries)}
+                          </td>
+                          <td className="text-right py-3 px-2">
+                            {formatNumber(db.totalRowsRead)}
+                          </td>
+                          <td className="text-right py-3 px-2">
+                            {formatNumber(db.totalRowsWritten)}
+                          </td>
+                          <td className="text-right py-3 px-2">
+                            {formatLatency(db.p90LatencyMs)}
+                          </td>
+                          <td className="text-right py-3 px-2">
+                            {db.currentSizeBytes ? formatBytes(db.currentSizeBytes) : 'N/A'}
+                          </td>
+                        </tr>
+                      ))}
+                      {metrics.byDatabase.length === 0 && (
+                        <tr>
+                          <td colSpan={7} className="text-center py-8 text-muted-foreground">
+                            No database metrics available for this time period
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Query Insights Tab */}
+          <TabsContent value="insights">
+            <QueryInsightsTab queryInsights={metrics.queryInsights ?? []} />
+          </TabsContent>
+        </Tabs>
       )}
     </div>
   );

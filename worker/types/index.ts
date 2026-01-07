@@ -525,6 +525,23 @@ export interface MetricsResponse {
   byDatabase: DatabaseMetricsSummary[];
   timeSeries: MetricsDataPoint[];
   storageSeries: StorageDataPoint[];
+  queryInsights?: QueryInsight[];
+}
+
+/**
+ * Query insight from d1QueriesAdaptiveGroups
+ * Provides slow query detection and analysis
+ */
+export interface QueryInsight {
+  queryHash: string;
+  queryString: string;
+  databaseId: string;
+  databaseName?: string | undefined;
+  totalTimeMs: number;
+  avgTimeMs: number;
+  executionCount: number;
+  rowsRead: number;
+  rowsWritten: number;
 }
 
 /**
@@ -615,6 +632,24 @@ export interface D1AnalyticsResult {
         dimensions: {
           date: string;
           databaseId: string;
+        };
+      }[];
+      d1QueriesAdaptiveGroups?: {
+        sum: {
+          queryDurationMs: number;
+          rowsRead: number;
+          rowsWritten: number;
+          rowsReturned: number;
+        };
+        avg?: {
+          queryDurationMs?: number;
+          rowsRead?: number;
+          rowsWritten?: number;
+          rowsReturned?: number;
+        };
+        count: number;
+        dimensions: {
+          query: string;
         };
       }[];
     }[];
