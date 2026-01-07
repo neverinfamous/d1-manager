@@ -4,6 +4,7 @@ import { isProtectedDatabase, createProtectedDatabaseResponse } from '../utils/d
 import { createJob, completeJob, generateJobId } from './jobs';
 import { OperationType, startJobTracking, finishJobTracking } from '../utils/job-tracking';
 import { logError, logInfo, logWarning } from '../utils/error-logger';
+import { triggerWebhooks, createImportCompletePayload, createExportCompletePayload } from '../utils/webhooks';
 
 // Helper to create response headers with CORS
 function jsonHeaders(corsHeaders: HeadersInit): Headers {
@@ -65,7 +66,7 @@ async function hasFTS5Tables(
       operation: 'fts5_check',
       databaseId
     });
-    
+
     const response = await fetch(
       `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database/${databaseId}/query`,
       {
@@ -76,7 +77,7 @@ async function hasFTS5Tables(
         })
       }
     );
-    
+
     if (!response.ok) {
       const errorText = await response.text();
       void logError(env, `Failed to query for FTS5 tables: ${errorText}`, {
@@ -88,9 +89,9 @@ async function hasFTS5Tables(
       // If we can't check, assume no FTS5 tables to avoid blocking unnecessarily
       return { hasFTS5: false, fts5Tables: [] };
     }
-    
+
     const data: D1APIResponse = await response.json();
-    
+
     const queryResults = data.result as D1QueryResult[] | undefined;
     if (!data.success || !queryResults?.[0]?.results) {
       logWarning('Invalid response structure for FTS5 check', {
@@ -100,10 +101,10 @@ async function hasFTS5Tables(
       });
       return { hasFTS5: false, fts5Tables: [] };
     }
-    
+
     const fts5Tables = queryResults[0].results.map((r) => r['name'] as string);
     const hasFTS5 = fts5Tables.length > 0;
-    
+
     if (hasFTS5) {
       logInfo(`Found FTS5 tables: ${fts5Tables.join(', ')}`, {
         module: 'databases',
@@ -118,7 +119,7 @@ async function hasFTS5Tables(
         databaseId
       });
     }
-    
+
     return { hasFTS5, fts5Tables };
   } catch (err) {
     void logError(env, err instanceof Error ? err : String(err), {
@@ -142,14 +143,14 @@ async function verifyDatabaseIntegrity(
   _env: Env
 ): Promise<{ success: boolean; issues: string[] }> {
   const issues: string[] = [];
-  
+
   try {
     logInfo('Starting database integrity verification', {
       module: 'databases',
       operation: 'verify',
       metadata: { sourceDbId, targetDbId }
     });
-    
+
     // Get list of tables from source
     const sourceTablesResponse = await fetch(
       `${CF_API}/accounts/${_env.ACCOUNT_ID}/d1/database/${sourceDbId}/query`,
@@ -161,7 +162,7 @@ async function verifyDatabaseIntegrity(
         })
       }
     );
-    
+
     if (!sourceTablesResponse.ok) {
       const errorText = await sourceTablesResponse.text();
       logWarning(`Failed to query source database tables: ${errorText}`, {
@@ -173,9 +174,9 @@ async function verifyDatabaseIntegrity(
       issues.push(`Failed to query source database tables: ${errorText}`);
       return { success: false, issues };
     }
-    
+
     const sourceTablesData: D1APIResponse = await sourceTablesResponse.json();
-    
+
     const sourceQueryResults = sourceTablesData.result as D1QueryResult[] | undefined;
     const sourceResult = sourceQueryResults?.[0];
     if (!sourceTablesData.success || !sourceResult) {
@@ -187,7 +188,7 @@ async function verifyDatabaseIntegrity(
       issues.push('Invalid response when querying source database tables');
       return { success: false, issues };
     }
-    
+
     const sourceTables = sourceResult.results.map((r) => r['name'] as string);
     logInfo(`Source tables: ${sourceTables.join(', ')}`, {
       module: 'databases',
@@ -195,7 +196,7 @@ async function verifyDatabaseIntegrity(
       databaseId: sourceDbId,
       metadata: { tableCount: sourceTables.length }
     });
-    
+
     // Get list of tables from target
     const targetTablesResponse = await fetch(
       `${CF_API}/accounts/${_env.ACCOUNT_ID}/d1/database/${targetDbId}/query`,
@@ -207,7 +208,7 @@ async function verifyDatabaseIntegrity(
         })
       }
     );
-    
+
     if (!targetTablesResponse.ok) {
       const errorText = await targetTablesResponse.text();
       logWarning(`Failed to query target database tables: ${errorText}`, {
@@ -219,9 +220,9 @@ async function verifyDatabaseIntegrity(
       issues.push(`Failed to query target database tables: ${errorText}`);
       return { success: false, issues };
     }
-    
+
     const targetTablesData: D1APIResponse = await targetTablesResponse.json();
-    
+
     const targetQueryResults = targetTablesData.result as D1QueryResult[] | undefined;
     const targetResult = targetQueryResults?.[0];
     if (!targetTablesData.success || !targetResult) {
@@ -233,7 +234,7 @@ async function verifyDatabaseIntegrity(
       issues.push('Invalid response when querying target database tables');
       return { success: false, issues };
     }
-    
+
     const targetTables = targetResult.results.map((r) => r['name'] as string);
     logInfo(`Target tables: ${targetTables.join(', ')}`, {
       module: 'databases',
@@ -241,7 +242,7 @@ async function verifyDatabaseIntegrity(
       databaseId: targetDbId,
       metadata: { tableCount: targetTables.length }
     });
-    
+
     // Verify table count matches
     if (sourceTables.length !== targetTables.length) {
       logWarning('Table count mismatch', {
@@ -251,7 +252,7 @@ async function verifyDatabaseIntegrity(
       });
       issues.push(`Table count mismatch: source has ${String(sourceTables.length)}, target has ${String(targetTables.length)}`);
     }
-    
+
     // Verify all source tables exist in target
     const missingTables = sourceTables.filter(t => !targetTables.includes(t));
     if (missingTables.length > 0) {
@@ -262,7 +263,7 @@ async function verifyDatabaseIntegrity(
       });
       issues.push(`Missing tables in target: ${missingTables.join(', ')}`);
     }
-    
+
     // If no tables exist, that's OK (empty database)
     if (sourceTables.length === 0 && targetTables.length === 0) {
       logInfo('Both databases are empty - verification passed', {
@@ -271,7 +272,7 @@ async function verifyDatabaseIntegrity(
       });
       return { success: true, issues: [] };
     }
-    
+
     // Verify row counts for each table
     logInfo(`Verifying row counts for ${String(sourceTables.length)} tables`, {
       module: 'databases',
@@ -280,7 +281,7 @@ async function verifyDatabaseIntegrity(
     });
     for (const tableName of sourceTables) {
       if (!targetTables.includes(tableName)) continue;
-      
+
       try {
         // Get source row count
         const sourceCountResponse = await fetch(
@@ -293,7 +294,7 @@ async function verifyDatabaseIntegrity(
             })
           }
         );
-        
+
         // Get target row count
         const targetCountResponse = await fetch(
           `${CF_API}/accounts/${_env.ACCOUNT_ID}/d1/database/${targetDbId}/query`,
@@ -305,11 +306,11 @@ async function verifyDatabaseIntegrity(
             })
           }
         );
-        
+
         if (sourceCountResponse.ok && targetCountResponse.ok) {
           const sourceCountData: D1APIResponse = await sourceCountResponse.json();
           const targetCountData: D1APIResponse = await targetCountResponse.json();
-          
+
           const sourceCountResults = sourceCountData.result as D1QueryResult[] | undefined;
           const srcResult = sourceCountResults?.[0];
           const srcRow = srcResult?.results[0];
@@ -323,7 +324,7 @@ async function verifyDatabaseIntegrity(
             issues.push(`Failed to get row count for source table "${tableName}"`);
             continue;
           }
-          
+
           const targetCountResults = targetCountData.result as D1QueryResult[] | undefined;
           const tgtResult = targetCountResults?.[0];
           const tgtRow = tgtResult?.results[0];
@@ -337,16 +338,16 @@ async function verifyDatabaseIntegrity(
             issues.push(`Failed to get row count for target table "${tableName}"`);
             continue;
           }
-          
+
           const sourceCount = srcRow['count'] as number;
           const targetCount = tgtRow['count'] as number;
-          
+
           logInfo(`Table "${tableName}": source=${String(sourceCount)}, target=${String(targetCount)}`, {
             module: 'databases',
             operation: 'verify',
             metadata: { tableName, sourceCount, targetCount }
           });
-          
+
           if (sourceCount !== targetCount) {
             logWarning(`Row count mismatch in table "${tableName}"`, {
               module: 'databases',
@@ -372,7 +373,7 @@ async function verifyDatabaseIntegrity(
         issues.push(`Error verifying table "${tableName}": ${err instanceof Error ? err.message : 'Unknown error'}`);
       }
     }
-    
+
     // Verify schema structure for each table
     logInfo('Verifying schema structure', {
       module: 'databases',
@@ -380,7 +381,7 @@ async function verifyDatabaseIntegrity(
     });
     for (const tableName of sourceTables) {
       if (!targetTables.includes(tableName)) continue;
-      
+
       try {
         // Get source schema
         const sourceSchemaResponse = await fetch(
@@ -393,7 +394,7 @@ async function verifyDatabaseIntegrity(
             })
           }
         );
-        
+
         // Get target schema
         const targetSchemaResponse = await fetch(
           `${CF_API}/accounts/${_env.ACCOUNT_ID}/d1/database/${targetDbId}/query`,
@@ -405,11 +406,11 @@ async function verifyDatabaseIntegrity(
             })
           }
         );
-        
+
         if (sourceSchemaResponse.ok && targetSchemaResponse.ok) {
           const sourceSchemaData: D1APIResponse = await sourceSchemaResponse.json();
           const targetSchemaData: D1APIResponse = await targetSchemaResponse.json();
-          
+
           const sourceSchemaResults = sourceSchemaData.result as D1QueryResult[] | undefined;
           const srcSchemaResult = sourceSchemaResults?.[0];
           if (!sourceSchemaData.success || !srcSchemaResult?.results) {
@@ -422,7 +423,7 @@ async function verifyDatabaseIntegrity(
             issues.push(`Failed to get schema for source table "${tableName}"`);
             continue;
           }
-          
+
           const targetSchemaResults = targetSchemaData.result as D1QueryResult[] | undefined;
           const tgtSchemaResult = targetSchemaResults?.[0];
           if (!targetSchemaData.success || !tgtSchemaResult?.results) {
@@ -435,16 +436,16 @@ async function verifyDatabaseIntegrity(
             issues.push(`Failed to get schema for target table "${tableName}"`);
             continue;
           }
-          
+
           const sourceColumns = srcSchemaResult.results;
           const targetColumns = tgtSchemaResult.results;
-          
+
           logInfo(`Table "${tableName}": source has ${String(sourceColumns.length)} columns, target has ${String(targetColumns.length)} columns`, {
             module: 'databases',
             operation: 'verify',
             metadata: { tableName, sourceColumnCount: sourceColumns.length, targetColumnCount: targetColumns.length }
           });
-          
+
           if (sourceColumns.length !== targetColumns.length) {
             logWarning(`Column count mismatch in table "${tableName}"`, {
               module: 'databases',
@@ -470,7 +471,7 @@ async function verifyDatabaseIntegrity(
         issues.push(`Error verifying schema for table "${tableName}": ${err instanceof Error ? err.message : 'Unknown error'}`);
       }
     }
-    
+
     logInfo(`Verification complete. Issues found: ${String(issues.length)}`, {
       module: 'databases',
       operation: 'verify',
@@ -483,9 +484,9 @@ async function verifyDatabaseIntegrity(
         metadata: { issues }
       });
     }
-    
+
     return { success: issues.length === 0, issues };
-    
+
   } catch (err) {
     logWarning(`Fatal verification error: ${err instanceof Error ? err.message : 'Unknown error'}`, {
       module: 'databases',
@@ -511,12 +512,12 @@ export async function handleDatabaseRoutes(
     userId: userEmail,
     metadata: { method: request.method, path: url.pathname }
   });
-  
+
   const cfHeaders = {
     'Authorization': `Bearer ${env.API_KEY}`,
     'Content-Type': 'application/json'
   };
-  
+
   // Verify auth configuration (sensitive values redacted)
   logInfo('Auth configured', {
     module: 'databases',
@@ -528,7 +529,7 @@ export async function handleDatabaseRoutes(
     // List databases
     if (request.method === 'GET' && url.pathname === '/api/databases') {
       logInfo('Listing databases', { module: 'databases', operation: 'list' });
-      
+
       // Mock response for local development
       if (isLocalDev) {
         logInfo('Using mock data for local development', { module: 'databases', operation: 'list' });
@@ -558,23 +559,23 @@ export async function handleDatabaseRoutes(
           headers: jsonHeaders(corsHeaders)
         });
       }
-      
+
       logInfo(`Making API request to: ${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database`, {
         module: 'databases',
         operation: 'list'
       });
-      
+
       const response = await fetch(
         `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database`,
         { headers: cfHeaders }
       );
-      
+
       logInfo(`Response status: ${String(response.status)}`, {
         module: 'databases',
         operation: 'list',
         metadata: { status: response.status }
       });
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         void logError(env, `List error: ${errorText}`, {
@@ -584,13 +585,13 @@ export async function handleDatabaseRoutes(
         }, isLocalDev);
         throw new Error(`Failed to list databases: ${String(response.status)}`);
       }
-      
+
       const data: D1APIResponse = await response.json();
       const databases = (data.result ?? []) as D1DatabaseInfo[];
-      
+
       // Filter out protected system databases
       const filteredDatabases = databases.filter((db: D1DatabaseInfo) => !isProtectedDatabase(db.name));
-      
+
       // Enhance database info with table count AND FTS5 count in a single query per database
       // This avoids N+1 API calls on the frontend by including FTS5 counts in the list response
       const enhancedDatabases = await Promise.all(
@@ -602,23 +603,23 @@ export async function handleDatabaseRoutes(
               {
                 method: 'POST',
                 headers: cfHeaders,
-                body: JSON.stringify({ 
+                body: JSON.stringify({
                   sql: `SELECT 
                     (SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%') as table_count,
                     (SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND sql LIKE '%USING fts5%') as fts5_count`
                 })
               }
             );
-            
+
             if (statsResponse.ok) {
               const statsData: D1APIResponse = await statsResponse.json();
               const statsResults = statsData.result as D1QueryResult[] | undefined;
               const firstResult = statsResults?.[0];
               const firstRow = firstResult?.results[0];
-              
+
               if (statsData.success && firstRow) {
-                return { 
-                  ...db, 
+                return {
+                  ...db,
                   num_tables: firstRow['table_count'] as number,
                   fts5_count: firstRow['fts5_count'] as number
                 };
@@ -632,12 +633,12 @@ export async function handleDatabaseRoutes(
               databaseName: db.name
             }, isLocalDev);
           }
-          
+
           // Return database without stats if query failed
           return db;
         })
       );
-      
+
       return new Response(JSON.stringify({
         result: enhancedDatabases,
         success: data.success
@@ -654,7 +655,7 @@ export async function handleDatabaseRoutes(
         operation: 'get_info',
         databaseId: dbId
       });
-      
+
       // Mock response for local development
       if (isLocalDev) {
         return new Response(JSON.stringify({
@@ -672,12 +673,12 @@ export async function handleDatabaseRoutes(
           headers: jsonHeaders(corsHeaders)
         });
       }
-      
+
       const response = await fetch(
         `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database/${dbId}`,
         { headers: cfHeaders }
       );
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         void logError(env, `Info error: ${errorText}`, {
@@ -688,10 +689,10 @@ export async function handleDatabaseRoutes(
         }, isLocalDev);
         throw new Error(`Failed to get database info: ${String(response.status)}`);
       }
-      
+
       const data: D1APIResponse = await response.json();
       const dbInfo = data.result as D1DatabaseInfo;
-      
+
       // Protect system databases from info access
       if (isProtectedDatabase(dbInfo.name)) {
         logWarning(`Attempted to access protected database info: ${dbInfo.name}`, {
@@ -708,7 +709,7 @@ export async function handleDatabaseRoutes(
           headers: jsonHeaders(corsHeaders)
         });
       }
-      
+
       return new Response(JSON.stringify(data), {
         headers: jsonHeaders(corsHeaders)
       });
@@ -724,7 +725,7 @@ export async function handleDatabaseRoutes(
         databaseId: dbId,
         metadata: { mode: body.mode }
       });
-      
+
       if (!body.mode || !['auto', 'disabled'].includes(body.mode)) {
         return new Response(JSON.stringify({
           error: 'Invalid mode',
@@ -735,7 +736,7 @@ export async function handleDatabaseRoutes(
           headers: jsonHeaders(corsHeaders)
         });
       }
-      
+
       // Mock response for local development
       if (isLocalDev) {
         logInfo('Simulating read replication change for local development', {
@@ -753,13 +754,13 @@ export async function handleDatabaseRoutes(
           headers: jsonHeaders(corsHeaders)
         });
       }
-      
+
       // First get the database to verify it exists and is not protected
       const dbInfoResponse = await fetch(
         `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database/${dbId}`,
         { headers: cfHeaders }
       );
-      
+
       if (!dbInfoResponse.ok) {
         const errorText = await dbInfoResponse.text();
         void logError(env, `Database not found: ${errorText}`, {
@@ -777,10 +778,10 @@ export async function handleDatabaseRoutes(
           headers: jsonHeaders(corsHeaders)
         });
       }
-      
+
       const dbInfoData: D1APIResponse = await dbInfoResponse.json();
       const dbInfo = dbInfoData.result as D1DatabaseInfo;
-      
+
       if (isProtectedDatabase(dbInfo.name)) {
         logWarning(`Attempted to modify protected database: ${dbInfo.name}`, {
           module: 'databases',
@@ -790,7 +791,7 @@ export async function handleDatabaseRoutes(
         });
         return createProtectedDatabaseResponse(corsHeaders);
       }
-      
+
       // Update read replication mode via Cloudflare API
       const response = await fetch(
         `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database/${dbId}`,
@@ -802,7 +803,7 @@ export async function handleDatabaseRoutes(
           })
         }
       );
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         void logError(env, `Read replication update error: ${errorText}`, {
@@ -820,7 +821,7 @@ export async function handleDatabaseRoutes(
           headers: jsonHeaders(corsHeaders)
         });
       }
-      
+
       const data: D1APIResponse = await response.json();
       logInfo('Read replication updated successfully', {
         module: 'databases',
@@ -828,7 +829,7 @@ export async function handleDatabaseRoutes(
         databaseId: dbId,
         metadata: { mode: body.mode }
       });
-      
+
       return new Response(JSON.stringify({
         result: data.result,
         success: true
@@ -846,7 +847,7 @@ export async function handleDatabaseRoutes(
         ...(body.name !== undefined && { databaseName: body.name }),
         metadata: { location: body.location }
       });
-      
+
       // Start job tracking
       const jobId = await startJobTracking(
         env,
@@ -856,7 +857,7 @@ export async function handleDatabaseRoutes(
         isLocalDev,
         { databaseName: body.name, location: body.location }
       );
-      
+
       // Mock response for local development
       if (isLocalDev) {
         logInfo('Simulating database creation for local development', {
@@ -876,15 +877,15 @@ export async function handleDatabaseRoutes(
           headers: jsonHeaders(corsHeaders)
         });
       }
-      
+
       const createBody: { name: string; primary_location_hint?: string } = {
         name: body.name ?? ''
       };
-      
+
       if (body.location) {
         createBody.primary_location_hint = body.location;
       }
-      
+
       try {
         const response = await fetch(
           `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database`,
@@ -894,7 +895,7 @@ export async function handleDatabaseRoutes(
             body: JSON.stringify(createBody)
           }
         );
-        
+
         if (!response.ok) {
           const errorText = await response.text();
           void logError(env, `Create error: ${errorText}`, {
@@ -905,9 +906,9 @@ export async function handleDatabaseRoutes(
           }, isLocalDev);
           throw new Error(`Failed to create database: ${String(response.status)}`);
         }
-        
+
         const data = await response.json();
-        
+
         // Complete job tracking
         await finishJobTracking(env, jobId, 'completed', userEmail, isLocalDev, {
           operationType: OperationType.DATABASE_CREATE,
@@ -915,7 +916,7 @@ export async function handleDatabaseRoutes(
           processedItems: 1,
           errorCount: 0,
         });
-        
+
         return new Response(JSON.stringify(data), {
           headers: jsonHeaders(corsHeaders)
         });
@@ -940,7 +941,7 @@ export async function handleDatabaseRoutes(
         operation: 'delete',
         databaseId: dbId
       });
-      
+
       // Mock response for local development
       if (isLocalDev) {
         logInfo('Simulating database deletion for local development', {
@@ -955,14 +956,14 @@ export async function handleDatabaseRoutes(
           headers: jsonHeaders(corsHeaders)
         });
       }
-      
+
       // Protect system databases from deletion
       // First, get the database info to check its name
       const dbInfoResponse = await fetch(
         `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database/${dbId}`,
         { headers: cfHeaders }
       );
-      
+
       let databaseName = dbId;
       if (dbInfoResponse.ok) {
         const dbInfoData: D1APIResponse = await dbInfoResponse.json();
@@ -978,7 +979,7 @@ export async function handleDatabaseRoutes(
           return createProtectedDatabaseResponse(corsHeaders);
         }
       }
-      
+
       // Start job tracking
       const jobId = await startJobTracking(
         env,
@@ -988,7 +989,7 @@ export async function handleDatabaseRoutes(
         isLocalDev,
         { databaseName }
       );
-      
+
       try {
         const response = await fetch(
           `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database/${dbId}`,
@@ -997,7 +998,7 @@ export async function handleDatabaseRoutes(
             headers: cfHeaders
           }
         );
-        
+
         if (!response.ok) {
           const errorText = await response.text();
           void logError(env, `Delete error: ${errorText}`, {
@@ -1008,9 +1009,9 @@ export async function handleDatabaseRoutes(
           }, isLocalDev);
           throw new Error(`Failed to delete database: ${String(response.status)}`);
         }
-        
+
         const data = await response.json();
-        
+
         // Complete job tracking
         await finishJobTracking(env, jobId, 'completed', userEmail, isLocalDev, {
           operationType: OperationType.DATABASE_DELETE,
@@ -1018,7 +1019,7 @@ export async function handleDatabaseRoutes(
           processedItems: 1,
           errorCount: 0,
         });
-        
+
         return new Response(JSON.stringify(data), {
           headers: jsonHeaders(corsHeaders)
         });
@@ -1043,11 +1044,11 @@ export async function handleDatabaseRoutes(
         operation: 'export',
         metadata: { databaseIds: body.databaseIds, count: body.databaseIds.length }
       });
-      
+
       // Create job for tracking (if metadata DB is available)
       const jobId = generateJobId('database_export');
       const db = env.METADATA;
-      
+
       if (!isLocalDev) {
         try {
           await createJob(db, {
@@ -1066,7 +1067,7 @@ export async function handleDatabaseRoutes(
           }, isLocalDev);
         }
       }
-      
+
       // Mock response for local development
       if (isLocalDev) {
         logInfo('Simulating database export for local development', {
@@ -1078,7 +1079,7 @@ export async function handleDatabaseRoutes(
         for (const exportDbId of body.databaseIds) {
           mockExports[exportDbId] = `-- Mock export for database ${exportDbId}\nCREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, name TEXT);\nINSERT INTO users (id, name) VALUES (1, 'Test User');`;
         }
-        
+
         return new Response(JSON.stringify({
           result: mockExports,
           success: true
@@ -1086,12 +1087,12 @@ export async function handleDatabaseRoutes(
           headers: jsonHeaders(corsHeaders)
         });
       }
-      
+
       // Export each database using D1's export API
       const exports: Record<string, string> = {};
       const skipped: { databaseId: string; name: string; reason: string; details?: string[] }[] = [];
       let errorCount = 0;
-      
+
       for (const exportDbId of body.databaseIds) {
         try {
           logInfo(`Starting export for database: ${exportDbId}`, {
@@ -1099,13 +1100,13 @@ export async function handleDatabaseRoutes(
             operation: 'export',
             databaseId: exportDbId
           });
-          
+
           // Check if this is a protected system database
           const dbInfoResponse = await fetch(
             `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database/${exportDbId}`,
             { headers: cfHeaders }
           );
-          
+
           let dbName = exportDbId;
           if (dbInfoResponse.ok) {
             const dbInfoData: D1APIResponse = await dbInfoResponse.json();
@@ -1130,7 +1131,7 @@ export async function handleDatabaseRoutes(
               metadata: { status: dbInfoResponse.status }
             }, isLocalDev);
           }
-          
+
           // Check for FTS5 tables - D1 export doesn't support virtual tables
           const fts5Check = await hasFTS5Tables(exportDbId, cfHeaders, env, isLocalDev);
           if (fts5Check.hasFTS5) {
@@ -1140,11 +1141,11 @@ export async function handleDatabaseRoutes(
               databaseId: exportDbId,
               metadata: { fts5Tables: fts5Check.fts5Tables }
             }, isLocalDev);
-            skipped.push({ 
-              databaseId: exportDbId, 
-              name: dbName, 
-              reason: 'fts5', 
-              details: fts5Check.fts5Tables 
+            skipped.push({
+              databaseId: exportDbId,
+              name: dbName,
+              reason: 'fts5',
+              details: fts5Check.fts5Tables
             });
             errorCount++;
             continue;
@@ -1165,7 +1166,7 @@ export async function handleDatabaseRoutes(
               body: JSON.stringify({ output_format: 'polling' })
             }
           );
-          
+
           if (!startResponse.ok) {
             const errorText = await startResponse.text();
             void logError(env, `Export start failed for ${dbName} (${exportDbId}): ${String(startResponse.status)} - ${errorText}`, {
@@ -1178,7 +1179,7 @@ export async function handleDatabaseRoutes(
             errorCount++;
             continue;
           }
-          
+
           const startData: ExportAPIResponse = await startResponse.json();
           logInfo(`Export API response for ${dbName}`, {
             module: 'databases',
@@ -1186,9 +1187,9 @@ export async function handleDatabaseRoutes(
             databaseId: exportDbId,
             metadata: { response: startData }
           });
-          
+
           let signedUrl: string | null = null;
-          
+
           // Check if export is already complete (small databases complete immediately)
           const startResult = startData.result;
           if (startResult?.status === 'complete' && startResult.result?.signed_url) {
@@ -1207,28 +1208,28 @@ export async function handleDatabaseRoutes(
               databaseId: exportDbId,
               metadata: { bookmark }
             });
-            
+
             let attempts = 0;
             const maxAttempts = 60; // 2 minutes max
-            
+
             while (!signedUrl && attempts < maxAttempts) {
               await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
-              
+
               const pollResponse = await fetch(
                 `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database/${exportDbId}/export`,
                 {
                   method: 'POST',
                   headers: cfHeaders,
-                  body: JSON.stringify({ 
+                  body: JSON.stringify({
                     output_format: 'polling',
-                    current_bookmark: bookmark 
+                    current_bookmark: bookmark
                   })
                 }
               );
-              
+
               if (pollResponse.ok) {
                 const pollData: ExportAPIResponse = await pollResponse.json();
-                
+
                 // Check both possible locations for signed_url
                 const pollUrl = pollData.result?.signed_url ?? pollData.result?.result?.signed_url;
                 if (pollUrl) {
@@ -1263,10 +1264,10 @@ export async function handleDatabaseRoutes(
                   metadata: { status: pollResponse.status }
                 }, isLocalDev);
               }
-              
+
               attempts++;
             }
-            
+
             if (!signedUrl) {
               void logError(env, `Export timeout for ${dbName} (${exportDbId}) after ${String(attempts)} attempts`, {
                 module: 'databases',
@@ -1283,12 +1284,12 @@ export async function handleDatabaseRoutes(
               metadata: { response: startData }
             }, isLocalDev);
           }
-          
+
           if (!signedUrl) {
             errorCount++;
             continue;
           }
-          
+
           // Download the SQL file
           logInfo(`Downloading export for ${dbName}...`, {
             module: 'databases',
@@ -1307,6 +1308,14 @@ export async function handleDatabaseRoutes(
               metadata: { bytes: sqlContent.length }
             });
             exports[exportDbId] = sqlContent;
+
+            // Trigger export_complete webhook
+            void triggerWebhooks(
+              env,
+              'export_complete',
+              createExportCompletePayload(exportDbId, dbName, sqlContent.length, 'sql', userEmail),
+              isLocalDev
+            );
           } else {
             void logError(env, `Failed to download export for ${dbName}: ${String(downloadResponse.status)}`, {
               module: 'databases',
@@ -1326,14 +1335,14 @@ export async function handleDatabaseRoutes(
           errorCount++;
         }
       }
-      
+
       // Build error message from skipped databases
       let errorMessage: string | undefined;
       if (skipped.length > 0) {
         const fts5Skipped = skipped.filter(s => s.reason === 'fts5');
         const protectedSkipped = skipped.filter(s => s.reason === 'protected');
         const messages: string[] = [];
-        
+
         if (fts5Skipped.length > 0) {
           messages.push(`FTS5 tables not supported: ${fts5Skipped.map(s => s.name).join(', ')}`);
         }
@@ -1344,7 +1353,7 @@ export async function handleDatabaseRoutes(
           errorMessage = messages.join('; ');
         }
       }
-      
+
       // Complete the job
       try {
         const jobParams: {
@@ -1372,7 +1381,7 @@ export async function handleDatabaseRoutes(
           metadata: { jobId }
         }, isLocalDev);
       }
-      
+
       return new Response(JSON.stringify({
         result: exports,
         skipped: skipped.length > 0 ? skipped : undefined,
@@ -1384,13 +1393,13 @@ export async function handleDatabaseRoutes(
 
     // Import database
     if (request.method === 'POST' && url.pathname === '/api/databases/import') {
-      const body: { 
-        createNew?: boolean; 
-        databaseName?: string; 
+      const body: {
+        createNew?: boolean;
+        databaseName?: string;
         targetDatabaseId?: string;
         sqlContent?: string;
       } = await request.json();
-      
+
       logInfo('Importing database', {
         module: 'databases',
         operation: 'import',
@@ -1398,7 +1407,7 @@ export async function handleDatabaseRoutes(
         ...(body.databaseName !== undefined && { databaseName: body.databaseName }),
         metadata: { createNew: body.createNew }
       });
-      
+
       // Validate sqlContent is present
       if (!body.sqlContent) {
         return new Response(JSON.stringify({
@@ -1410,7 +1419,7 @@ export async function handleDatabaseRoutes(
           headers: jsonHeaders(corsHeaders)
         });
       }
-      
+
       // Clean up SQL content - remove statements that cause import failures
       // 1. Transaction statements: "cannot start a transaction within a transaction" error
       // 2. ANALYZE statements: Creates sqlite_stat1 which may cause ordering issues
@@ -1431,11 +1440,11 @@ export async function handleDatabaseRoutes(
         .replace(/INSERT\s+INTO\s+["']?sqlite_sequence["']?\s+VALUES\s*\([^)]*\);?\s*/gi, '')
         .replace(/DELETE\s+FROM\s+["']?sqlite_sequence["']?[^;]*;?\s*/gi, '')
         .replace(/UPDATE\s+["']?sqlite_sequence["']?\s+[^;]*;?\s*/gi, '');
-      
+
       // Create job for tracking
       const jobId = generateJobId('database_import');
       const db = env.METADATA;
-      
+
       if (!isLocalDev) {
         try {
           await createJob(db, {
@@ -1444,9 +1453,9 @@ export async function handleDatabaseRoutes(
             operationType: 'database_import',
             totalItems: 1,
             userEmail,
-            metadata: { 
-              createNew: body.createNew, 
-              databaseName: body.databaseName 
+            metadata: {
+              createNew: body.createNew,
+              databaseName: body.databaseName
             }
           });
         } catch (err) {
@@ -1457,7 +1466,7 @@ export async function handleDatabaseRoutes(
           }, isLocalDev);
         }
       }
-      
+
       // Mock response for local development
       if (isLocalDev) {
         logInfo('Simulating database import for local development', {
@@ -1485,9 +1494,9 @@ export async function handleDatabaseRoutes(
           });
         }
       }
-      
+
       let targetDbId = body.targetDatabaseId;
-      
+
       try {
         // Create new database if requested
         if (body.createNew && body.databaseName) {
@@ -1499,7 +1508,7 @@ export async function handleDatabaseRoutes(
               body: JSON.stringify({ name: body.databaseName })
             }
           );
-          
+
           if (!createResponse.ok) {
             const errorText = await createResponse.text();
             void logError(env, `Create error during import: ${errorText}`, {
@@ -1510,16 +1519,16 @@ export async function handleDatabaseRoutes(
             }, isLocalDev);
             throw new Error(`Failed to create database: ${String(createResponse.status)}`);
           }
-          
+
           const createData: D1APIResponse = await createResponse.json();
           const newDb = createData.result as D1DatabaseInfo;
           targetDbId = newDb.uuid;
         }
-        
+
         if (!targetDbId) {
           throw new Error('No target database specified');
         }
-        
+
         // Import SQL content using D1's import API (4-step process)
         // Step 1: Generate MD5 hash of SQL content
         const encoder = new TextEncoder();
@@ -1527,14 +1536,14 @@ export async function handleDatabaseRoutes(
         const hashBuffer = await crypto.subtle.digest('MD5', sqlData);
         const hashArray = Array.from(new Uint8Array(hashBuffer));
         const etag = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-        
+
         logInfo(`Import Step 1: Init upload with etag: ${etag}`, {
           module: 'databases',
           operation: 'import',
           databaseId: targetDbId,
           metadata: { etag }
         });
-        
+
         // Step 2: Initialize upload - get R2 upload URL
         const initResponse = await fetch(
           `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database/${targetDbId}/import`,
@@ -1547,7 +1556,7 @@ export async function handleDatabaseRoutes(
             })
           }
         );
-        
+
         if (!initResponse.ok) {
           const errorText = await initResponse.text();
           void logError(env, `Import init error: ${errorText}`, {
@@ -1558,9 +1567,9 @@ export async function handleDatabaseRoutes(
           }, isLocalDev);
           throw new Error(`Failed to initialize import: ${String(initResponse.status)}`);
         }
-        
+
         const initData: ImportAPIResponse = await initResponse.json();
-        
+
         if (!initData.success || !initData.result?.upload_url) {
           void logError(env, 'Import init failed', {
             module: 'databases',
@@ -1570,20 +1579,20 @@ export async function handleDatabaseRoutes(
           }, isLocalDev);
           throw new Error('Failed to get upload URL from init response');
         }
-        
+
         logInfo(`Import Step 2: Uploading SQL to R2, filename: ${initData.result.filename ?? 'unknown'}`, {
           module: 'databases',
           operation: 'import',
           databaseId: targetDbId,
           metadata: { filename: initData.result.filename }
         });
-        
+
         // Step 3: Upload SQL content to R2
         const uploadResponse = await fetch(initData.result.upload_url, {
           method: 'PUT',
           body: sqlContent
         });
-        
+
         if (!uploadResponse.ok) {
           const errorText = await uploadResponse.text();
           void logError(env, `Import upload error: ${errorText}`, {
@@ -1594,7 +1603,7 @@ export async function handleDatabaseRoutes(
           }, isLocalDev);
           throw new Error(`Failed to upload SQL content: ${String(uploadResponse.status)}`);
         }
-        
+
         // Verify ETag from R2 response
         const r2Etag = uploadResponse.headers.get('ETag')?.replace(/"/g, '') ?? '';
         logInfo(`Import R2 ETag: ${r2Etag}, Expected: ${etag}`, {
@@ -1603,7 +1612,7 @@ export async function handleDatabaseRoutes(
           databaseId: targetDbId,
           metadata: { r2Etag, etag }
         });
-        
+
         if (r2Etag && r2Etag !== etag) {
           logWarning('ETag mismatch, but continuing with import', {
             module: 'databases',
@@ -1612,13 +1621,13 @@ export async function handleDatabaseRoutes(
             metadata: { r2Etag, etag }
           });
         }
-        
+
         logInfo('Import Step 3: Starting ingestion', {
           module: 'databases',
           operation: 'import',
           databaseId: targetDbId
         });
-        
+
         // Step 4: Start ingestion
         const ingestResponse = await fetch(
           `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database/${targetDbId}/import`,
@@ -1632,7 +1641,7 @@ export async function handleDatabaseRoutes(
             })
           }
         );
-        
+
         if (!ingestResponse.ok) {
           const errorText = await ingestResponse.text();
           void logError(env, `Import ingest error: ${errorText}`, {
@@ -1643,21 +1652,21 @@ export async function handleDatabaseRoutes(
           }, isLocalDev);
           throw new Error(`Failed to start ingestion: ${String(ingestResponse.status)}`);
         }
-        
+
         const ingestData: ImportAPIResponse = await ingestResponse.json();
-        
+
         logInfo(`Import Step 4: Polling for completion, bookmark: ${ingestData.result?.at_bookmark ?? 'none'}`, {
           module: 'databases',
           operation: 'import',
           databaseId: targetDbId,
           metadata: { bookmark: ingestData.result?.at_bookmark }
         });
-        
+
         // Step 5: Poll for completion
         if (ingestData.result?.at_bookmark) {
           let pollAttempts = 0;
           const maxPollAttempts = 60; // Max 60 seconds of polling
-          
+
           while (pollAttempts < maxPollAttempts) {
             const pollResponse = await fetch(
               `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database/${targetDbId}/import`,
@@ -1670,7 +1679,7 @@ export async function handleDatabaseRoutes(
                 })
               }
             );
-            
+
             if (!pollResponse.ok) {
               logWarning('Poll request failed, continuing...', {
                 module: 'databases',
@@ -1682,16 +1691,16 @@ export async function handleDatabaseRoutes(
               await new Promise(resolve => setTimeout(resolve, 1000));
               continue;
             }
-            
+
             const pollData: ImportAPIResponse = await pollResponse.json();
-            
+
             logInfo('Poll response received', {
               module: 'databases',
               operation: 'import',
               databaseId: targetDbId,
               metadata: { result: pollData.result }
             });
-            
+
             if (pollData.result?.success) {
               logInfo('Import completed successfully', {
                 module: 'databases',
@@ -1700,11 +1709,11 @@ export async function handleDatabaseRoutes(
               });
               break;
             }
-            
+
             if (pollData.result?.error && pollData.result.error !== 'Not currently importing anything.') {
               throw new Error(`Import failed: ${pollData.result.error}`);
             }
-            
+
             // Check for "Not currently importing anything" which means import is done
             if (pollData.result?.error === 'Not currently importing anything.') {
               logInfo('Import completed (no active import)', {
@@ -1714,11 +1723,11 @@ export async function handleDatabaseRoutes(
               });
               break;
             }
-            
+
             pollAttempts++;
             await new Promise(resolve => setTimeout(resolve, 1000));
           }
-          
+
           if (pollAttempts >= maxPollAttempts) {
             logWarning('Import poll timeout, but upload may have succeeded', {
               module: 'databases',
@@ -1728,7 +1737,7 @@ export async function handleDatabaseRoutes(
             });
           }
         }
-        
+
         // Complete the job successfully
         try {
           await completeJob(db, {
@@ -1746,9 +1755,17 @@ export async function handleDatabaseRoutes(
             metadata: { jobId }
           }, isLocalDev);
         }
-        
+
+        // Trigger import_complete webhook
+        void triggerWebhooks(
+          env,
+          'import_complete',
+          createImportCompletePayload(targetDbId, body.databaseName ?? '', ingestData.result?.num_queries, userEmail),
+          isLocalDev
+        );
+
         return new Response(JSON.stringify({
-          result: { 
+          result: {
             imported: true,
             databaseId: targetDbId,
             numQueries: ingestData.result?.num_queries
@@ -1783,14 +1800,14 @@ export async function handleDatabaseRoutes(
     if (request.method === 'POST' && /^\/api\/databases\/[^/]+\/rename$/.exec(url.pathname)) {
       const dbId = url.pathname.split('/')[3] ?? '';
       const body: { newName?: string } = await request.json();
-      
+
       logInfo(`Renaming database: ${dbId} to ${body.newName ?? 'unknown'}`, {
         module: 'databases',
         operation: 'rename',
         databaseId: dbId,
         metadata: { newName: body.newName }
       });
-      
+
       // Mock response for local development
       if (isLocalDev) {
         logInfo('Simulating database rename for local development', {
@@ -1813,13 +1830,13 @@ export async function handleDatabaseRoutes(
           headers: jsonHeaders(corsHeaders)
         });
       }
-      
+
       // Protect system databases from being renamed
       const dbInfoResponse = await fetch(
         `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database/${dbId}`,
         { headers: cfHeaders }
       );
-      
+
       if (dbInfoResponse.ok) {
         const dbInfoData: D1APIResponse = await dbInfoResponse.json();
         const dbInfo = dbInfoData.result as D1DatabaseInfo;
@@ -1833,7 +1850,7 @@ export async function handleDatabaseRoutes(
           return createProtectedDatabaseResponse(corsHeaders);
         }
       }
-      
+
       // Check for FTS5 tables - D1 export API cannot export databases with FTS5 tables
       const fts5Check = await hasFTS5Tables(dbId, cfHeaders, env, isLocalDev);
       if (fts5Check.hasFTS5) {
@@ -1853,7 +1870,7 @@ export async function handleDatabaseRoutes(
           headers: jsonHeaders(corsHeaders)
         });
       }
-      
+
       // Start job tracking for rename operation
       const renameJobId = await startJobTracking(
         env,
@@ -1863,9 +1880,9 @@ export async function handleDatabaseRoutes(
         isLocalDev,
         { oldName: dbId, newName: body.newName }
       );
-      
+
       let newDbId: string | null = null;
-      
+
       try {
         // Step 1: Validate new name - check if it already exists
         logInfo('Step 1: Validating new name', { module: 'databases', operation: 'rename', databaseId: dbId });
@@ -1873,19 +1890,19 @@ export async function handleDatabaseRoutes(
           `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database`,
           { headers: cfHeaders }
         );
-        
+
         if (!listResponse.ok) {
           throw new Error('Failed to validate database name');
         }
-        
+
         const listData: D1APIResponse = await listResponse.json();
         const databases = listData.result as D1DatabaseInfo[];
         const existingDb = databases.find((d: D1DatabaseInfo) => d.name === body.newName);
-        
+
         if (existingDb) {
           throw new Error(`Database with name "${body.newName ?? ''}" already exists`);
         }
-        
+
         // Step 2: Create new database with desired name
         logInfo('Step 2: Creating new database', { module: 'databases', operation: 'rename', databaseId: dbId, metadata: { newName: body.newName } });
         const createResponse = await fetch(
@@ -1896,7 +1913,7 @@ export async function handleDatabaseRoutes(
             body: JSON.stringify({ name: body.newName })
           }
         );
-        
+
         if (!createResponse.ok) {
           const errorText = await createResponse.text();
           void logError(env, `Create error during rename: ${errorText}`, {
@@ -1907,12 +1924,12 @@ export async function handleDatabaseRoutes(
           }, isLocalDev);
           throw new Error(`Failed to create new database: ${String(createResponse.status)}`);
         }
-        
+
         const createData: D1APIResponse = await createResponse.json();
         const newDb = createData.result as D1DatabaseInfo;
         newDbId = newDb.uuid;
         logInfo(`Created new database: ${newDbId}`, { module: 'databases', operation: 'rename', databaseId: newDbId });
-        
+
         // Step 3: Export source database
         logInfo('Step 3: Exporting source database', { module: 'databases', operation: 'rename', databaseId: dbId });
         const startExportResponse = await fetch(
@@ -1923,7 +1940,7 @@ export async function handleDatabaseRoutes(
             body: JSON.stringify({ output_format: 'polling' })
           }
         );
-        
+
         if (!startExportResponse.ok) {
           const errorText = await startExportResponse.text();
           void logError(env, `Export start failed: ${errorText}`, {
@@ -1934,12 +1951,12 @@ export async function handleDatabaseRoutes(
           }, isLocalDev);
           throw new Error('Failed to start database export');
         }
-        
+
         const exportStartData: ExportAPIResponse = await startExportResponse.json();
         logInfo('Export API response received', { module: 'databases', operation: 'rename', databaseId: dbId, metadata: { response: exportStartData } });
-        
+
         let signedUrl: string | null = null;
-        
+
         // Check if export is already complete (small databases complete immediately)
         const exportResult = exportStartData.result;
         if (exportResult?.status === 'complete' && exportResult.result?.signed_url) {
@@ -1952,28 +1969,28 @@ export async function handleDatabaseRoutes(
           // Need to poll for completion
           const bookmark = exportResult.at_bookmark;
           logInfo(`Got bookmark, polling for completion: ${bookmark}`, { module: 'databases', operation: 'rename', databaseId: dbId, metadata: { bookmark } });
-          
+
           let attempts = 0;
           const maxAttempts = 60; // 2 minutes max
-          
+
           while (!signedUrl && attempts < maxAttempts) {
             await new Promise(resolve => setTimeout(resolve, 2000));
-            
+
             const pollResponse = await fetch(
               `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database/${dbId}/export`,
               {
                 method: 'POST',
                 headers: cfHeaders,
-                body: JSON.stringify({ 
+                body: JSON.stringify({
                   output_format: 'polling',
-                  current_bookmark: bookmark 
+                  current_bookmark: bookmark
                 })
               }
             );
-            
+
             if (pollResponse.ok) {
               const pollData: ExportAPIResponse = await pollResponse.json();
-              
+
               // Check both possible locations for signed_url
               const pollUrl = pollData.result?.signed_url ?? pollData.result?.result?.signed_url;
               if (pollUrl) {
@@ -1991,7 +2008,7 @@ export async function handleDatabaseRoutes(
                 metadata: { status: pollResponse.status }
               }, isLocalDev);
             }
-            
+
             attempts++;
           }
         } else {
@@ -2003,28 +2020,28 @@ export async function handleDatabaseRoutes(
           }, isLocalDev);
           throw new Error('Failed to start database export - unexpected API response');
         }
-        
+
         if (!signedUrl) {
           throw new Error('Export timeout - database may be too large');
         }
-        
+
         // Download the SQL content
         logInfo('Downloading exported SQL', { module: 'databases', operation: 'rename', databaseId: dbId });
         const downloadResponse = await fetch(signedUrl);
         if (!downloadResponse.ok) {
           throw new Error('Failed to download database export');
         }
-        
+
         let sqlContent = await downloadResponse.text();
         // DEBUG: Log SQL content details
         const sqlPreview = sqlContent.substring(0, 500);
         const createTableCount = (sqlContent.match(/CREATE TABLE/g) ?? []).length;
         const hasTransaction = sqlContent.includes('BEGIN TRANSACTION') || sqlContent.includes('BEGIN;') || sqlContent.includes('COMMIT;');
         const hasStrict = sqlContent.includes('STRICT');
-        
-        logInfo(`Downloaded SQL content: ${String(sqlContent.length)} bytes, CREATE TABLE count: ${String(createTableCount)}, hasTransaction: ${String(hasTransaction)}, hasSTRICT: ${String(hasStrict)}`, { 
-          module: 'databases', 
-          operation: 'rename', 
+
+        logInfo(`Downloaded SQL content: ${String(sqlContent.length)} bytes, CREATE TABLE count: ${String(createTableCount)}, hasTransaction: ${String(hasTransaction)}, hasSTRICT: ${String(hasStrict)}`, {
+          module: 'databases',
+          operation: 'rename',
           databaseId: dbId
         });
         // Log the first 500 chars of SQL for debugging
@@ -2033,7 +2050,7 @@ export async function handleDatabaseRoutes(
           operation: 'rename',
           databaseId: dbId
         });
-        
+
         // Clean up SQL content - remove statements that cause import failures
         // 1. Transaction statements: "cannot start a transaction within a transaction" error
         // 2. ANALYZE statements: Creates sqlite_stat1 which may cause ordering issues
@@ -2055,7 +2072,7 @@ export async function handleDatabaseRoutes(
           .replace(/INSERT\s+INTO\s+["']?sqlite_sequence["']?\s+VALUES\s*\([^)]*\);?\s*/gi, '')
           .replace(/DELETE\s+FROM\s+["']?sqlite_sequence["']?[^;]*;?\s*/gi, '')
           .replace(/UPDATE\s+["']?sqlite_sequence["']?\s+[^;]*;?\s*/gi, '');
-        
+
         if (sqlContent.length !== originalLength) {
           logInfo(`SQL cleaned: removed problematic statements (${String(originalLength)} -> ${String(sqlContent.length)} bytes)`, {
             module: 'databases',
@@ -2063,10 +2080,10 @@ export async function handleDatabaseRoutes(
             databaseId: dbId
           });
         }
-        
+
         // Step 4: Import into new database using multi-step process
         logInfo('Step 4: Importing into new database', { module: 'databases', operation: 'rename', databaseId: newDbId });
-        
+
         // 4a: Calculate MD5 hash for etag
         const encoder = new TextEncoder();
         const sqlData = encoder.encode(sqlContent);
@@ -2074,7 +2091,7 @@ export async function handleDatabaseRoutes(
         const hashArray = Array.from(new Uint8Array(hashBuffer));
         const etag = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
         logInfo(`Calculated etag (MD5): ${etag}`, { module: 'databases', operation: 'rename', databaseId: newDbId, metadata: { etag } });
-        
+
         // 4b: Init upload to get presigned URL
         logInfo('Step 4b: Initializing import upload', { module: 'databases', operation: 'rename', databaseId: newDbId });
         const initResponse = await fetch(
@@ -2088,7 +2105,7 @@ export async function handleDatabaseRoutes(
             })
           }
         );
-        
+
         if (!initResponse.ok) {
           const errorText = await initResponse.text();
           void logError(env, `Import init error: ${errorText}`, {
@@ -2099,20 +2116,20 @@ export async function handleDatabaseRoutes(
           }, isLocalDev);
           throw new Error('Failed to initialize import');
         }
-        
+
         const initData: ImportAPIResponse = await initResponse.json();
         logInfo(`Got upload URL and filename: ${initData.result?.filename ?? 'unknown'}`, { module: 'databases', operation: 'rename', databaseId: newDbId, metadata: { filename: initData.result?.filename } });
-        
+
         const uploadUrl = initData.result?.upload_url ?? '';
         const filename = initData.result?.filename ?? '';
-        
+
         // 4c: Upload SQL content to R2
         logInfo('Step 4c: Uploading SQL to R2', { module: 'databases', operation: 'rename', databaseId: newDbId });
         const uploadResponse = await fetch(uploadUrl, {
           method: 'PUT',
           body: sqlContent
         });
-        
+
         if (!uploadResponse.ok) {
           const errorText = await uploadResponse.text();
           void logError(env, `R2 upload error: ${errorText}`, {
@@ -2123,11 +2140,11 @@ export async function handleDatabaseRoutes(
           }, isLocalDev);
           throw new Error('Failed to upload SQL content');
         }
-        
+
         // Verify etag from R2 response
         const r2Etag = uploadResponse.headers.get('ETag')?.replace(/"/g, '');
         logInfo(`R2 upload complete, ETag: ${r2Etag ?? 'none'}`, { module: 'databases', operation: 'rename', databaseId: newDbId, metadata: { r2Etag } });
-        
+
         if (r2Etag && r2Etag !== etag) {
           logWarning(`ETag mismatch - expected: ${etag}, got: ${r2Etag}`, {
             module: 'databases',
@@ -2137,16 +2154,16 @@ export async function handleDatabaseRoutes(
           });
           // Continue anyway, some environments may have different etag handling
         }
-        
+
         // 4d: Start ingestion
         const ingestBody = {
           action: 'ingest',
           etag: etag,
           filename: filename
         };
-        logInfo(`Step 4d: Starting ingestion with etag=${etag}, filename=${filename}, sqlSize=${String(sqlContent.length)}`, { 
-          module: 'databases', 
-          operation: 'rename', 
+        logInfo(`Step 4d: Starting ingestion with etag=${etag}, filename=${filename}, sqlSize=${String(sqlContent.length)}`, {
+          module: 'databases',
+          operation: 'rename',
           databaseId: newDbId
         });
         const ingestResponse = await fetch(
@@ -2157,7 +2174,7 @@ export async function handleDatabaseRoutes(
             body: JSON.stringify(ingestBody)
           }
         );
-        
+
         if (!ingestResponse.ok) {
           const errorText = await ingestResponse.text();
           void logError(env, `Ingest error: ${errorText}`, {
@@ -2168,16 +2185,16 @@ export async function handleDatabaseRoutes(
           }, isLocalDev);
           throw new Error('Failed to start import ingestion');
         }
-        
+
         const ingestData: ImportAPIResponse = await ingestResponse.json();
         // DEBUG: Log full ingest response explicitly
         const ingestResponseStr = JSON.stringify(ingestData);
-        logInfo(`Ingestion response: ${ingestResponseStr.substring(0, 500)}`, { 
-          module: 'databases', 
-          operation: 'rename', 
+        logInfo(`Ingestion response: ${ingestResponseStr.substring(0, 500)}`, {
+          module: 'databases',
+          operation: 'rename',
           databaseId: newDbId
         });
-        
+
         // 4e: Poll for import completion
         if (ingestData.result?.at_bookmark) {
           logInfo('Step 4e: Polling for import completion', { module: 'databases', operation: 'rename', databaseId: newDbId });
@@ -2185,10 +2202,10 @@ export async function handleDatabaseRoutes(
           let importAttempts = 0;
           const maxImportAttempts = 60; // 2 minutes max
           let importComplete = false;
-          
+
           while (!importComplete && importAttempts < maxImportAttempts) {
             await new Promise(resolve => setTimeout(resolve, 2000));
-            
+
             const pollResponse = await fetch(
               `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database/${newDbId}/import`,
               {
@@ -2200,30 +2217,30 @@ export async function handleDatabaseRoutes(
                 })
               }
             );
-            
+
             if (pollResponse.ok) {
               const pollData: ImportAPIResponse = await pollResponse.json();
               // DEBUG: Log full poll response
-              logInfo('Import poll response', { 
-                module: 'databases', 
-                operation: 'rename', 
-                databaseId: newDbId, 
-                metadata: { 
+              logInfo('Import poll response', {
+                module: 'databases',
+                operation: 'rename',
+                databaseId: newDbId,
+                metadata: {
                   attempt: importAttempts + 1,
                   fullResponse: JSON.stringify(pollData),
                   resultKeys: pollData.result ? Object.keys(pollData.result) : []
-                } 
+                }
               });
-              
+
               if (pollData.result?.success) {
                 logInfo(`Import completed successfully after ${String(importAttempts + 1)} polls`, { module: 'databases', operation: 'rename', databaseId: newDbId, metadata: { attempts: importAttempts + 1 } });
                 importComplete = true;
               } else if (pollData.result?.error === 'Not currently importing anything.') {
                 // DEBUG: This might be a problem - let's also query the database to see if tables exist
-                logWarning('Got "Not currently importing anything" - this may indicate the import was rejected. Checking table count...', { 
-                  module: 'databases', 
-                  operation: 'rename', 
-                  databaseId: newDbId 
+                logWarning('Got "Not currently importing anything" - this may indicate the import was rejected. Checking table count...', {
+                  module: 'databases',
+                  operation: 'rename',
+                  databaseId: newDbId
                 });
                 // Quick check if any tables exist
                 try {
@@ -2241,9 +2258,9 @@ export async function handleDatabaseRoutes(
                   if (checkResponse.ok) {
                     const checkData = await checkResponse.json() as { result: { results: { name: string }[] }[] };
                     const tableCount = checkData.result?.[0]?.results?.length ?? 0;
-                    logInfo(`Quick table count check: ${String(tableCount)} tables found`, { 
-                      module: 'databases', 
-                      operation: 'rename', 
+                    logInfo(`Quick table count check: ${String(tableCount)} tables found`, {
+                      module: 'databases',
+                      operation: 'rename',
                       databaseId: newDbId,
                       metadata: { tableCount, tables: checkData.result?.[0]?.results?.map(r => r.name) }
                     });
@@ -2271,36 +2288,36 @@ export async function handleDatabaseRoutes(
                 metadata: { status: pollResponse.status }
               }, isLocalDev);
             }
-            
+
             importAttempts++;
           }
-          
+
           if (!importComplete) {
             throw new Error('Import timeout - database may be too large');
           }
         } else {
           // DEBUG: No at_bookmark means import either completed instantly or was rejected
-          logWarning('No at_bookmark in ingest response - import may have failed silently', { 
-            module: 'databases', 
-            operation: 'rename', 
+          logWarning('No at_bookmark in ingest response - import may have failed silently', {
+            module: 'databases',
+            operation: 'rename',
             databaseId: newDbId,
-            metadata: { 
-              fullResponse: JSON.stringify(ingestData) 
+            metadata: {
+              fullResponse: JSON.stringify(ingestData)
             }
           });
         }
-        
+
         // Step 5: Verify import (with retry for D1 eventual consistency)
         logInfo('Step 5: Verifying import integrity', { module: 'databases', operation: 'rename', databaseId: newDbId });
-        
+
         // D1 has eventual consistency - wait a bit before verification
         logInfo('Waiting 3 seconds for D1 eventual consistency...', { module: 'databases', operation: 'rename', databaseId: newDbId });
         await new Promise(resolve => setTimeout(resolve, 3000));
-        
+
         // Retry verification up to 3 times with delays
         let verification: { success: boolean; issues: string[] } = { success: false, issues: [] };
         const maxVerifyAttempts = 3;
-        
+
         for (let verifyAttempt = 0; verifyAttempt < maxVerifyAttempts; verifyAttempt++) {
           verification = await verifyDatabaseIntegrity(
             dbId,
@@ -2308,14 +2325,14 @@ export async function handleDatabaseRoutes(
             cfHeaders,
             env
           );
-          
+
           if (verification.success) {
             if (verifyAttempt > 0) {
               logInfo(`Verification passed on attempt ${String(verifyAttempt + 1)}`, { module: 'databases', operation: 'rename', databaseId: newDbId });
             }
             break;
           }
-          
+
           // If failed and not last attempt, wait and retry
           if (verifyAttempt < maxVerifyAttempts - 1) {
             logWarning(`Verification attempt ${String(verifyAttempt + 1)} failed, retrying in 3 seconds... Issues: ${verification.issues.join('; ')}`, {
@@ -2344,7 +2361,7 @@ export async function handleDatabaseRoutes(
         }
 
         logInfo('Verification passed - all data migrated successfully', { module: 'databases', operation: 'rename', databaseId: newDbId });
-        
+
         // Step 6: Delete original database
         logInfo('Step 6: Deleting original database', { module: 'databases', operation: 'rename', databaseId: dbId });
         const deleteResponse = await fetch(
@@ -2354,7 +2371,7 @@ export async function handleDatabaseRoutes(
             headers: cfHeaders
           }
         );
-        
+
         if (!deleteResponse.ok) {
           logWarning('Failed to delete original database - manual cleanup may be required', {
             module: 'databases',
@@ -2363,9 +2380,9 @@ export async function handleDatabaseRoutes(
           });
           // Don't throw here - the rename essentially succeeded, user just needs to manually delete old db
         }
-        
+
         logInfo('Rename completed successfully', { module: 'databases', operation: 'rename', databaseId: dbId, metadata: { newDbId, newName: body.newName } });
-        
+
         // Complete job tracking
         await finishJobTracking(env, renameJobId, 'completed', userEmail, isLocalDev, {
           operationType: OperationType.DATABASE_RENAME,
@@ -2373,7 +2390,7 @@ export async function handleDatabaseRoutes(
           processedItems: 1,
           errorCount: 0,
         });
-        
+
         return new Response(JSON.stringify({
           result: {
             uuid: newDbId,
@@ -2384,14 +2401,14 @@ export async function handleDatabaseRoutes(
         }), {
           headers: jsonHeaders(corsHeaders)
         });
-        
+
       } catch (err) {
         void logError(env, err instanceof Error ? err : String(err), {
           module: 'databases',
           operation: 'rename',
           databaseId: dbId
         }, isLocalDev);
-        
+
         // Mark job as failed
         await finishJobTracking(env, renameJobId, 'failed', userEmail, isLocalDev, {
           operationType: OperationType.DATABASE_RENAME,
@@ -2400,7 +2417,7 @@ export async function handleDatabaseRoutes(
           errorCount: 1,
           errorMessage: err instanceof Error ? err.message : 'Unknown error',
         });
-        
+
         // Rollback: Delete the new database if it was created
         if (newDbId) {
           logInfo(`Rolling back - deleting new database: ${newDbId}`, { module: 'databases', operation: 'rename', databaseId: newDbId });
@@ -2420,7 +2437,7 @@ export async function handleDatabaseRoutes(
             }, isLocalDev);
           }
         }
-        
+
         throw err;
       }
     }
@@ -2433,7 +2450,7 @@ export async function handleDatabaseRoutes(
         operation: 'optimize',
         metadata: { databaseIds: body.databaseIds, count: body.databaseIds.length }
       });
-      
+
       // Mock response for local development
       if (isLocalDev) {
         logInfo('Simulating database optimization for local development', { module: 'databases', operation: 'optimize' });
@@ -2447,7 +2464,7 @@ export async function handleDatabaseRoutes(
           headers: jsonHeaders(corsHeaders)
         });
       }
-      
+
       // Start job tracking
       const jobId = await startJobTracking(
         env,
@@ -2457,10 +2474,10 @@ export async function handleDatabaseRoutes(
         isLocalDev,
         { databaseIds: body.databaseIds, count: body.databaseIds.length }
       );
-      
+
       const succeeded: { id: string; name: string }[] = [];
       const failed: { id: string; name: string; error: string }[] = [];
-      
+
       try {
         for (const optimizeDbId of body.databaseIds) {
           try {
@@ -2469,14 +2486,14 @@ export async function handleDatabaseRoutes(
               `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database/${optimizeDbId}`,
               { headers: cfHeaders }
             );
-            
+
             let dbName = optimizeDbId;
             if (dbInfoResponse.ok) {
               const dbInfoData: D1APIResponse = await dbInfoResponse.json();
               const dbInfo = dbInfoData.result as D1DatabaseInfo;
               dbName = dbInfo.name;
             }
-            
+
             // Run PRAGMA optimize
             logInfo(`Running PRAGMA optimize on ${dbName} (${optimizeDbId})`, {
               module: 'databases',
@@ -2492,7 +2509,7 @@ export async function handleDatabaseRoutes(
                 body: JSON.stringify({ sql: 'PRAGMA optimize' })
               }
             );
-            
+
             if (!queryResponse.ok) {
               const errorText = await queryResponse.text();
               void logError(env, `Optimize failed for ${optimizeDbId}: ${errorText}`, {
@@ -2527,7 +2544,7 @@ export async function handleDatabaseRoutes(
             });
           }
         }
-        
+
         // Complete job tracking
         logInfo(`Optimize complete - Succeeded: ${String(succeeded.length)}, Failed: ${String(failed.length)}`, {
           module: 'databases',
@@ -2545,7 +2562,7 @@ export async function handleDatabaseRoutes(
           failedCount: failed.length,
           triggerWebhook: true,
         });
-        
+
         return new Response(JSON.stringify({
           result: { succeeded, failed },
           success: true
@@ -2566,9 +2583,9 @@ export async function handleDatabaseRoutes(
     }
 
     // Route not found
-    return new Response(JSON.stringify({ 
-      error: 'Route not found' 
-    }), { 
+    return new Response(JSON.stringify({
+      error: 'Route not found'
+    }), {
       status: 404,
       headers: jsonHeaders(corsHeaders)
     });
@@ -2581,10 +2598,10 @@ export async function handleDatabaseRoutes(
       userId: userEmail
     }, isLocalDev);
     // Return generic error to client (security: don't expose stack traces)
-    return new Response(JSON.stringify({ 
+    return new Response(JSON.stringify({
       error: 'Database operation failed',
       message: 'Unable to complete database operation. Please try again.'
-    }), { 
+    }), {
       status: 500,
       headers: jsonHeaders(corsHeaders)
     });

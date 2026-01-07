@@ -44,3 +44,6 @@ new_classes = ["BackupDO"]
 [observability.logs]
 enabled = true
 
+# AI Search Integration (local dev uses mock data)
+[ai]
+binding = "AI"

@@ -17,6 +17,8 @@ import { handleMigrationRoutes } from './routes/migrations';
 import { handleMetricsRoutes } from './routes/metrics';
 import { handleScheduledBackupRoutes } from './routes/scheduled-backups';
 import { handleDrizzleRoutes } from './routes/drizzle';
+import { handleHealthRoutes } from './routes/health';
+import { handleAISearchRoutes } from './routes/ai-search';
 import { processScheduledBackups } from './utils/scheduled-backup-processor';
 import { trackDatabaseAccess } from './utils/database-tracking';
 import { logInfo, logWarning } from './utils/error-logger';
@@ -78,7 +80,7 @@ function getCacheHeaders(pathname: string): Record<string, string> {
       'Expires': '0'
     };
   }
-  
+
   // Hashed assets (Vite adds content hash to filename)
   // These are immutable - safe to cache forever
   if (/\/assets\/.*-[a-zA-Z0-9]{8}\.(js|css|woff2?|ttf|eot)$/.exec(pathname)) {
@@ -87,7 +89,7 @@ function getCacheHeaders(pathname: string): Record<string, string> {
       'CDN-Cache-Control': 'public, max-age=31536000, immutable'
     };
   }
-  
+
   // Images and other static files in assets folder
   if (pathname.startsWith('/assets/')) {
     return {
@@ -95,7 +97,7 @@ function getCacheHeaders(pathname: string): Record<string, string> {
       'CDN-Cache-Control': 'public, max-age=31536000, immutable'
     };
   }
-  
+
   // SVG, favicon, and other root-level static files
   if (/\.(svg|ico|png|jpg|jpeg|gif|webp)$/.exec(pathname)) {
     return {
@@ -103,7 +105,7 @@ function getCacheHeaders(pathname: string): Record<string, string> {
       'CDN-Cache-Control': 'public, max-age=604800'
     };
   }
-  
+
   // Default: short cache for other static files
   return {
     'Cache-Control': 'public, max-age=3600, stale-while-revalidate=86400',
@@ -118,7 +120,7 @@ async function handleApiRequest(request: Request, env: Env, ctx: ExecutionContex
     operation: 'request',
     metadata: { method: request.method, path: url.pathname }
   });
-  
+
   // Get CORS headers
   const corsHeaders = getCorsHeaders(request);
 
@@ -129,32 +131,32 @@ async function handleApiRequest(request: Request, env: Env, ctx: ExecutionContex
 
   // Check if local development
   const isLocalhost = isLocalDevelopment(request);
-  
+
   // Allow static assets without authentication (from Workers Assets binding)
   // These are served by Cloudflare's edge network and don't need auth
   if (!url.pathname.startsWith('/api/')) {
     // Static asset request - serve with optimized cache and security headers
     const assetResponse = await env.ASSETS.fetch(request);
-    
+
     // Clone response and add cache + security headers
     const cacheHeaders = getCacheHeaders(url.pathname);
     const securityHeaders = getSecurityHeaders();
     const newHeaders = new Headers(assetResponse.headers);
-    
+
     Object.entries(cacheHeaders).forEach(([key, value]) => {
       newHeaders.set(key, value);
     });
     Object.entries(securityHeaders).forEach(([key, value]) => {
       newHeaders.set(key, value);
     });
-    
+
     return new Response(assetResponse.body, {
       status: assetResponse.status,
       statusText: assetResponse.statusText,
       headers: newHeaders
     });
   }
-  
+
   // Skip auth for localhost development API requests
   let userEmail: string | null = null;
   if (isLocalhost) {
@@ -167,7 +169,7 @@ async function handleApiRequest(request: Request, env: Env, ctx: ExecutionContex
     // Require auth for production API endpoints
     userEmail = await validateAccessJWT(request, env);
     if (!userEmail) {
-      return new Response('Unauthorized', { 
+      return new Response('Unauthorized', {
         status: 401,
         headers: corsHeaders
       });
@@ -176,7 +178,7 @@ async function handleApiRequest(request: Request, env: Env, ctx: ExecutionContex
 
   // Only use mock data if in local development AND missing credentials
   const isLocalDev = isLocalhost && (!env.ACCOUNT_ID || !env.API_KEY);
-  
+
   logInfo('Environment configuration', {
     module: 'worker',
     operation: 'init',
@@ -191,10 +193,10 @@ async function handleApiRequest(request: Request, env: Env, ctx: ExecutionContex
 
   // Route API requests
   // Handle color routes first (more specific paths)
-  if (url.pathname === '/api/databases/colors' || 
-      /^\/api\/databases\/[^/]+\/color$/.exec(url.pathname) !== null ||
-      /^\/api\/tables\/[^/]+\/colors$/.exec(url.pathname) !== null ||
-      /^\/api\/tables\/[^/]+\/[^/]+\/color$/.exec(url.pathname) !== null) {
+  if (url.pathname === '/api/databases/colors' ||
+    /^\/api\/databases\/[^/]+\/color$/.exec(url.pathname) !== null ||
+    /^\/api\/tables\/[^/]+\/colors$/.exec(url.pathname) !== null ||
+    /^\/api\/tables\/[^/]+\/[^/]+\/color$/.exec(url.pathname) !== null) {
     const colorResponse = await handleColorRoutes(request, env, url, corsHeaders, isLocalDev, userEmail);
     if (colorResponse) {
       return colorResponse;
@@ -270,6 +272,14 @@ async function handleApiRequest(request: Request, env: Env, ctx: ExecutionContex
     }
   }
 
+  // Health dashboard routes
+  if (url.pathname === '/api/health') {
+    const healthResponse = await handleHealthRoutes(request, env, url, corsHeaders, isLocalDev, userEmail);
+    if (healthResponse) {
+      return healthResponse;
+    }
+  }
+
   if (url.pathname.startsWith('/api/metrics')) {
     const metricsResponse = await handleMetricsRoutes(request, env, url, corsHeaders, isLocalDev, userEmail);
     if (metricsResponse) {
@@ -288,6 +298,11 @@ async function handleApiRequest(request: Request, env: Env, ctx: ExecutionContex
     return await handleDrizzleRoutes(request, env, url, corsHeaders, isLocalDev, userEmail);
   }
 
+  // AI Search routes
+  if (url.pathname.startsWith('/api/ai-search')) {
+    return await handleAISearchRoutes(request, env, url, corsHeaders, isLocalDev, userEmail);
+  }
+
   // Serve frontend assets
   if (isLocalhost) {
     // In development, Vite serves the frontend on port 5173
@@ -302,12 +317,12 @@ async function handleApiRequest(request: Request, env: Env, ctx: ExecutionContex
   try {
     const assetResponse = await env.ASSETS.fetch(request);
     const securityHeaders = getSecurityHeaders();
-    
+
     // If asset not found and not an API route, serve index.html for client-side routing
     if (assetResponse.status === 404 && !url.pathname.startsWith('/api/')) {
       const indexRequest = new Request(new URL('/index.html', request.url), request);
       const indexResponse = await env.ASSETS.fetch(indexRequest);
-      
+
       // index.html should not be cached but needs security headers
       const indexHeaders = new Headers(indexResponse.headers);
       const noCacheHeaders = getCacheHeaders('/index.html');
@@ -317,14 +332,14 @@ async function handleApiRequest(request: Request, env: Env, ctx: ExecutionContex
       Object.entries(securityHeaders).forEach(([key, value]) => {
         indexHeaders.set(key, value);
       });
-      
+
       return new Response(indexResponse.body, {
         status: indexResponse.status,
         statusText: indexResponse.statusText,
         headers: indexHeaders
       });
     }
-    
+
     // Add cache + security headers to successful asset response
     const cacheHeaders = getCacheHeaders(url.pathname);
     const newHeaders = new Headers(assetResponse.headers);
@@ -334,7 +349,7 @@ async function handleApiRequest(request: Request, env: Env, ctx: ExecutionContex
     Object.entries(securityHeaders).forEach(([key, value]) => {
       newHeaders.set(key, value);
     });
-    
+
     return new Response(assetResponse.body, {
       status: assetResponse.status,
       statusText: assetResponse.statusText,
@@ -346,7 +361,7 @@ async function handleApiRequest(request: Request, env: Env, ctx: ExecutionContex
       operation: 'serve_asset',
       metadata: { path: url.pathname, error: err instanceof Error ? err.message : String(err) }
     });
-    return new Response('Not Found', { 
+    return new Response('Not Found', {
       status: 404,
       headers: corsHeaders
     });
@@ -369,8 +384,8 @@ export default {
           {
             module: 'worker',
             operation: 'fetch',
-            metadata: { 
-              method: request.method, 
+            metadata: {
+              method: request.method,
               path: url.pathname,
               stack: err instanceof Error ? err.stack : undefined
             }
@@ -382,10 +397,10 @@ export default {
       const jsonErrHeaders = new Headers(corsHeaders);
       jsonErrHeaders.set('Content-Type', 'application/json');
       // Return generic error to client (security: don't expose stack traces)
-      return new Response(JSON.stringify({ 
+      return new Response(JSON.stringify({
         error: 'Internal Server Error',
         message: 'An unexpected error occurred. Please try again later.'
-      }), { 
+      }), {
         status: 500,
         headers: jsonErrHeaders
       });

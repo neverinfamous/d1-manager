@@ -2,7 +2,7 @@ import { useState, useEffect, lazy, Suspense } from 'react'
 import { api, type D1Database, type DatabaseColor, getUndoHistory, getR2BackupStatus, type R2BackupStatus, getMigrationStatus, applyMigrations, markLegacyMigrations, type MigrationStatus, listR2Backups, listOrphanedR2Backups, deleteAllR2Backups, type OrphanedBackupGroup } from './services/api'
 import { auth } from './services/auth'
 import { useTheme } from './hooks/useTheme'
-import { Database, Plus, Moon, Sun, Monitor, Loader2, Code, GitCompare, Upload, Download, Trash2, Pencil, Zap, Undo, History, AlertCircle, AlertTriangle, Globe, Sparkles, Copy, Bell, Search, Check, Cloud, RefreshCw, ArrowUpCircle, LayoutGrid, LayoutList, BarChart3, BookOpen, ExternalLink, Book } from 'lucide-react'
+import { Database, Plus, Moon, Sun, Monitor, Loader2, Code, GitCompare, Upload, Download, Trash2, Pencil, Zap, Undo, History, AlertCircle, AlertTriangle, Globe, Sparkles, Copy, Bell, Search, Check, Cloud, RefreshCw, ArrowUpCircle, LayoutGrid, LayoutList, BarChart3, BookOpen, ExternalLink, Book, Activity } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
@@ -45,6 +45,7 @@ const BackupRestoreHub = lazy(() => import('./components/BackupRestoreHub').then
 const WebhookManager = lazy(() => import('./components/WebhookManager').then(m => ({ default: m.WebhookManager })))
 const MetricsDashboard = lazy(() => import('./components/MetricsDashboard').then(m => ({ default: m.MetricsDashboard })))
 const JobHistory = lazy(() => import('./components/JobHistory').then(m => ({ default: m.JobHistory })))
+const HealthDashboard = lazy(() => import('./components/HealthDashboard').then(m => ({ default: m.HealthDashboard })))
 import { R2BackupDialog } from './components/R2BackupDialog'
 import { R2RestoreDialog } from './components/R2RestoreDialog'
 import { BackupProgressDialog } from './components/BackupProgressDialog'
@@ -63,6 +64,7 @@ type View =
   | { type: 'job-history' }
   | { type: 'webhooks' }
   | { type: 'metrics' }
+  | { type: 'health' }
 
 type DatabaseViewMode = 'grid' | 'list'
 
@@ -1039,6 +1041,13 @@ export default function App(): React.JSX.Element {
             Metrics
           </Button>
           <Button
+            variant={currentView.type === 'health' ? 'default' : 'ghost'}
+            onClick={() => setCurrentView({ type: 'health' })}
+          >
+            <Activity className="h-4 w-4 mr-2" />
+            Health
+          </Button>
+          <Button
             variant={currentView.type === 'webhooks' ? 'default' : 'ghost'}
             onClick={() => setCurrentView({ type: 'webhooks' })}
           >
@@ -1681,6 +1690,12 @@ export default function App(): React.JSX.Element {
         {currentView.type === 'metrics' && (
           <Suspense fallback={<LazyLoadingFallback />}>
             <MetricsDashboard />
+          </Suspense>
+        )}
+
+        {currentView.type === 'health' && (
+          <Suspense fallback={<LazyLoadingFallback />}>
+            <HealthDashboard />
           </Suspense>
         )}
       </main>
@@ -2413,8 +2428,8 @@ export default function App(): React.JSX.Element {
                         {r2BackupStatus?.configured && (
                           <button
                             className={`text-xs px-2 py-1 rounded-md transition-colors ${r2CountValue > 0
-                                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/50'
-                                : 'text-muted-foreground hover:bg-muted'
+                              ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/50'
+                              : 'text-muted-foreground hover:bg-muted'
                               }`}
                             onClick={() => {
                               setUndoSelectedDatabase({ id: db.uuid, name: db.name, preferR2Tab: true })
@@ -2435,8 +2450,8 @@ export default function App(): React.JSX.Element {
                         )}
                         <button
                           className={`text-xs px-2 py-1 rounded-md transition-colors ${undoCountValue > 0
-                              ? 'bg-primary/10 text-primary hover:bg-primary/20'
-                              : 'text-muted-foreground hover:bg-muted'
+                            ? 'bg-primary/10 text-primary hover:bg-primary/20'
+                            : 'text-muted-foreground hover:bg-muted'
                             }`}
                           onClick={() => {
                             setUndoSelectedDatabase({ id: db.uuid, name: db.name })

@@ -6,6 +6,7 @@ import { captureTableSnapshot, captureColumnSnapshot, captureRowSnapshot, saveUn
 import { isProtectedDatabase, createProtectedDatabaseResponse, getDatabaseInfo } from '../utils/database-protection';
 import { OperationType, startJobTracking, finishJobTracking } from '../utils/job-tracking';
 import { logError, logInfo, logWarning } from '../utils/error-logger';
+import { triggerWebhooks, createTableCreatePayload, createTableDeletePayload, createTableUpdatePayload, createBulkDeleteCompletePayload } from '../utils/webhooks';
 
 // Helper to create response headers with CORS
 function jsonHeaders(corsHeaders: HeadersInit): Headers {
@@ -60,15 +61,15 @@ export async function handleTableRoutes(
     ...(userEmail !== null && { userId: userEmail }),
     metadata: { method: request.method, path: url.pathname }
   });
-  
+
   // Extract database ID from URL (format: /api/tables/:dbId/...)
   const pathParts = url.pathname.split('/');
   const dbId = pathParts[3];
-  
+
   if (!dbId) {
-    return new Response(JSON.stringify({ 
-      error: 'Database ID required' 
-    }), { 
+    return new Response(JSON.stringify({
+      error: 'Database ID required'
+    }), {
       status: 400,
       headers: jsonHeaders(corsHeaders)
     });
@@ -103,7 +104,7 @@ export async function handleTableRoutes(
     // List tables in database
     if (request.method === 'GET' && url.pathname === `/api/tables/${dbId}/list`) {
       logInfo(`Listing tables for database: ${dbId}`, { module: 'tables', operation: 'list', databaseId: dbId });
-      
+
       // Mock response for local development
       if (isLocalDev) {
         return new Response(JSON.stringify({
@@ -117,19 +118,19 @@ export async function handleTableRoutes(
           headers: jsonHeaders(corsHeaders)
         });
       }
-      
+
       // Execute PRAGMA table_list using REST API
       const query = "PRAGMA table_list";
       const result = await executeQueryViaAPI(dbId, query, env);
-      
+
       // Filter out system tables
-      const tables = (result.results as TableInfo[]).filter((table: TableInfo) => 
+      const tables = (result.results as TableInfo[]).filter((table: TableInfo) =>
         !table.name.startsWith('sqlite_') && !table.name.startsWith('_cf_')
       );
-      
+
       // Fetch row counts for regular tables (limit to 100 to avoid performance issues)
       const tablesToCount = tables.filter(t => t.type === 'table').slice(0, 100);
-      
+
       if (tablesToCount.length > 0) {
         // Fetch row counts in parallel with concurrency limit
         const countPromises = tablesToCount.map(async (table) => {
@@ -143,10 +144,10 @@ export async function handleTableRoutes(
             return { name: table.name, count: undefined };
           }
         });
-        
+
         const counts = await Promise.all(countPromises);
         const countMap = new Map(counts.map(c => [c.name, c.count]));
-        
+
         // Add row counts to table info
         for (const table of tables) {
           const count = countMap.get(table.name);
@@ -155,7 +156,7 @@ export async function handleTableRoutes(
           }
         }
       }
-      
+
       return new Response(JSON.stringify({
         result: tables,
         success: true
@@ -168,7 +169,7 @@ export async function handleTableRoutes(
     if (request.method === 'GET' && /^\/api\/tables\/[^/]+\/schema\/[^/]+$/.exec(url.pathname)) {
       const tableName = decodeURIComponent(pathParts[5] ?? '');
       logInfo(`Getting schema for table: ${tableName}`, { module: 'tables', operation: 'schema', databaseId: dbId, metadata: { tableName } });
-      
+
       // Mock response for local development
       if (isLocalDev) {
         return new Response(JSON.stringify({
@@ -184,21 +185,21 @@ export async function handleTableRoutes(
           headers: jsonHeaders(corsHeaders)
         });
       }
-      
+
       const sanitizedTable = sanitizeIdentifier(tableName);
-      
+
       // Use table_xinfo to get hidden column info (for generated columns)
       // hidden values: 0=normal, 1=hidden (internal rowid), 2=generated virtual, 3=generated stored
       const xinfoQuery = `PRAGMA table_xinfo("${sanitizedTable}")`;
       const xinfoResult = await executeQueryViaAPI(dbId, xinfoQuery, env);
-      
+
       // Get index list to find UNIQUE constraints
       const indexQuery = `PRAGMA index_list("${sanitizedTable}")`;
       const uniqueColumns = new Set<string>();
       try {
         const indexResult = await executeQueryViaAPI(dbId, indexQuery, env);
         const indexes = indexResult.results as { name: string; unique: number; origin: string; partial: number }[];
-        
+
         // For each unique index, get the columns
         for (const idx of indexes) {
           if (idx.unique === 1) {
@@ -214,7 +215,7 @@ export async function handleTableRoutes(
       } catch {
         // Ignore errors fetching index info
       }
-      
+
       // Enhance results with unique info
       interface XInfoColumn { cid: number; name: string; type: string; notnull: number; dflt_value: string | null; pk: number; hidden: number }
       const enhancedResults = (xinfoResult.results as XInfoColumn[]).map(col => ({
@@ -223,7 +224,7 @@ export async function handleTableRoutes(
         // Map hidden values: 2=virtual generated, 3=stored generated
         generatedExpression: (col.hidden === 2 || col.hidden === 3) ? '(computed)' : undefined
       }));
-      
+
       return new Response(JSON.stringify({
         result: enhancedResults,
         success: true
@@ -237,7 +238,7 @@ export async function handleTableRoutes(
       const tableName = decodeURIComponent(pathParts[5] ?? '');
       const limit = parseInt(url.searchParams.get('limit') ?? '100');
       const offset = parseInt(url.searchParams.get('offset') ?? '0');
-      
+
       // Parse filter parameters from URL
       const filters: Record<string, { type: string; value?: string; value2?: string; values?: (string | number)[]; logicOperator?: 'AND' | 'OR' }> = {};
       for (const [key, value] of url.searchParams.entries()) {
@@ -247,7 +248,7 @@ export async function handleTableRoutes(
           const filterValue2 = url.searchParams.get(`filterValue2_${columnName}`);
           const filterValues = url.searchParams.get(`filterValues_${columnName}`);
           const filterLogic = url.searchParams.get(`filterLogic_${columnName}`);
-          
+
           const filterObj: { type: string; value?: string; value2?: string; values?: (string | number)[]; logicOperator?: 'AND' | 'OR' } = {
             type: value,
           };
@@ -265,7 +266,7 @@ export async function handleTableRoutes(
           filters[columnName] = filterObj;
         }
       }
-      
+
       // Parse FK filter (format: column:value)
       const fkFilter = url.searchParams.get('fkFilter');
       if (fkFilter) {
@@ -279,26 +280,26 @@ export async function handleTableRoutes(
           };
         }
       }
-      
+
       logInfo(`Getting data for table: ${tableName}`, { module: 'tables', operation: 'data', databaseId: dbId, metadata: { tableName, limit, offset, filterCount: Object.keys(filters).length } });
-      
+
       // Mock response for local development
       if (isLocalDev) {
         let mockData = [
           { id: 1, email: 'user1@example.com', name: 'User One', created_at: new Date().toISOString() },
           { id: 2, email: 'user2@example.com', name: 'User Two', created_at: new Date().toISOString() }
         ];
-        
+
         // Apply mock filtering
         if (Object.keys(filters).length > 0) {
           mockData = mockData.filter(row => {
             for (const [columnName, filter] of Object.entries(filters)) {
               const cellValue = row[columnName as keyof typeof row];
               if (cellValue === null || cellValue === undefined) continue;
-              
+
               const value = String(cellValue).toLowerCase();
               const filterVal = (filter.value ?? '').toLowerCase();
-              
+
               switch (filter.type) {
                 case 'contains':
                   if (!value.includes(filterVal)) return false;
@@ -317,7 +318,7 @@ export async function handleTableRoutes(
             return true;
           });
         }
-        
+
         return new Response(JSON.stringify({
           result: mockData,
           meta: {
@@ -329,9 +330,9 @@ export async function handleTableRoutes(
           headers: jsonHeaders(corsHeaders)
         });
       }
-      
+
       const sanitizedTable = sanitizeIdentifier(tableName);
-      
+
       // Build WHERE clause from filters if any
       let whereClause = '';
       if (Object.keys(filters).length > 0) {
@@ -345,10 +346,10 @@ export async function handleTableRoutes(
           dflt_value: string | null;
           pk: number;
         }[];
-        
+
         // Import buildWhereClause
         const { buildWhereClause } = await import('../utils/helpers.js');
-        
+
         // Convert filters to FilterCondition format
         const filterConditions: Record<string, FilterCondition> = {};
         for (const [columnName, filter] of Object.entries(filters)) {
@@ -361,14 +362,14 @@ export async function handleTableRoutes(
           if (filter.logicOperator !== undefined) condition.logicOperator = filter.logicOperator;
           filterConditions[columnName] = condition;
         }
-        
+
         const { whereClause: clause } = buildWhereClause(filterConditions, schema);
         whereClause = clause;
       }
-      
+
       const query = `SELECT * FROM "${sanitizedTable}"${whereClause} LIMIT ${String(limit)} OFFSET ${String(offset)}`;
       const result = await executeQueryViaAPI(dbId, query, env);
-      
+
       return new Response(JSON.stringify({
         result: result.results,
         meta: result.meta,
@@ -382,7 +383,7 @@ export async function handleTableRoutes(
     if (request.method === 'GET' && /^\/api\/tables\/[^/]+\/indexes\/[^/]+$/.exec(url.pathname)) {
       const tableName = decodeURIComponent(pathParts[5] ?? '');
       logInfo(`Getting indexes for table: ${tableName}`, { module: 'tables', operation: 'indexes', databaseId: dbId, metadata: { tableName } });
-      
+
       // Mock response for local development
       if (isLocalDev) {
         return new Response(JSON.stringify({
@@ -394,11 +395,11 @@ export async function handleTableRoutes(
           headers: jsonHeaders(corsHeaders)
         });
       }
-      
+
       const sanitizedTable = sanitizeIdentifier(tableName);
       const query = `PRAGMA index_list("${sanitizedTable}")`;
       const result = await executeQueryViaAPI(dbId, query, env);
-      
+
       return new Response(JSON.stringify({
         result: result.results,
         success: true
@@ -411,7 +412,7 @@ export async function handleTableRoutes(
     if (request.method === 'GET' && /^\/api\/tables\/[^/]+\/foreign-keys\/[^/]+$/.exec(url.pathname)) {
       const tableName = decodeURIComponent(pathParts[5] ?? '');
       logInfo(`Getting foreign keys for table: ${tableName}`, { module: 'tables', operation: 'foreign_keys', databaseId: dbId, metadata: { tableName } });
-      
+
       // Mock response for local development
       if (isLocalDev) {
         return new Response(JSON.stringify({
@@ -426,11 +427,11 @@ export async function handleTableRoutes(
           headers: jsonHeaders(corsHeaders)
         });
       }
-      
+
       const sanitizedTable = sanitizeIdentifier(tableName);
       const fkQuery = `PRAGMA foreign_key_list("${sanitizedTable}")`;
       const result = await executeQueryViaAPI(dbId, fkQuery, env);
-      
+
       // Transform the PRAGMA result to our desired format
       const fks = result.results as {
         id: number;
@@ -442,7 +443,7 @@ export async function handleTableRoutes(
         on_delete: string;
         match: string;
       }[];
-      
+
       // Group by FK constraint (id) and column
       const foreignKeys: {
         column: string;
@@ -451,9 +452,9 @@ export async function handleTableRoutes(
         onDelete: string | null;
         onUpdate: string | null;
       }[] = [];
-      
+
       const processed = new Map<string, typeof foreignKeys[0]>();
-      
+
       for (const fk of fks) {
         const key = `${fk.from}_${fk.table}_${fk.to}`;
         if (!processed.has(key)) {
@@ -466,9 +467,9 @@ export async function handleTableRoutes(
           });
         }
       }
-      
+
       foreignKeys.push(...processed.values());
-      
+
       return new Response(JSON.stringify({
         result: {
           foreignKeys
@@ -483,7 +484,7 @@ export async function handleTableRoutes(
     if (request.method === 'DELETE' && /^\/api\/tables\/[^/]+\/[^/]+$/.exec(url.pathname)) {
       const tableName = decodeURIComponent(pathParts[4] ?? '');
       logInfo(`Deleting table: ${tableName}`, { module: 'tables', operation: 'delete', databaseId: dbId, metadata: { tableName } });
-      
+
       // Mock response for local development
       if (isLocalDev) {
         return new Response(JSON.stringify({
@@ -492,7 +493,7 @@ export async function handleTableRoutes(
           headers: jsonHeaders(corsHeaders)
         });
       }
-      
+
       // Start job tracking
       const jobId = await startJobTracking(
         env,
@@ -502,12 +503,12 @@ export async function handleTableRoutes(
         isLocalDev,
         { tableName }
       );
-      
+
       try {
         // NOTE: Bookmark capture via Export API is disabled - it was causing database locks
         // TODO: Re-enable when D1 export API behavior is fixed
         // The Export API with output_format:'polling' appears to trigger real exports
-        
+
         // Capture snapshot before drop (best effort)
         try {
           const snapshot = await captureTableSnapshot(dbId, tableName, env);
@@ -529,7 +530,7 @@ export async function handleTableRoutes(
             databaseId: dbId,
             metadata: { tableName }
           }, isLocalDev);
-          
+
           // Check if database is locked by export - if so, skip the drop entirely
           if (errMsg.includes('Currently processing a long-running export')) {
             logInfo('Database locked by export - cannot delete table', { module: 'tables', operation: 'delete', databaseId: dbId, metadata: { tableName } });
@@ -544,14 +545,23 @@ export async function handleTableRoutes(
           }
           // For other errors, continue with drop
         }
-        
+
         const sanitizedTable = sanitizeIdentifier(tableName);
         const query = `DROP TABLE "${sanitizedTable}"`;
         await executeQueryViaAPI(dbId, query, env);
-        
+
         // Complete job tracking
         await finishJobTracking(env, jobId, 'completed', userEmail ?? 'unknown', isLocalDev, { processedItems: 1, errorCount: 0 });
-        
+
+        // Trigger table_delete webhook
+        const dbInfo = await getDatabaseInfo(dbId, env);
+        void triggerWebhooks(
+          env,
+          'table_delete',
+          createTableDeletePayload(dbId, dbInfo?.name ?? 'unknown', tableName, userEmail),
+          isLocalDev
+        );
+
         return new Response(JSON.stringify({
           success: true
         }), {
@@ -572,19 +582,19 @@ export async function handleTableRoutes(
     if (request.method === 'PATCH' && /^\/api\/tables\/[^/]+\/[^/]+\/rename$/.exec(url.pathname)) {
       const tableName = decodeURIComponent(pathParts[4] ?? '');
       logInfo(`Renaming table: ${tableName}`, { module: 'tables', operation: 'rename', databaseId: dbId, metadata: { tableName } });
-      
+
       const body = await parseJsonBody<{ newName?: string }>(request);
       const newName = body?.newName;
-      
+
       if (!newName?.trim()) {
-        return new Response(JSON.stringify({ 
-          error: 'New table name is required' 
-        }), { 
+        return new Response(JSON.stringify({
+          error: 'New table name is required'
+        }), {
           status: 400,
           headers: jsonHeaders(corsHeaders)
         });
       }
-      
+
       // Mock response for local development
       if (isLocalDev) {
         return new Response(JSON.stringify({
@@ -594,7 +604,7 @@ export async function handleTableRoutes(
           headers: jsonHeaders(corsHeaders)
         });
       }
-      
+
       // Start job tracking
       const jobId = await startJobTracking(
         env,
@@ -604,22 +614,31 @@ export async function handleTableRoutes(
         isLocalDev,
         { oldName: tableName, newName }
       );
-      
+
       try {
         const sanitizedOldTable = sanitizeIdentifier(tableName);
         const sanitizedNewTable = sanitizeIdentifier(newName);
         const query = `ALTER TABLE "${sanitizedOldTable}" RENAME TO "${sanitizedNewTable}"`;
         await executeQueryViaAPI(dbId, query, env);
-        
+
         // Get the new table info
         const tableListResult = await executeQueryViaAPI(dbId, "PRAGMA table_list", env);
         const newTableInfo = (tableListResult.results as TableInfo[]).find(
           (table: TableInfo) => table.name === newName
         );
-        
+
         // Complete job tracking
         await finishJobTracking(env, jobId, 'completed', userEmail ?? 'unknown', isLocalDev, { processedItems: 1, errorCount: 0 });
-        
+
+        // Trigger table_update webhook for rename
+        const dbInfo = await getDatabaseInfo(dbId, env);
+        void triggerWebhooks(
+          env,
+          'table_update',
+          createTableUpdatePayload(dbId, dbInfo?.name ?? 'unknown', newName, `renamed from ${tableName}`, userEmail),
+          isLocalDev
+        );
+
         return new Response(JSON.stringify({
           result: newTableInfo ?? { name: newName, type: 'table', ncol: 0, wr: 0, strict: 0 },
           success: true
@@ -641,19 +660,19 @@ export async function handleTableRoutes(
     if (request.method === 'POST' && /^\/api\/tables\/[^/]+\/[^/]+\/clone$/.exec(url.pathname)) {
       const tableName = decodeURIComponent(pathParts[4] ?? '');
       logInfo(`Cloning table: ${tableName}`, { module: 'tables', operation: 'clone', databaseId: dbId, metadata: { tableName } });
-      
+
       const body = await parseJsonBody<{ newName?: string }>(request);
       const newName = body?.newName;
-      
+
       if (!newName?.trim()) {
-        return new Response(JSON.stringify({ 
-          error: 'New table name is required' 
-        }), { 
+        return new Response(JSON.stringify({
+          error: 'New table name is required'
+        }), {
           status: 400,
           headers: jsonHeaders(corsHeaders)
         });
       }
-      
+
       // Mock response for local development
       if (isLocalDev) {
         return new Response(JSON.stringify({
@@ -663,7 +682,7 @@ export async function handleTableRoutes(
           headers: jsonHeaders(corsHeaders)
         });
       }
-      
+
       // Start job tracking
       const jobId = await startJobTracking(
         env,
@@ -673,11 +692,11 @@ export async function handleTableRoutes(
         isLocalDev,
         { sourceTable: tableName, targetTable: newName }
       );
-      
+
       try {
         const sanitizedOldTable = sanitizeIdentifier(tableName);
         const sanitizedNewTable = sanitizeIdentifier(newName);
-        
+
         // Get schema
         const schemaResult = await executeQueryViaAPI(dbId, `PRAGMA table_info("${sanitizedOldTable}")`, env);
         const columns = schemaResult.results as {
@@ -688,7 +707,7 @@ export async function handleTableRoutes(
           dflt_value: string | null;
           pk: number;
         }[];
-        
+
         // Generate CREATE TABLE statement
         const columnDefs = columns.map(col => {
           let def = `"${col.name}" ${col.type || 'TEXT'}`;
@@ -697,14 +716,14 @@ export async function handleTableRoutes(
           if (col.dflt_value !== null) def += ` DEFAULT ${col.dflt_value}`;
           return def;
         }).join(', ');
-        
+
         const createTableQuery = `CREATE TABLE "${sanitizedNewTable}" (${columnDefs})`;
         await executeQueryViaAPI(dbId, createTableQuery, env);
-        
+
         // Copy data
         const copyDataQuery = `INSERT INTO "${sanitizedNewTable}" SELECT * FROM "${sanitizedOldTable}"`;
         await executeQueryViaAPI(dbId, copyDataQuery, env);
-        
+
         // Get indexes and recreate them
         const indexesResult = await executeQueryViaAPI(dbId, `PRAGMA index_list("${sanitizedOldTable}")`, env);
         const indexes = indexesResult.results as {
@@ -714,12 +733,12 @@ export async function handleTableRoutes(
           origin: string;
           partial: number;
         }[];
-        
+
         for (const index of indexes) {
           if (index.origin === 'c') { // Only copy user-created indexes
             const indexInfoResult = await executeQueryViaAPI(dbId, `PRAGMA index_info("${index.name}")`, env);
             const indexColumns = indexInfoResult.results as { seqno: number; cid: number; name: string }[];
-            
+
             const columnNames = indexColumns.map(ic => `"${ic.name}"`).join(', ');
             // Generate new index name: try replacing table name first, otherwise append _copy
             let newIndexName = index.name.replace(tableName, newName);
@@ -728,21 +747,30 @@ export async function handleTableRoutes(
               newIndexName = `${index.name}_${newName}`;
             }
             const uniqueStr = index.unique ? 'UNIQUE ' : '';
-            
+
             const createIndexQuery = `CREATE ${uniqueStr}INDEX "${newIndexName}" ON "${sanitizedNewTable}" (${columnNames})`;
             await executeQueryViaAPI(dbId, createIndexQuery, env);
           }
         }
-        
+
         // Get the new table info
         const tableListResult = await executeQueryViaAPI(dbId, "PRAGMA table_list", env);
         const newTableInfo = (tableListResult.results as TableInfo[]).find(
           (table: TableInfo) => table.name === newName
         );
-        
+
         // Complete job tracking
         await finishJobTracking(env, jobId, 'completed', userEmail ?? 'unknown', isLocalDev, { processedItems: 1, errorCount: 0 });
-        
+
+        // Trigger table_create webhook
+        const dbInfo = await getDatabaseInfo(dbId, env);
+        void triggerWebhooks(
+          env,
+          'table_create',
+          createTableCreatePayload(dbId, dbInfo?.name ?? 'unknown', newName, userEmail),
+          isLocalDev
+        );
+
         return new Response(JSON.stringify({
           result: newTableInfo ?? { name: newName, type: 'table', ncol: columns.length, wr: 0, strict: 0 },
           success: true
@@ -764,7 +792,7 @@ export async function handleTableRoutes(
     if (request.method === 'GET' && /^\/api\/tables\/[^/]+\/[^/]+\/strict-check$/.exec(url.pathname)) {
       const tableName = decodeURIComponent(pathParts[4] ?? '');
       logInfo(`Checking STRICT mode compatibility: ${tableName}`, { module: 'tables', operation: 'strict_check', databaseId: dbId, metadata: { tableName } });
-      
+
       // Mock response for local development
       if (isLocalDev) {
         return new Response(JSON.stringify({
@@ -784,16 +812,16 @@ export async function handleTableRoutes(
           headers: jsonHeaders(corsHeaders)
         });
       }
-      
+
       try {
         const sanitizedTable = sanitizeIdentifier(tableName);
-        
+
         // Check if table exists and get its info
         const tableListResult = await executeQueryViaAPI(dbId, "PRAGMA table_list", env);
         const currentTableInfo = (tableListResult.results as TableInfo[]).find(
           (t: TableInfo) => t.name === tableName
         );
-        
+
         if (!currentTableInfo) {
           return new Response(JSON.stringify({
             error: `Table "${tableName}" not found`,
@@ -802,18 +830,18 @@ export async function handleTableRoutes(
             headers: jsonHeaders(corsHeaders)
           });
         }
-        
+
         const isAlreadyStrict = currentTableInfo.strict === 1;
-        
+
         // Check if table is a virtual table (FTS5, etc.)
-        const createSqlResult = await executeQueryViaAPI(dbId, 
+        const createSqlResult = await executeQueryViaAPI(dbId,
           `SELECT sql FROM sqlite_master WHERE type='table' AND name='${sanitizedTable}'`, env);
         const createSql = (createSqlResult.results[0] as { sql: string } | undefined)?.sql ?? '';
-        const isVirtualTable = createSql.toLowerCase().includes('virtual table') || 
-                               createSql.toLowerCase().includes('using fts5') ||
-                               createSql.toLowerCase().includes('using fts4') ||
-                               createSql.toLowerCase().includes('using rtree');
-        
+        const isVirtualTable = createSql.toLowerCase().includes('virtual table') ||
+          createSql.toLowerCase().includes('using fts5') ||
+          createSql.toLowerCase().includes('using fts4') ||
+          createSql.toLowerCase().includes('using rtree');
+
         // Use table_xinfo to get extended column info including generated columns
         const xinfoResult = await executeQueryViaAPI(dbId, `PRAGMA table_xinfo("${sanitizedTable}")`, env);
         const columns = xinfoResult.results as {
@@ -825,7 +853,7 @@ export async function handleTableRoutes(
           pk: number;
           hidden: number;
         }[];
-        
+
         // Check for generated columns (hidden = 2 for virtual, 3 for stored)
         const generatedColumns = columns
           .filter(col => col.hidden === 2 || col.hidden === 3)
@@ -834,7 +862,7 @@ export async function handleTableRoutes(
             type: col.type,
             generatedType: col.hidden === 2 ? 'VIRTUAL' : 'STORED'
           }));
-        
+
         // Get foreign key constraints
         const fkResult = await executeQueryViaAPI(dbId, `PRAGMA foreign_key_list("${sanitizedTable}")`, env);
         const foreignKeys = fkResult.results as {
@@ -846,7 +874,7 @@ export async function handleTableRoutes(
           on_update: string;
           on_delete: string;
         }[];
-        
+
         // Group FKs by id for composite keys
         const fkGroups = new Map<number, typeof foreignKeys>();
         for (const fk of foreignKeys) {
@@ -856,7 +884,7 @@ export async function handleTableRoutes(
           const group = fkGroups.get(fk.id);
           if (group) group.push(fk);
         }
-        
+
         const fkSummary = Array.from(fkGroups.values()).map(group => {
           group.sort((a, b) => a.seq - b.seq);
           return {
@@ -867,30 +895,30 @@ export async function handleTableRoutes(
             onDelete: group[0]?.on_delete ?? 'NO ACTION'
           };
         });
-        
+
         // Build warnings and blockers
         const warnings: string[] = [];
         const blockers: string[] = [];
-        
+
         if (isAlreadyStrict) {
           warnings.push('Table is already in STRICT mode');
         }
-        
+
         if (isVirtualTable) {
           blockers.push('Virtual tables (FTS5, FTS4, rtree) cannot be converted to STRICT mode');
         }
-        
+
         if (generatedColumns.length > 0) {
           const colNames = generatedColumns.map(c => c.name).join(', ');
           blockers.push(`Table has generated columns (${colNames}) which cannot be automatically converted`);
         }
-        
+
         if (fkSummary.length > 0) {
           warnings.push(`Table has ${fkSummary.length} foreign key constraint(s) which will be preserved during conversion`);
         }
-        
+
         const compatible = blockers.length === 0 && !isAlreadyStrict;
-        
+
         return new Response(JSON.stringify({
           result: {
             compatible,
@@ -922,7 +950,7 @@ export async function handleTableRoutes(
     if (request.method === 'POST' && /^\/api\/tables\/[^/]+\/[^/]+\/strict$/.exec(url.pathname)) {
       const tableName = decodeURIComponent(pathParts[4] ?? '');
       logInfo(`Converting table to STRICT: ${tableName}`, { module: 'tables', operation: 'strict', databaseId: dbId, metadata: { tableName } });
-      
+
       // Mock response for local development
       if (isLocalDev) {
         return new Response(JSON.stringify({
@@ -932,7 +960,7 @@ export async function handleTableRoutes(
           headers: jsonHeaders(corsHeaders)
         });
       }
-      
+
       // Start job tracking
       const jobId = await startJobTracking(
         env,
@@ -942,18 +970,18 @@ export async function handleTableRoutes(
         isLocalDev,
         { tableName, operation: 'convert_to_strict' }
       );
-      
+
       try {
         const sanitizedTable = sanitizeIdentifier(tableName);
         const tempTableName = `_temp_strict_${tableName}_${Date.now()}`;
         const sanitizedTempTable = sanitizeIdentifier(tempTableName);
-        
+
         // Check if table is already STRICT or is a virtual table
         const tableListResult = await executeQueryViaAPI(dbId, "PRAGMA table_list", env);
         const currentTableInfo = (tableListResult.results as TableInfo[]).find(
           (t: TableInfo) => t.name === tableName
         );
-        
+
         if (currentTableInfo?.strict === 1) {
           await finishJobTracking(env, jobId, 'completed', userEmail ?? 'unknown', isLocalDev, { processedItems: 0, errorCount: 0 });
           return new Response(JSON.stringify({
@@ -964,16 +992,16 @@ export async function handleTableRoutes(
             headers: jsonHeaders(corsHeaders)
           });
         }
-        
+
         // Check if table is a virtual table (FTS5, etc.) - these cannot be converted to STRICT
-        const createSqlResult = await executeQueryViaAPI(dbId, 
+        const createSqlResult = await executeQueryViaAPI(dbId,
           `SELECT sql FROM sqlite_master WHERE type='table' AND name='${sanitizedTable}'`, env);
         const createSql = (createSqlResult.results[0] as { sql: string } | undefined)?.sql ?? '';
-        const isVirtualTable = createSql.toLowerCase().includes('virtual table') || 
-                               createSql.toLowerCase().includes('using fts5') ||
-                               createSql.toLowerCase().includes('using fts4') ||
-                               createSql.toLowerCase().includes('using rtree');
-        
+        const isVirtualTable = createSql.toLowerCase().includes('virtual table') ||
+          createSql.toLowerCase().includes('using fts5') ||
+          createSql.toLowerCase().includes('using fts4') ||
+          createSql.toLowerCase().includes('using rtree');
+
         if (isVirtualTable) {
           await finishJobTracking(env, jobId, 'failed', userEmail ?? 'unknown', isLocalDev, {
             processedItems: 0,
@@ -988,7 +1016,7 @@ export async function handleTableRoutes(
             headers: jsonHeaders(corsHeaders)
           });
         }
-        
+
         // Use table_xinfo to get extended column info including generated columns
         // hidden values: 0=normal, 1=hidden rowid, 2=virtual generated, 3=stored generated
         const xinfoResult = await executeQueryViaAPI(dbId, `PRAGMA table_xinfo("${sanitizedTable}")`, env);
@@ -1001,7 +1029,7 @@ export async function handleTableRoutes(
           pk: number;
           hidden: number;
         }[];
-        
+
         // Check for generated columns - these cannot be easily converted to STRICT
         // because we would need to preserve the GENERATED ALWAYS AS expression
         const generatedColumns = columns.filter(col => col.hidden === 2 || col.hidden === 3);
@@ -1020,10 +1048,10 @@ export async function handleTableRoutes(
             headers: jsonHeaders(corsHeaders)
           });
         }
-        
+
         // Filter to only normal columns (not hidden rowid)
         const normalColumns = columns.filter(col => col.hidden === 0);
-        
+
         // Get foreign key constraints to preserve them
         const fkResult = await executeQueryViaAPI(dbId, `PRAGMA foreign_key_list("${sanitizedTable}")`, env);
         const foreignKeys = fkResult.results as {
@@ -1036,7 +1064,7 @@ export async function handleTableRoutes(
           on_delete: string;
           match: string;
         }[];
-        
+
         // Capture undo snapshot before conversion (best effort)
         // This saves the original non-STRICT table so it can be restored if needed
         try {
@@ -1060,22 +1088,22 @@ export async function handleTableRoutes(
             metadata: { tableName }
           });
         }
-        
+
         // Get sample data to analyze actual types in use
         const sampleDataResult = await executeQueryViaAPI(dbId, `SELECT * FROM "${sanitizedTable}" LIMIT 100`, env);
         const sampleRows = sampleDataResult.results as Record<string, unknown>[];
-        
+
         // Analyze each column to determine best STRICT type
         // STRICT tables only allow: INT, INTEGER, REAL, TEXT, BLOB, ANY
         const analyzeColumnType = (colName: string, declaredType: string): string => {
           const upperType = (declaredType || '').toUpperCase().trim();
-          
+
           // Check actual data types in the column
           const actualTypes = new Set<string>();
           for (const row of sampleRows) {
             const val = row[colName];
             if (val === null || val === undefined) continue;
-            
+
             const jsType = typeof val;
             if (jsType === 'number') {
               // Check if integer or float
@@ -1094,7 +1122,7 @@ export async function handleTableRoutes(
               actualTypes.add('ANY');
             }
           }
-          
+
           // If column has mixed types, use ANY
           if (actualTypes.size > 1) {
             // Special case: INTEGER + REAL = REAL (compatible)
@@ -1103,13 +1131,13 @@ export async function handleTableRoutes(
             }
             return 'ANY';
           }
-          
+
           // If we have data, use the detected type
           if (actualTypes.size === 1) {
             const typesArray = Array.from(actualTypes);
             const detectedType = typesArray[0];
             if (!detectedType) return 'ANY'; // Safety fallback
-            
+
             // Verify detected type is compatible with declared type
             if (upperType.includes('INT') && detectedType === 'TEXT') {
               return 'ANY'; // Declared INT but has TEXT - use ANY
@@ -1119,7 +1147,7 @@ export async function handleTableRoutes(
             }
             return detectedType;
           }
-          
+
           // No data, use mapped declared type
           if (upperType.includes('INT')) return 'INTEGER';
           if (upperType.includes('REAL') || upperType.includes('FLOAT') || upperType.includes('DOUBLE') || upperType.includes('NUMERIC') || upperType.includes('DECIMAL')) return 'REAL';
@@ -1127,7 +1155,7 @@ export async function handleTableRoutes(
           if (upperType === '' || upperType === 'ANY') return 'ANY';
           return 'TEXT';
         };
-        
+
         // Helper to format default values for CREATE TABLE
         // Non-literal defaults (like CURRENT_TIMESTAMP) need parentheses
         const formatDefaultValue = (dfltValue: string): string => {
@@ -1138,7 +1166,7 @@ export async function handleTableRoutes(
           }
           // Literal string (single or double quoted)
           if ((trimmed.startsWith("'") && trimmed.endsWith("'")) ||
-              (trimmed.startsWith('"') && trimmed.endsWith('"'))) {
+            (trimmed.startsWith('"') && trimmed.endsWith('"'))) {
             return trimmed;
           }
           // Numeric literal
@@ -1156,7 +1184,7 @@ export async function handleTableRoutes(
           // Everything else (CURRENT_TIMESTAMP, CURRENT_DATE, expressions) needs parentheses
           return `(${trimmed})`;
         };
-        
+
         // Generate column definitions with STRICT-compatible types
         const columnDefs = normalColumns.map(col => {
           const strictType = analyzeColumnType(col.name, col.type);
@@ -1171,7 +1199,7 @@ export async function handleTableRoutes(
           }
           return def;
         });
-        
+
         // Validate we have column definitions
         if (columnDefs.length === 0) {
           await finishJobTracking(env, jobId, 'failed', userEmail ?? 'unknown', isLocalDev, {
@@ -1186,7 +1214,7 @@ export async function handleTableRoutes(
             headers: jsonHeaders(corsHeaders)
           });
         }
-        
+
         // Group foreign keys by id (composite FKs have multiple rows with same id)
         const fkGroups = new Map<number, typeof foreignKeys>();
         for (const fk of foreignKeys) {
@@ -1196,7 +1224,7 @@ export async function handleTableRoutes(
           const group = fkGroups.get(fk.id);
           if (group) group.push(fk);
         }
-        
+
         // Generate foreign key constraints
         const fkDefs: string[] = [];
         for (const [, fkGroup] of fkGroups) {
@@ -1207,7 +1235,7 @@ export async function handleTableRoutes(
           const targetTable = fkGroup[0]?.table;
           const onUpdate = fkGroup[0]?.on_update ?? 'NO ACTION';
           const onDelete = fkGroup[0]?.on_delete ?? 'NO ACTION';
-          
+
           if (targetTable) {
             let fkDef = `FOREIGN KEY (${fromCols}) REFERENCES "${targetTable}" (${toCols})`;
             if (onUpdate !== 'NO ACTION') fkDef += ` ON UPDATE ${onUpdate}`;
@@ -1215,15 +1243,15 @@ export async function handleTableRoutes(
             fkDefs.push(fkDef);
           }
         }
-        
+
         // Combine column definitions and foreign key constraints
         const allDefs = [...columnDefs, ...fkDefs].join(', ');
-        
+
         // Create temp table with STRICT
         const createTableQuery = `CREATE TABLE "${sanitizedTempTable}" (${allDefs}) STRICT`;
         logInfo(`Creating STRICT table with query: ${createTableQuery}`, { module: 'tables', operation: 'strict', databaseId: dbId });
         await executeQueryViaAPI(dbId, createTableQuery, env);
-        
+
         // Try to copy data - should succeed now with proper type analysis
         try {
           // Build explicit column list to ensure order matches
@@ -1247,7 +1275,7 @@ export async function handleTableRoutes(
             headers: jsonHeaders(corsHeaders)
           });
         }
-        
+
         // Get indexes and store their column information BEFORE dropping the original table
         const indexesResult = await executeQueryViaAPI(dbId, `PRAGMA index_list("${sanitizedTable}")`, env);
         const indexes = indexesResult.results as {
@@ -1257,55 +1285,55 @@ export async function handleTableRoutes(
           origin: string;
           partial: number;
         }[];
-        
+
         // Store index definitions before we drop the original table
         const indexDefinitions: { name: string; unique: boolean; columns: string }[] = [];
-        
+
         for (const index of indexes) {
           if (index.origin === 'c') {
             const indexInfoResult = await executeQueryViaAPI(dbId, `PRAGMA index_info("${index.name}")`, env);
             const indexColumns = indexInfoResult.results as { seqno: number; cid: number; name: string }[];
-            
+
             const columnNames = indexColumns.map(ic => `"${ic.name}"`).join(', ');
-            
+
             // Store the index definition for later recreation
             indexDefinitions.push({
               name: index.name,
               unique: index.unique === 1,
               columns: columnNames
             });
-            
+
             // Create temp index on temp table
             const tempIndexName = `_temp_idx_${index.name}_${Date.now()}`;
             const uniqueStr = index.unique ? 'UNIQUE ' : '';
-            
+
             const createIndexQuery = `CREATE ${uniqueStr}INDEX "${tempIndexName}" ON "${sanitizedTempTable}" (${columnNames})`;
             await executeQueryViaAPI(dbId, createIndexQuery, env);
           }
         }
-        
+
         // Drop original table and rename temp table (with FK checks disabled for safety)
         await executeQueryViaAPI(dbId, `PRAGMA foreign_keys = OFF`, env);
         await executeQueryViaAPI(dbId, `DROP TABLE "${sanitizedTable}"`, env);
         await executeQueryViaAPI(dbId, `ALTER TABLE "${sanitizedTempTable}" RENAME TO "${sanitizedTable}"`, env);
         await executeQueryViaAPI(dbId, `PRAGMA foreign_keys = ON`, env);
-        
+
         // Recreate indexes with original names using the stored definitions
         for (const indexDef of indexDefinitions) {
           const uniqueStr = indexDef.unique ? 'UNIQUE ' : '';
           const createIndexQuery = `CREATE ${uniqueStr}INDEX IF NOT EXISTS "${indexDef.name}" ON "${sanitizedTable}" (${indexDef.columns})`;
           await executeQueryViaAPI(dbId, createIndexQuery, env);
         }
-        
+
         // Get the updated table info
         const updatedTableListResult = await executeQueryViaAPI(dbId, "PRAGMA table_list", env);
         const updatedTableInfo = (updatedTableListResult.results as TableInfo[]).find(
           (t: TableInfo) => t.name === tableName
         );
-        
+
         // Complete job tracking
         await finishJobTracking(env, jobId, 'completed', userEmail ?? 'unknown', isLocalDev, { processedItems: 1, errorCount: 0 });
-        
+
         return new Response(JSON.stringify({
           result: updatedTableInfo ?? { name: tableName, type: 'table', ncol: normalColumns.length, wr: 0, strict: 1 },
           success: true
@@ -1328,7 +1356,7 @@ export async function handleTableRoutes(
       const tableName = decodeURIComponent(pathParts[4] ?? '');
       const format = url.searchParams.get('format') ?? 'sql';
       logInfo(`Exporting table: ${tableName}`, { module: 'tables', operation: 'export', databaseId: dbId, metadata: { tableName, format } });
-      
+
       // Mock response for local development
       if (isLocalDev) {
         let mockContent: string;
@@ -1342,7 +1370,7 @@ export async function handleTableRoutes(
         } else {
           mockContent = `CREATE TABLE "${tableName}" (id INTEGER PRIMARY KEY, email TEXT, name TEXT, created_at DATETIME);\nINSERT INTO "${tableName}" VALUES (1, 'user1@example.com', 'User One', '2024-01-01');\nINSERT INTO "${tableName}" VALUES (2, 'user2@example.com', 'User Two', '2024-01-02');`;
         }
-        
+
         const fileExt = format === 'json' ? 'json' : format === 'csv' ? 'csv' : 'sql';
         return new Response(JSON.stringify({
           result: {
@@ -1354,7 +1382,7 @@ export async function handleTableRoutes(
           headers: jsonHeaders(corsHeaders)
         });
       }
-      
+
       // Start job tracking
       const jobId = await startJobTracking(
         env,
@@ -1364,16 +1392,16 @@ export async function handleTableRoutes(
         isLocalDev,
         { tableName, format }
       );
-      
+
       try {
         const sanitizedTable = sanitizeIdentifier(tableName);
-        
+
         // Check if table is FTS5 virtual table - these need special handling
-        const createSqlResult = await executeQueryViaAPI(dbId, 
+        const createSqlResult = await executeQueryViaAPI(dbId,
           `SELECT sql FROM sqlite_master WHERE type='table' AND name='${sanitizedTable}'`, env);
         const createSql = (createSqlResult.results[0] as { sql: string } | undefined)?.sql ?? '';
         const isFTS5 = createSql.toLowerCase().includes('using fts5');
-        
+
         // For FTS5 tables, we need to explicitly list columns (SELECT * doesn't work properly)
         let selectQuery: string;
         if (isFTS5) {
@@ -1386,7 +1414,7 @@ export async function handleTableRoutes(
             const fts5Columns = parts
               .filter(p => !p.includes('=') && p.length > 0)
               .map(p => `"${p.replace(/"/g, '')}"`);
-            
+
             if (fts5Columns.length === 0) {
               throw new Error('Could not extract columns from FTS5 table');
             }
@@ -1397,182 +1425,182 @@ export async function handleTableRoutes(
         } else {
           selectQuery = `SELECT * FROM "${sanitizedTable}"`;
         }
-      
-      if (format === 'csv') {
-        // Export as CSV
-        const dataResult = await executeQueryViaAPI(dbId, selectQuery, env);
-        const rows = dataResult.results as Record<string, unknown>[];
-        
-        const firstRow = rows[0];
-        if (rows.length === 0 || !firstRow) {
-          // Complete job tracking (empty table)
+
+        if (format === 'csv') {
+          // Export as CSV
+          const dataResult = await executeQueryViaAPI(dbId, selectQuery, env);
+          const rows = dataResult.results as Record<string, unknown>[];
+
+          const firstRow = rows[0];
+          if (rows.length === 0 || !firstRow) {
+            // Complete job tracking (empty table)
+            await finishJobTracking(env, jobId, 'completed', userEmail ?? 'unknown', isLocalDev, { processedItems: 1, errorCount: 0 });
+
+            return new Response(JSON.stringify({
+              result: {
+                content: '',
+                filename: `${tableName}.csv`
+              },
+              success: true
+            }), {
+              headers: jsonHeaders(corsHeaders)
+            });
+          }
+
+          // Get column names from first row
+          const columns = Object.keys(firstRow);
+
+          // Create CSV content
+          const csvRows: string[] = [];
+          csvRows.push(columns.map(col => `"${col}"`).join(','));
+
+          for (const row of rows) {
+            const values = columns.map(col => {
+              const cell = row[col];
+              if (cell === null) return 'NULL';
+              if (cell === undefined) return '';
+              // Handle objects and primitives safely for CSV export
+              let str: string;
+              if (typeof cell === 'object') {
+                str = JSON.stringify(cell);
+              } else if (typeof cell === 'string') {
+                str = cell;
+              } else {
+                str = String(cell as string | number | boolean);
+              }
+              if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                return `"${str.replace(/"/g, '""')}"`;
+              }
+              return str;
+            });
+            csvRows.push(values.join(','));
+          }
+
+          // Complete job tracking
           await finishJobTracking(env, jobId, 'completed', userEmail ?? 'unknown', isLocalDev, { processedItems: 1, errorCount: 0 });
-          
+
           return new Response(JSON.stringify({
             result: {
-              content: '',
+              content: csvRows.join('\n'),
               filename: `${tableName}.csv`
             },
             success: true
           }), {
             headers: jsonHeaders(corsHeaders)
           });
-        }
-        
-        // Get column names from first row
-        const columns = Object.keys(firstRow);
-        
-        // Create CSV content
-        const csvRows: string[] = [];
-        csvRows.push(columns.map(col => `"${col}"`).join(','));
-        
-        for (const row of rows) {
-          const values = columns.map(col => {
-            const cell = row[col];
-            if (cell === null) return 'NULL';
-            if (cell === undefined) return '';
-            // Handle objects and primitives safely for CSV export
-            let str: string;
-            if (typeof cell === 'object') {
-              str = JSON.stringify(cell);
-            } else if (typeof cell === 'string') {
-              str = cell;
-            } else {
-              str = String(cell as string | number | boolean);
-            }
-            if (str.includes(',') || str.includes('"') || str.includes('\n')) {
-              return `"${str.replace(/"/g, '""')}"`;
-            }
-            return str;
+        } else if (format === 'json') {
+          // Export as JSON
+          const dataResult = await executeQueryViaAPI(dbId, selectQuery, env);
+          const rows = dataResult.results as Record<string, unknown>[];
+
+          // Complete job tracking
+          await finishJobTracking(env, jobId, 'completed', userEmail ?? 'unknown', isLocalDev, { processedItems: 1, errorCount: 0 });
+
+          return new Response(JSON.stringify({
+            result: {
+              content: JSON.stringify(rows, null, 2),
+              filename: `${tableName}.json`
+            },
+            success: true
+          }), {
+            headers: jsonHeaders(corsHeaders)
           });
-          csvRows.push(values.join(','));
-        }
-        
-        // Complete job tracking
-        await finishJobTracking(env, jobId, 'completed', userEmail ?? 'unknown', isLocalDev, { processedItems: 1, errorCount: 0 });
-        
-        return new Response(JSON.stringify({
-          result: {
-            content: csvRows.join('\n'),
-            filename: `${tableName}.csv`
-          },
-          success: true
-        }), {
-          headers: jsonHeaders(corsHeaders)
-        });
-      } else if (format === 'json') {
-        // Export as JSON
-        const dataResult = await executeQueryViaAPI(dbId, selectQuery, env);
-        const rows = dataResult.results as Record<string, unknown>[];
-        
-        // Complete job tracking
-        await finishJobTracking(env, jobId, 'completed', userEmail ?? 'unknown', isLocalDev, { processedItems: 1, errorCount: 0 });
-        
-        return new Response(JSON.stringify({
-          result: {
-            content: JSON.stringify(rows, null, 2),
-            filename: `${tableName}.json`
-          },
-          success: true
-        }), {
-          headers: jsonHeaders(corsHeaders)
-        });
-      } else {
-        // Export as SQL
-        const sqlStatements: string[] = [];
-        
-        if (isFTS5) {
-          // For FTS5 tables, include the original CREATE VIRTUAL TABLE statement
-          sqlStatements.push(`${createSql};`);
         } else {
-          // Get schema for regular tables
-          const schemaResult = await executeQueryViaAPI(dbId, `PRAGMA table_info("${sanitizedTable}")`, env);
-          const columns = schemaResult.results as {
-            cid: number;
-            name: string;
-            type: string;
-            notnull: number;
-            dflt_value: string | null;
-            pk: number;
-          }[];
-          
-          // Generate CREATE TABLE statement
-          const columnDefs = columns.map(col => {
-            let def = `"${col.name}" ${col.type || 'TEXT'}`;
-            if (col.pk > 0) def += ' PRIMARY KEY';
-            if (col.notnull && col.pk === 0) def += ' NOT NULL';
-            if (col.dflt_value !== null) def += ` DEFAULT ${col.dflt_value}`;
-            return def;
-          }).join(', ');
-          
-          sqlStatements.push(`CREATE TABLE "${tableName}" (${columnDefs});`);
-        }
-        
-        // Get data using the appropriate query (handles FTS5 properly)
-        const dataResult = await executeQueryViaAPI(dbId, selectQuery, env);
-        const rows = dataResult.results as Record<string, unknown>[];
-        
-        // Generate INSERT statements
-        for (const row of rows) {
-          const columnNames = Object.keys(row);
-          const values = columnNames.map(col => {
-            const val = row[col];
-            if (val === null) return 'NULL';
-            if (typeof val === 'number') return String(val);
-            // Handle objects and other types safely
-            let strVal: string;
-            if (typeof val === 'object') {
-              strVal = JSON.stringify(val);
-            } else if (typeof val === 'string') {
-              strVal = val;
-            } else {
-              strVal = String(val as boolean);
-            }
-            return `'${strVal.replace(/'/g, "''")}'`;
-          });
-          
-          sqlStatements.push(
-            `INSERT INTO "${tableName}" (${columnNames.map(n => `"${n}"`).join(', ')}) VALUES (${values.join(', ')});`
-          );
-        }
-        
-        // Get indexes
-        const indexesResult = await executeQueryViaAPI(dbId, `PRAGMA index_list("${sanitizedTable}")`, env);
-        const indexes = indexesResult.results as {
-          seq: number;
-          name: string;
-          unique: number;
-          origin: string;
-          partial: number;
-        }[];
-        
-        for (const index of indexes) {
-          if (index.origin === 'c') {
-            const indexInfoResult = await executeQueryViaAPI(dbId, `PRAGMA index_info("${index.name}")`, env);
-            const indexColumns = indexInfoResult.results as { seqno: number; cid: number; name: string }[];
-            
-            const columnNames = indexColumns.map(ic => `"${ic.name}"`).join(', ');
-            const uniqueStr = index.unique ? 'UNIQUE ' : '';
-            
+          // Export as SQL
+          const sqlStatements: string[] = [];
+
+          if (isFTS5) {
+            // For FTS5 tables, include the original CREATE VIRTUAL TABLE statement
+            sqlStatements.push(`${createSql};`);
+          } else {
+            // Get schema for regular tables
+            const schemaResult = await executeQueryViaAPI(dbId, `PRAGMA table_info("${sanitizedTable}")`, env);
+            const columns = schemaResult.results as {
+              cid: number;
+              name: string;
+              type: string;
+              notnull: number;
+              dflt_value: string | null;
+              pk: number;
+            }[];
+
+            // Generate CREATE TABLE statement
+            const columnDefs = columns.map(col => {
+              let def = `"${col.name}" ${col.type || 'TEXT'}`;
+              if (col.pk > 0) def += ' PRIMARY KEY';
+              if (col.notnull && col.pk === 0) def += ' NOT NULL';
+              if (col.dflt_value !== null) def += ` DEFAULT ${col.dflt_value}`;
+              return def;
+            }).join(', ');
+
+            sqlStatements.push(`CREATE TABLE "${tableName}" (${columnDefs});`);
+          }
+
+          // Get data using the appropriate query (handles FTS5 properly)
+          const dataResult = await executeQueryViaAPI(dbId, selectQuery, env);
+          const rows = dataResult.results as Record<string, unknown>[];
+
+          // Generate INSERT statements
+          for (const row of rows) {
+            const columnNames = Object.keys(row);
+            const values = columnNames.map(col => {
+              const val = row[col];
+              if (val === null) return 'NULL';
+              if (typeof val === 'number') return String(val);
+              // Handle objects and other types safely
+              let strVal: string;
+              if (typeof val === 'object') {
+                strVal = JSON.stringify(val);
+              } else if (typeof val === 'string') {
+                strVal = val;
+              } else {
+                strVal = String(val as boolean);
+              }
+              return `'${strVal.replace(/'/g, "''")}'`;
+            });
+
             sqlStatements.push(
-              `CREATE ${uniqueStr}INDEX "${index.name}" ON "${tableName}" (${columnNames});`
+              `INSERT INTO "${tableName}" (${columnNames.map(n => `"${n}"`).join(', ')}) VALUES (${values.join(', ')});`
             );
           }
+
+          // Get indexes
+          const indexesResult = await executeQueryViaAPI(dbId, `PRAGMA index_list("${sanitizedTable}")`, env);
+          const indexes = indexesResult.results as {
+            seq: number;
+            name: string;
+            unique: number;
+            origin: string;
+            partial: number;
+          }[];
+
+          for (const index of indexes) {
+            if (index.origin === 'c') {
+              const indexInfoResult = await executeQueryViaAPI(dbId, `PRAGMA index_info("${index.name}")`, env);
+              const indexColumns = indexInfoResult.results as { seqno: number; cid: number; name: string }[];
+
+              const columnNames = indexColumns.map(ic => `"${ic.name}"`).join(', ');
+              const uniqueStr = index.unique ? 'UNIQUE ' : '';
+
+              sqlStatements.push(
+                `CREATE ${uniqueStr}INDEX "${index.name}" ON "${tableName}" (${columnNames});`
+              );
+            }
+          }
+
+          // Complete job tracking
+          await finishJobTracking(env, jobId, 'completed', userEmail ?? 'unknown', isLocalDev, { processedItems: 1, errorCount: 0 });
+
+          return new Response(JSON.stringify({
+            result: {
+              content: sqlStatements.join('\n'),
+              filename: `${tableName}.sql`
+            },
+            success: true
+          }), {
+            headers: jsonHeaders(corsHeaders)
+          });
         }
-        
-        // Complete job tracking
-        await finishJobTracking(env, jobId, 'completed', userEmail ?? 'unknown', isLocalDev, { processedItems: 1, errorCount: 0 });
-        
-        return new Response(JSON.stringify({
-          result: {
-            content: sqlStatements.join('\n'),
-            filename: `${tableName}.sql`
-          },
-          success: true
-        }), {
-          headers: jsonHeaders(corsHeaders)
-        });
-      }
       } catch (err) {
         // Mark job as failed
         await finishJobTracking(env, jobId, 'failed', userEmail ?? 'unknown', isLocalDev, {
@@ -1588,37 +1616,37 @@ export async function handleTableRoutes(
     if (request.method === 'POST' && /^\/api\/tables\/[^/]+\/[^/]+\/columns\/add$/.exec(url.pathname)) {
       const tableName = decodeURIComponent(pathParts[4] ?? '');
       logInfo(`Adding column to table: ${tableName}`, { module: 'tables', operation: 'add_column', databaseId: dbId, metadata: { tableName } });
-      
-      const body = await parseJsonBody<{ 
-        name?: string; 
-        type?: string; 
-        notnull?: boolean; 
+
+      const body = await parseJsonBody<{
+        name?: string;
+        type?: string;
+        notnull?: boolean;
         unique?: boolean;
         defaultValue?: string;
         isGenerated?: boolean;
         generatedExpression?: string;
         generatedType?: 'STORED' | 'VIRTUAL';
       }>(request);
-      
+
       if (!body?.name || !body.type) {
-        return new Response(JSON.stringify({ 
-          error: 'Column name and type are required' 
-        }), { 
+        return new Response(JSON.stringify({
+          error: 'Column name and type are required'
+        }), {
           status: 400,
           headers: jsonHeaders(corsHeaders)
         });
       }
-      
+
       // Validate generated column has expression
       if (body.isGenerated && !body.generatedExpression?.trim()) {
-        return new Response(JSON.stringify({ 
-          error: 'Generated column requires an expression' 
-        }), { 
+        return new Response(JSON.stringify({
+          error: 'Generated column requires an expression'
+        }), {
           status: 400,
           headers: jsonHeaders(corsHeaders)
         });
       }
-      
+
       // Mock response for local development
       if (isLocalDev) {
         return new Response(JSON.stringify({
@@ -1631,7 +1659,7 @@ export async function handleTableRoutes(
           headers: jsonHeaders(corsHeaders)
         });
       }
-      
+
       // Start job tracking
       const jobId = await startJobTracking(
         env,
@@ -1641,23 +1669,23 @@ export async function handleTableRoutes(
         isLocalDev,
         { tableName, columnName: body.name, columnType: body.type, isGenerated: body.isGenerated }
       );
-      
+
       try {
         const sanitizedTable = sanitizeIdentifier(tableName);
         const sanitizedColumn = sanitizeIdentifier(body.name);
-        
+
         // Build ALTER TABLE ADD COLUMN query
         // Note: SQLite doesn't support UNIQUE or GENERATED in ALTER TABLE ADD COLUMN
         // UNIQUE is handled by creating a separate unique index after adding the column
         let query = `ALTER TABLE "${sanitizedTable}" ADD COLUMN "${sanitizedColumn}" ${body.type}`;
-        
+
         if (body.notnull) {
           query += ' NOT NULL';
         }
-        
+
         // Note: UNIQUE cannot be added directly in ALTER TABLE ADD COLUMN
         // We'll create a unique index after adding the column
-        
+
         // Handle generated column (also not supported in ALTER TABLE, but we try anyway for error message)
         if (body.isGenerated && body.generatedExpression) {
           const genType = body.generatedType ?? 'STORED';
@@ -1673,9 +1701,9 @@ export async function handleTableRoutes(
             query += ` DEFAULT '${defaultVal.replace(/'/g, "''")}'`;
           }
         }
-        
+
         await executeQueryViaAPI(dbId, query, env);
-        
+
         // If UNIQUE was requested, create a unique index on the column
         // (SQLite doesn't support UNIQUE in ALTER TABLE ADD COLUMN)
         if (body.unique) {
@@ -1683,13 +1711,13 @@ export async function handleTableRoutes(
           const indexQuery = `CREATE UNIQUE INDEX "${indexName}" ON "${sanitizedTable}" ("${sanitizedColumn}")`;
           await executeQueryViaAPI(dbId, indexQuery, env);
         }
-        
+
         // Get updated schema
         const schemaResult = await executeQueryViaAPI(dbId, `PRAGMA table_info("${sanitizedTable}")`, env);
-        
+
         // Complete job tracking
         await finishJobTracking(env, jobId, 'completed', userEmail ?? 'unknown', isLocalDev, { processedItems: 1, errorCount: 0 });
-        
+
         return new Response(JSON.stringify({
           result: schemaResult.results,
           success: true
@@ -1712,18 +1740,18 @@ export async function handleTableRoutes(
       const tableName = decodeURIComponent(pathParts[4] ?? '');
       const columnName = decodeURIComponent(pathParts[6] ?? '');
       logInfo(`Renaming column: ${columnName} in table: ${tableName}`, { module: 'tables', operation: 'rename_column', databaseId: dbId, metadata: { tableName, columnName } });
-      
+
       const body = await parseJsonBody<{ newName?: string }>(request);
-      
+
       if (!body?.newName?.trim()) {
-        return new Response(JSON.stringify({ 
-          error: 'New column name is required' 
-        }), { 
+        return new Response(JSON.stringify({
+          error: 'New column name is required'
+        }), {
           status: 400,
           headers: jsonHeaders(corsHeaders)
         });
       }
-      
+
       // Mock response for local development
       if (isLocalDev) {
         return new Response(JSON.stringify({
@@ -1732,7 +1760,7 @@ export async function handleTableRoutes(
           headers: jsonHeaders(corsHeaders)
         });
       }
-      
+
       // Start job tracking
       const jobId = await startJobTracking(
         env,
@@ -1742,19 +1770,19 @@ export async function handleTableRoutes(
         isLocalDev,
         { tableName, oldName: columnName, newName: body.newName }
       );
-      
+
       try {
         const sanitizedTable = sanitizeIdentifier(tableName);
         const sanitizedOldColumn = sanitizeIdentifier(columnName);
         const sanitizedNewColumn = sanitizeIdentifier(body.newName);
-        
+
         const query = `ALTER TABLE "${sanitizedTable}" RENAME COLUMN "${sanitizedOldColumn}" TO "${sanitizedNewColumn}"`;
-        
+
         await executeQueryViaAPI(dbId, query, env);
-        
+
         // Complete job tracking
         await finishJobTracking(env, jobId, 'completed', userEmail ?? 'unknown', isLocalDev, { processedItems: 1, errorCount: 0 });
-        
+
         return new Response(JSON.stringify({
           success: true
         }), {
@@ -1776,9 +1804,9 @@ export async function handleTableRoutes(
       const tableName = decodeURIComponent(pathParts[4] ?? '');
       const columnName = decodeURIComponent(pathParts[6] ?? '');
       logInfo(`Modifying column: ${columnName} in table: ${tableName}`, { module: 'tables', operation: 'modify_column', databaseId: dbId, metadata: { tableName, columnName } });
-      
+
       const body = await parseJsonBody<{ type?: string; notnull?: boolean; defaultValue?: string }>(request);
-      
+
       // Mock response for local development
       if (isLocalDev) {
         return new Response(JSON.stringify({
@@ -1791,7 +1819,7 @@ export async function handleTableRoutes(
           headers: jsonHeaders(corsHeaders)
         });
       }
-      
+
       // Start job tracking
       const jobId = await startJobTracking(
         env,
@@ -1801,7 +1829,7 @@ export async function handleTableRoutes(
         isLocalDev,
         { tableName, columnName, updates: body }
       );
-      
+
       try {
         // Table recreation required for modifying columns
         const modificationParams: { action: 'modify'; columnName: string; newColumnDef?: { type?: string; notnull?: boolean; defaultValue?: string } } = {
@@ -1812,14 +1840,14 @@ export async function handleTableRoutes(
           modificationParams.newColumnDef = body;
         }
         await recreateTableWithModifiedColumn(dbId, tableName, modificationParams, env);
-        
+
         // Get updated schema
         const sanitizedTable = sanitizeIdentifier(tableName);
         const schemaResult = await executeQueryViaAPI(dbId, `PRAGMA table_info("${sanitizedTable}")`, env);
-        
+
         // Complete job tracking
         await finishJobTracking(env, jobId, 'completed', userEmail ?? 'unknown', isLocalDev, { processedItems: 1, errorCount: 0 });
-        
+
         return new Response(JSON.stringify({
           result: schemaResult.results,
           success: true
@@ -1842,7 +1870,7 @@ export async function handleTableRoutes(
       const tableName = decodeURIComponent(pathParts[4] ?? '');
       const columnName = decodeURIComponent(pathParts[6] ?? '');
       logInfo(`Deleting column: ${columnName} from table: ${tableName}`, { module: 'tables', operation: 'delete_column', databaseId: dbId, metadata: { tableName, columnName } });
-      
+
       // Mock response for local development
       if (isLocalDev) {
         return new Response(JSON.stringify({
@@ -1851,7 +1879,7 @@ export async function handleTableRoutes(
           headers: jsonHeaders(corsHeaders)
         });
       }
-      
+
       // Start job tracking
       const jobId = await startJobTracking(
         env,
@@ -1861,11 +1889,11 @@ export async function handleTableRoutes(
         isLocalDev,
         { tableName, columnName }
       );
-      
+
       try {
         // NOTE: Bookmark capture disabled - Export API was causing database locks
         // TODO: Re-enable when D1 export API behavior is fixed
-        
+
         // Capture snapshot before drop
         try {
           const snapshot = await captureColumnSnapshot(dbId, tableName, columnName, env);
@@ -1883,18 +1911,18 @@ export async function handleTableRoutes(
           void logError(env, snapshotErr instanceof Error ? snapshotErr : String(snapshotErr), { module: 'tables', operation: 'column_snapshot', databaseId: dbId, metadata: { tableName, columnName } }, isLocalDev);
           // Continue with drop even if snapshot fails
         }
-        
+
         const sanitizedTable = sanitizeIdentifier(tableName);
         const sanitizedColumn = sanitizeIdentifier(columnName);
-        
+
         // Use ALTER TABLE DROP COLUMN (supported in SQLite 3.35.0+)
         const query = `ALTER TABLE "${sanitizedTable}" DROP COLUMN "${sanitizedColumn}"`;
-        
+
         await executeQueryViaAPI(dbId, query, env);
-        
+
         // Complete job tracking
         await finishJobTracking(env, jobId, 'completed', userEmail ?? 'unknown', isLocalDev, { processedItems: 1, errorCount: 0 });
-        
+
         return new Response(JSON.stringify({
           success: true
         }), {
@@ -1915,18 +1943,18 @@ export async function handleTableRoutes(
     if (request.method === 'POST' && /^\/api\/tables\/[^/]+\/[^/]+\/rows\/delete$/.exec(url.pathname)) {
       const tableName = decodeURIComponent(pathParts[4] ?? '');
       logInfo(`Deleting rows from table: ${tableName}`, { module: 'tables', operation: 'delete_rows', databaseId: dbId, metadata: { tableName } });
-      
+
       const body = await parseJsonBody<{ whereClause?: string; description?: string }>(request);
-      
+
       if (!body?.whereClause) {
-        return new Response(JSON.stringify({ 
-          error: 'WHERE clause required' 
-        }), { 
+        return new Response(JSON.stringify({
+          error: 'WHERE clause required'
+        }), {
           status: 400,
           headers: jsonHeaders(corsHeaders)
         });
       }
-      
+
       // Mock response for local development
       if (isLocalDev) {
         return new Response(JSON.stringify({
@@ -1936,7 +1964,7 @@ export async function handleTableRoutes(
           headers: jsonHeaders(corsHeaders)
         });
       }
-      
+
       // Start job tracking
       const jobId = await startJobTracking(
         env,
@@ -1946,16 +1974,16 @@ export async function handleTableRoutes(
         isLocalDev,
         { tableName, whereClause: body.whereClause }
       );
-      
+
       try {
         // NOTE: Bookmark capture disabled - Export API was causing database locks
         // TODO: Re-enable when D1 export API behavior is fixed
-        
+
         // Capture snapshot before delete
         try {
           const snapshot = await captureRowSnapshot(dbId, tableName, body.whereClause, env);
           const rowCount = snapshot.rowData?.rows.length ?? 0;
-          
+
           await saveUndoSnapshot(
             dbId,
             'DELETE_ROW',
@@ -1970,17 +1998,28 @@ export async function handleTableRoutes(
           void logError(env, snapshotErr instanceof Error ? snapshotErr : String(snapshotErr), { module: 'tables', operation: 'row_snapshot', databaseId: dbId, metadata: { tableName } }, isLocalDev);
           // Continue with delete even if snapshot fails
         }
-        
+
         // Execute delete
         const sanitizedTable = sanitizeIdentifier(tableName);
         const deleteQuery = `DELETE FROM "${sanitizedTable}"${body.whereClause}`;
         const result = await executeQueryViaAPI(dbId, deleteQuery, env);
-        
+
         const rowsDeleted = (result.meta['changes'] as number | undefined) ?? 0;
-        
+
         // Complete job tracking
         await finishJobTracking(env, jobId, 'completed', userEmail ?? 'unknown', isLocalDev, { processedItems: 1, errorCount: 0 });
-        
+
+        // Trigger bulk_delete_complete webhook if rows were deleted
+        if (rowsDeleted > 0) {
+          const dbInfo = await getDatabaseInfo(dbId, env);
+          void triggerWebhooks(
+            env,
+            'bulk_delete_complete',
+            createBulkDeleteCompletePayload(dbId, dbInfo?.name ?? 'unknown', tableName, rowsDeleted, userEmail),
+            isLocalDev
+          );
+        }
+
         return new Response(JSON.stringify({
           success: true,
           rowsDeleted
@@ -2004,17 +2043,17 @@ export async function handleTableRoutes(
     if (request.method === 'GET' && url.pathname === `/api/tables/${dbId}/dependencies`) {
       const tablesParam = url.searchParams.get('tables');
       if (!tablesParam) {
-        return new Response(JSON.stringify({ 
-          error: 'Tables parameter required' 
-        }), { 
+        return new Response(JSON.stringify({
+          error: 'Tables parameter required'
+        }), {
           status: 400,
           headers: jsonHeaders(corsHeaders)
         });
       }
-      
+
       const tableNames = tablesParam.split(',').map(t => t.trim());
       logInfo(`Getting dependencies for tables: ${tableNames.join(', ')}`, { module: 'tables', operation: 'dependencies', databaseId: dbId, metadata: { tableCount: tableNames.length } });
-      
+
       // Define types for dependencies
       interface ForeignKeyDependency {
         table: string;
@@ -2023,12 +2062,12 @@ export async function handleTableRoutes(
         onUpdate: string | null;
         rowCount: number;
       }
-      
+
       interface TableDependencies {
         outbound: ForeignKeyDependency[];
         inbound: ForeignKeyDependency[];
       }
-      
+
       // Mock response for local development
       if (isLocalDev) {
         const mockDependencies: Record<string, TableDependencies> = {};
@@ -2056,7 +2095,7 @@ export async function handleTableRoutes(
             };
           }
         });
-        
+
         return new Response(JSON.stringify({
           result: mockDependencies,
           success: true
@@ -2064,14 +2103,14 @@ export async function handleTableRoutes(
           headers: jsonHeaders(corsHeaders)
         });
       }
-      
+
       // OPTIMIZATION: Build complete FK index in single pass
       // Step 1: Get all tables ONCE (instead of per table being deleted)
       const tableListQuery = "PRAGMA table_list";
       const tableListResult = await executeQueryViaAPI(dbId, tableListQuery, env);
       const allTables = (tableListResult.results as { name: string; type: string }[])
         .filter(t => !t.name.startsWith('sqlite_') && !t.name.startsWith('_cf_') && t.type === 'table');
-      
+
       // Step 2: Build FK index for ALL tables in database
       // This is O(N) calls instead of O(M * N) where M = tables to delete
       interface FKIndexEntry {
@@ -2082,9 +2121,9 @@ export async function handleTableRoutes(
         onDelete: string;
         onUpdate: string;
       }
-      
+
       const fkIndex: FKIndexEntry[] = [];
-      
+
       // Collect FK info from all tables
       for (const tableInfo of allTables) {
         const sanitizedTable = sanitizeIdentifier(tableInfo.name);
@@ -2101,7 +2140,7 @@ export async function handleTableRoutes(
             on_delete: string;
             match: string;
           }[];
-          
+
           for (const fk of fks) {
             fkIndex.push({
               sourceTable: tableInfo.name,
@@ -2121,14 +2160,14 @@ export async function handleTableRoutes(
           });
         }
       }
-      
+
       // Step 3: Collect all tables that need row counts
       const tablesNeedingRowCount = new Set<string>();
-      
+
       for (const tableName of tableNames) {
         // Tables being deleted need row counts for outbound FKs
         tablesNeedingRowCount.add(tableName);
-        
+
         // Tables referencing the deleted tables (inbound) need row counts
         for (const fk of fkIndex) {
           if (fk.targetTable === tableName) {
@@ -2136,17 +2175,17 @@ export async function handleTableRoutes(
           }
         }
       }
-      
+
       // Step 4: Get row counts in batched fashion
       // Use a single compound query for efficiency
       const rowCounts = new Map<string, number>();
       const tablesToCount = Array.from(tablesNeedingRowCount);
-      
+
       // Batch row count queries (max 10 at a time to avoid overly complex queries)
       const BATCH_SIZE = 10;
       for (let i = 0; i < tablesToCount.length; i += BATCH_SIZE) {
         const batch = tablesToCount.slice(i, i + BATCH_SIZE);
-        
+
         // Execute count queries for this batch
         for (const tableName of batch) {
           const sanitizedTable = sanitizeIdentifier(tableName);
@@ -2161,15 +2200,15 @@ export async function handleTableRoutes(
           }
         }
       }
-      
+
       // Step 5: Build dependency response from the index
       const dependencies: Record<string, TableDependencies> = {};
-      
+
       for (const tableName of tableNames) {
         // Outbound FKs: this table references other tables
         const outbound: ForeignKeyDependency[] = [];
         const processedOutbound = new Set<string>();
-        
+
         for (const fk of fkIndex) {
           if (fk.sourceTable === tableName) {
             const key = `${fk.targetTable}_${fk.sourceColumn}`;
@@ -2185,11 +2224,11 @@ export async function handleTableRoutes(
             }
           }
         }
-        
+
         // Inbound FKs: other tables reference this table
         const inbound: ForeignKeyDependency[] = [];
         const processedInbound = new Set<string>();
-        
+
         for (const fk of fkIndex) {
           if (fk.targetTable === tableName) {
             const key = `${fk.sourceTable}_${fk.sourceColumn}`;
@@ -2205,13 +2244,13 @@ export async function handleTableRoutes(
             }
           }
         }
-        
+
         dependencies[tableName] = {
           outbound,
           inbound
         };
       }
-      
+
       logInfo(`Dependencies computed for ${String(tableNames.length)} tables using optimized FK index`, {
         module: 'tables',
         operation: 'dependencies',
@@ -2223,7 +2262,7 @@ export async function handleTableRoutes(
           rowCountQueries: tablesToCount.length
         }
       });
-      
+
       return new Response(JSON.stringify({
         result: dependencies,
         success: true
@@ -2235,18 +2274,18 @@ export async function handleTableRoutes(
     // Simulate cascade impact for deletion
     if (request.method === 'POST' && url.pathname === `/api/tables/${dbId}/simulate-cascade`) {
       logInfo('Simulating cascade impact', { module: 'tables', operation: 'cascade_impact', databaseId: dbId });
-      
+
       const body = await parseJsonBody<{ targetTable?: string; whereClause?: string }>(request);
-      
+
       if (!body?.targetTable) {
-        return new Response(JSON.stringify({ 
-          error: 'Target table is required' 
-        }), { 
+        return new Response(JSON.stringify({
+          error: 'Target table is required'
+        }), {
           status: 400,
           headers: jsonHeaders(corsHeaders)
         });
       }
-      
+
       // Mock response for local development
       if (isLocalDev) {
         // Provide comprehensive mock data with circular dependencies
@@ -2345,7 +2384,7 @@ export async function handleTableRoutes(
           constraints: [],
           circularDependencies: []
         };
-        
+
         return new Response(JSON.stringify({
           result: mockSimulation,
           success: true
@@ -2353,10 +2392,10 @@ export async function handleTableRoutes(
           headers: jsonHeaders(corsHeaders)
         });
       }
-      
+
       // Perform cascade simulation
       const simulation = await simulateCascadeImpact(dbId, body.targetTable, body.whereClause, env);
-      
+
       return new Response(JSON.stringify({
         result: simulation,
         success: true
@@ -2372,7 +2411,7 @@ export async function handleTableRoutes(
       const includeCycles = url.searchParams.get('includeCycles') === 'true';
       const includeSchemas = url.searchParams.get('includeSchemas') === 'true';
       logInfo(`Getting all foreign keys for database: ${dbId}${includeCycles ? ' (with cycles)' : ''}${includeSchemas ? ' (with schemas)' : ''}`, { module: 'tables', operation: 'all_foreign_keys', databaseId: dbId, metadata: { includeCycles, includeSchemas } });
-      
+
       // Mock response for local development
       if (isLocalDev) {
         const mockResult: {
@@ -2391,7 +2430,7 @@ export async function handleTableRoutes(
             { id: 'fk_comments_post', source: 'comments', target: 'posts', sourceColumn: 'post_id', targetColumn: 'id', onDelete: 'CASCADE', onUpdate: 'CASCADE' }
           ]
         };
-        
+
         if (includeCycles) {
           mockResult.cycles = [
             {
@@ -2405,7 +2444,7 @@ export async function handleTableRoutes(
             }
           ];
         }
-        
+
         if (includeSchemas) {
           mockResult.schemas = {
             'users': [{ cid: 0, name: 'id', type: 'INTEGER', notnull: 1, dflt_value: null, pk: 1 }],
@@ -2413,7 +2452,7 @@ export async function handleTableRoutes(
             'comments': [{ cid: 0, name: 'id', type: 'INTEGER', notnull: 1, dflt_value: null, pk: 1 }, { cid: 1, name: 'post_id', type: 'INTEGER', notnull: 0, dflt_value: null, pk: 0 }]
           };
         }
-        
+
         return new Response(JSON.stringify({
           result: mockResult,
           success: true
@@ -2421,15 +2460,15 @@ export async function handleTableRoutes(
           headers: jsonHeaders(corsHeaders)
         });
       }
-      
+
       // Get all foreign keys for the entire database (optionally with full schemas)
       const fkGraphResult = await getAllForeignKeysForDatabase(dbId, env, includeSchemas);
-      
+
       // Optionally include cycle detection in same response to save API calls
       if (includeCycles) {
         const { detectCircularDependencies } = await import('../utils/circular-dependency-detector');
         const cycles = detectCircularDependencies(fkGraphResult);
-        
+
         return new Response(JSON.stringify({
           result: { ...fkGraphResult, cycles },
           success: true
@@ -2437,7 +2476,7 @@ export async function handleTableRoutes(
           headers: jsonHeaders(corsHeaders)
         });
       }
-      
+
       return new Response(JSON.stringify({
         result: fkGraphResult,
         success: true
@@ -2449,7 +2488,7 @@ export async function handleTableRoutes(
     // Get circular dependencies in database (standalone endpoint for backwards compatibility)
     if (request.method === 'GET' && url.pathname === `/api/tables/${dbId}/circular-dependencies`) {
       logInfo(`Detecting circular dependencies for database: ${dbId}`, { module: 'tables', operation: 'circular_deps', databaseId: dbId });
-      
+
       // Mock response for local development
       if (isLocalDev) {
         return new Response(JSON.stringify({
@@ -2469,12 +2508,12 @@ export async function handleTableRoutes(
           headers: jsonHeaders(corsHeaders)
         });
       }
-      
+
       // Get FK graph and detect cycles (using lightweight version - skips schema/row count queries)
       const { detectCircularDependencies } = await import('../utils/circular-dependency-detector');
       const fkGraphResult = await getForeignKeyGraphForCycleDetection(dbId, env);
       const cycles = detectCircularDependencies(fkGraphResult);
-      
+
       return new Response(JSON.stringify({
         result: cycles,
         success: true
@@ -2486,18 +2525,18 @@ export async function handleTableRoutes(
     // Simulate adding a foreign key (check for cycles)
     if (request.method === 'POST' && url.pathname === `/api/tables/${dbId}/foreign-keys/simulate`) {
       logInfo('Simulating foreign key addition', { module: 'tables', operation: 'fk_simulate', databaseId: dbId });
-      
+
       const body = await parseJsonBody<{ sourceTable?: string; targetTable?: string }>(request);
-      
+
       if (!body?.sourceTable || !body.targetTable) {
-        return new Response(JSON.stringify({ 
-          error: 'sourceTable and targetTable are required' 
-        }), { 
+        return new Response(JSON.stringify({
+          error: 'sourceTable and targetTable are required'
+        }), {
           status: 400,
           headers: jsonHeaders(corsHeaders)
         });
       }
-      
+
       // Mock response for local development
       if (isLocalDev) {
         return new Response(JSON.stringify({
@@ -2509,12 +2548,12 @@ export async function handleTableRoutes(
           headers: jsonHeaders(corsHeaders)
         });
       }
-      
+
       // Get FK graph and simulate addition (using lightweight version - skips schema/row count queries)
       const { wouldCreateCycle } = await import('../utils/circular-dependency-detector');
       const fkGraphResult = await getForeignKeyGraphForCycleDetection(dbId, env);
       const simulation = wouldCreateCycle(fkGraphResult, body.sourceTable, body.targetTable);
-      
+
       return new Response(JSON.stringify({
         result: simulation,
         success: true
@@ -2526,18 +2565,18 @@ export async function handleTableRoutes(
     // Add foreign key constraint
     if (request.method === 'POST' && url.pathname === `/api/tables/${dbId}/foreign-keys/add`) {
       logInfo('Adding foreign key constraint', { module: 'tables', operation: 'fk_add', databaseId: dbId });
-      
+
       const body = await parseJsonBody<{ sourceTable?: string; sourceColumn?: string; targetTable?: string; targetColumn?: string; onDelete?: string; onUpdate?: string; constraintName?: string }>(request);
-      
+
       if (!body?.sourceTable || !body.sourceColumn || !body.targetTable || !body.targetColumn) {
-        return new Response(JSON.stringify({ 
-          error: 'sourceTable, sourceColumn, targetTable, and targetColumn are required' 
-        }), { 
+        return new Response(JSON.stringify({
+          error: 'sourceTable, sourceColumn, targetTable, and targetColumn are required'
+        }), {
           status: 400,
           headers: jsonHeaders(corsHeaders)
         });
       }
-      
+
       // Mock response for local development
       if (isLocalDev) {
         return new Response(JSON.stringify({
@@ -2547,7 +2586,7 @@ export async function handleTableRoutes(
           headers: jsonHeaders(corsHeaders)
         });
       }
-      
+
       // Start job tracking
       const jobId = await startJobTracking(
         env,
@@ -2555,14 +2594,14 @@ export async function handleTableRoutes(
         dbId,
         userEmail ?? 'unknown',
         isLocalDev,
-        { 
+        {
           sourceTable: body.sourceTable,
           sourceColumn: body.sourceColumn,
           targetTable: body.targetTable,
           targetColumn: body.targetColumn
         }
       );
-      
+
       try {
         // Add the foreign key constraint - we've validated that sourceTable etc. exist
         const fkParams: { sourceTable: string; sourceColumn: string; targetTable: string; targetColumn: string; onDelete: string; onUpdate: string; constraintName?: string } = {
@@ -2577,10 +2616,10 @@ export async function handleTableRoutes(
           fkParams.constraintName = body.constraintName;
         }
         await addForeignKeyConstraint(dbId, fkParams, env);
-        
+
         // Complete job tracking
         await finishJobTracking(env, jobId, 'completed', userEmail ?? 'unknown', isLocalDev, { processedItems: 1, errorCount: 0 });
-        
+
         return new Response(JSON.stringify({
           result: { success: true, message: 'Foreign key constraint added successfully' },
           success: true
@@ -2595,7 +2634,7 @@ export async function handleTableRoutes(
           errorCount: 1,
           errorMessage,
         });
-        
+
         // Return specific error message to user
         void logError(env, `Foreign key add error: ${errorMessage}`, { module: 'tables', operation: 'fk_add', databaseId: dbId }, isLocalDev);
         return new Response(JSON.stringify({
@@ -2613,9 +2652,9 @@ export async function handleTableRoutes(
     if (request.method === 'PATCH' && /^\/api\/tables\/[^/]+\/foreign-keys\/[^/]+$/.exec(url.pathname)) {
       const constraintName = decodeURIComponent(pathParts[5] ?? '');
       logInfo(`Modifying foreign key constraint: ${constraintName}`, { module: 'tables', operation: 'fk_modify', databaseId: dbId, metadata: { constraintName } });
-      
+
       const body = await parseJsonBody<{ onDelete?: string; onUpdate?: string }>(request);
-      
+
       // Mock response for local development
       if (isLocalDev) {
         return new Response(JSON.stringify({
@@ -2625,7 +2664,7 @@ export async function handleTableRoutes(
           headers: jsonHeaders(corsHeaders)
         });
       }
-      
+
       // Start job tracking
       const jobId = await startJobTracking(
         env,
@@ -2635,14 +2674,14 @@ export async function handleTableRoutes(
         isLocalDev,
         { constraintName, updates: body }
       );
-      
+
       try {
         // Modify the foreign key constraint
         await modifyForeignKeyConstraint(dbId, constraintName, body ?? {}, env);
-        
+
         // Complete job tracking
         await finishJobTracking(env, jobId, 'completed', userEmail ?? 'unknown', isLocalDev, { processedItems: 1, errorCount: 0 });
-        
+
         return new Response(JSON.stringify({
           result: { success: true, message: 'Foreign key constraint modified successfully' },
           success: true
@@ -2657,7 +2696,7 @@ export async function handleTableRoutes(
           errorCount: 1,
           errorMessage,
         });
-        
+
         // Return specific error message to user
         void logError(env, `Foreign key modify error: ${errorMessage}`, { module: 'tables', operation: 'fk_modify', databaseId: dbId, metadata: { constraintName } }, isLocalDev);
         return new Response(JSON.stringify({
@@ -2675,7 +2714,7 @@ export async function handleTableRoutes(
     if (request.method === 'DELETE' && /^\/api\/tables\/[^/]+\/foreign-keys\/[^/]+$/.exec(url.pathname)) {
       const constraintName = decodeURIComponent(pathParts[5] ?? '');
       logInfo(`Deleting foreign key constraint: ${constraintName}`, { module: 'tables', operation: 'fk_delete', databaseId: dbId, metadata: { constraintName } });
-      
+
       // Mock response for local development
       if (isLocalDev) {
         return new Response(JSON.stringify({
@@ -2685,7 +2724,7 @@ export async function handleTableRoutes(
           headers: jsonHeaders(corsHeaders)
         });
       }
-      
+
       // Start job tracking
       const jobId = await startJobTracking(
         env,
@@ -2695,14 +2734,14 @@ export async function handleTableRoutes(
         isLocalDev,
         { constraintName }
       );
-      
+
       try {
         // Delete the foreign key constraint
         await deleteForeignKeyConstraint(dbId, constraintName, env);
-        
+
         // Complete job tracking
         await finishJobTracking(env, jobId, 'completed', userEmail ?? 'unknown', isLocalDev, { processedItems: 1, errorCount: 0 });
-        
+
         return new Response(JSON.stringify({
           result: { success: true, message: 'Foreign key constraint deleted successfully' },
           success: true
@@ -2717,7 +2756,7 @@ export async function handleTableRoutes(
           errorCount: 1,
           errorMessage,
         });
-        
+
         // Return specific error message to user
         void logError(env, `Foreign key delete error: ${errorMessage}`, { module: 'tables', operation: 'fk_delete', databaseId: dbId, metadata: { constraintName } }, isLocalDev);
         return new Response(JSON.stringify({
@@ -2731,9 +2770,9 @@ export async function handleTableRoutes(
       }
     }
 
-    return new Response(JSON.stringify({ 
-      error: 'Route not found' 
-    }), { 
+    return new Response(JSON.stringify({
+      error: 'Route not found'
+    }), {
       status: 404,
       headers: jsonHeaders(corsHeaders)
     });
@@ -2741,22 +2780,22 @@ export async function handleTableRoutes(
   } catch (err) {
     // Log full error details on server only
     void logError(env, err instanceof Error ? err : String(err), { module: 'tables', operation: 'request', databaseId: dbId }, isLocalDev);
-    
+
     // Extract meaningful error message
     let errorMessage = 'Unable to complete table operation. Please try again.';
     const errorStr = err instanceof Error ? err.message : String(err);
-    
+
     // Check for D1-specific errors
     if (errorStr.includes('Currently processing a long-running export')) {
       errorMessage = 'Database is currently processing an export. Please wait a few minutes and try again.';
     } else if (errorStr.includes('SQLITE_BUSY')) {
       errorMessage = 'Database is busy. Please wait a moment and try again.';
     }
-    
-    return new Response(JSON.stringify({ 
+
+    return new Response(JSON.stringify({
       error: 'Table operation failed',
       message: errorMessage
-    }), { 
+    }), {
       status: 500,
       headers: jsonHeaders(corsHeaders)
     });
@@ -2811,8 +2850,8 @@ async function recreateTableWithModifiedColumn(
           return {
             ...col,
             type: newColDef.type ?? col.type,
-            notnull: newColDef.notnull !== undefined 
-              ? (newColDef.notnull ? 1 : 0) 
+            notnull: newColDef.notnull !== undefined
+              ? (newColDef.notnull ? 1 : 0)
               : col.notnull,
             dflt_value: newColDef.defaultValue ?? col.dflt_value
           };
@@ -2915,14 +2954,14 @@ async function simulateCascadeImpact(
 }> {
   const sanitizedTable = sanitizeIdentifier(targetTable);
   const maxDepth = 10; // Prevent infinite loops
-  
+
   // Count rows that will be deleted from target table
   const whereCondition = whereClause ? ` WHERE ${whereClause}` : '';
   const countQuery = `SELECT COUNT(*) as count FROM "${sanitizedTable}"${whereCondition}`;
   const countResult = await executeQueryViaAPI(dbId, countQuery, env);
   const targetCountRow = countResult.results[0] as { count: number } | undefined;
   const targetRowCount = targetCountRow?.count ?? 0;
-  
+
   if (targetRowCount === 0) {
     // No rows to delete, return empty simulation
     const emptyResult: {
@@ -2948,13 +2987,13 @@ async function simulateCascadeImpact(
     if (whereClause) emptyResult.whereClause = whereClause;
     return emptyResult;
   }
-  
+
   // OPTIMIZATION: Build complete FK index upfront instead of querying inside BFS loop
   // Step 1: Get all tables in database ONCE
   const tableListResult = await executeQueryViaAPI(dbId, "PRAGMA table_list", env);
   const allTables = (tableListResult.results as { name: string; type: string }[])
     .filter(t => !t.name.startsWith('sqlite_') && !t.name.startsWith('_cf_') && t.type === 'table');
-  
+
   // Step 2: Build FK index for ALL tables in a single pass - O(N) instead of O(M*N)
   interface FKEdge {
     sourceTable: string;
@@ -2963,10 +3002,10 @@ async function simulateCascadeImpact(
     onDelete: string;
     onUpdate: string;
   }
-  
+
   // Build reverse index: which tables reference which (target -> sources)
   const reverseIndex = new Map<string, FKEdge[]>();
-  
+
   for (const tableInfo of allTables) {
     const sanitizedTableName = sanitizeIdentifier(tableInfo.name);
     try {
@@ -2982,7 +3021,7 @@ async function simulateCascadeImpact(
         on_delete: string;
         match: string;
       }[];
-      
+
       for (const fk of fks) {
         const edge: FKEdge = {
           sourceTable: tableInfo.name,
@@ -2991,7 +3030,7 @@ async function simulateCascadeImpact(
           onDelete: fk.on_delete || 'NO ACTION',
           onUpdate: fk.on_update || 'NO ACTION'
         };
-        
+
         // Add to reverse index (which tables reference targetTable)
         if (!reverseIndex.has(fk.table)) {
           reverseIndex.set(fk.table, []);
@@ -3002,10 +3041,10 @@ async function simulateCascadeImpact(
       // Skip tables that can't be queried (e.g., FTS5 virtual tables)
     }
   }
-  
+
   // Step 3: Build row count cache - fetch lazily as needed during BFS
   const rowCountCache = new Map<string, number>();
-  
+
   // Helper to get row count with caching
   const getRowCount = async (tableName: string): Promise<number> => {
     if (rowCountCache.has(tableName)) {
@@ -3024,7 +3063,7 @@ async function simulateCascadeImpact(
       return 0;
     }
   };
-  
+
   // Build dependency graph using the pre-built index
   const cascadePaths: {
     id: string;
@@ -3035,7 +3074,7 @@ async function simulateCascadeImpact(
     affectedRows: number;
     column: string;
   }[] = [];
-  
+
   const affectedTablesMap = new Map<string, {
     tableName: string;
     action: string;
@@ -3043,20 +3082,20 @@ async function simulateCascadeImpact(
     rowsAfter: number;
     depth: number;
   }>();
-  
+
   const warnings: {
     type: string;
     message: string;
     severity: 'low' | 'medium' | 'high';
   }[] = [];
-  
+
   const constraints: {
     table: string;
     message: string;
   }[] = [];
-  
+
   const circularDeps = new Set<string>();
-  
+
   // Add target table to affected tables
   affectedTablesMap.set(targetTable, {
     tableName: targetTable,
@@ -3065,22 +3104,22 @@ async function simulateCascadeImpact(
     rowsAfter: 0,
     depth: 0
   });
-  
+
   // Recursively analyze cascade impact using BFS with pre-built index
   const queue: { table: string; depth: number; parentRows: number }[] = [
     { table: targetTable, depth: 0, parentRows: targetRowCount }
   ];
   const visited = new Set<string>();
   const pathMap = new Map<string, Set<string>>(); // Track paths for circular detection
-  
+
   let totalAffected = targetRowCount;
   let currentMaxDepth = 0;
-  
+
   while (queue.length > 0) {
     const item = queue.shift();
     if (!item) break;
     const { table: currentTable, depth, parentRows } = item;
-    
+
     if (depth >= maxDepth) {
       warnings.push({
         type: 'max_depth',
@@ -3089,16 +3128,16 @@ async function simulateCascadeImpact(
       });
       break;
     }
-    
+
     currentMaxDepth = Math.max(currentMaxDepth, depth);
-    
+
     // OPTIMIZED: Use reverse index to find tables referencing currentTable
     // Instead of iterating all tables and querying FKs for each
     const referencingEdges = reverseIndex.get(currentTable) ?? [];
-    
+
     for (const edge of referencingEdges) {
       const action = edge.onDelete;
-      
+
       // Check for circular dependencies
       if (!pathMap.has(currentTable)) {
         pathMap.set(currentTable, new Set());
@@ -3107,19 +3146,19 @@ async function simulateCascadeImpact(
       if (pathSet) {
         pathSet.add(edge.sourceTable);
       }
-      
+
       // Detect cycles
       if (visited.has(edge.sourceTable) && pathMap.has(edge.sourceTable)) {
         const cycle = [currentTable, edge.sourceTable];
         circularDeps.add(cycle.join(' -> '));
       }
-      
+
       // Get row count from cache or fetch once
       const refRowCount = await getRowCount(edge.sourceTable);
-      
+
       // Calculate actual affected rows (simplified - assumes all rows reference parent)
       const affectedRows = Math.min(refRowCount, parentRows);
-      
+
       if (affectedRows > 0) {
         // Add to cascade paths
         cascadePaths.push({
@@ -3131,11 +3170,11 @@ async function simulateCascadeImpact(
           affectedRows,
           column: edge.sourceColumn
         });
-        
+
         // Handle different cascade actions
         if (action.toUpperCase() === 'CASCADE') {
           totalAffected += affectedRows;
-          
+
           // Add to affected tables
           if (!affectedTablesMap.has(edge.sourceTable)) {
             affectedTablesMap.set(edge.sourceTable, {
@@ -3146,13 +3185,13 @@ async function simulateCascadeImpact(
               depth: depth + 1
             });
           }
-          
+
           // Continue traversal for CASCADE
           if (!visited.has(edge.sourceTable)) {
-            queue.push({ 
-              table: edge.sourceTable, 
-              depth: depth + 1, 
-              parentRows: affectedRows 
+            queue.push({
+              table: edge.sourceTable,
+              depth: depth + 1,
+              parentRows: affectedRows
             });
           }
         } else if (action.toUpperCase() === 'SET NULL' || action.toUpperCase() === 'SET DEFAULT') {
@@ -3175,10 +3214,10 @@ async function simulateCascadeImpact(
         }
       }
     }
-    
+
     visited.add(currentTable);
   }
-  
+
   // Generate warnings based on analysis
   if (totalAffected > targetRowCount) {
     const additionalRows = totalAffected - targetRowCount;
@@ -3188,7 +3227,7 @@ async function simulateCascadeImpact(
       severity: additionalRows > 100 ? 'high' : additionalRows > 10 ? 'medium' : 'low'
     });
   }
-  
+
   if (currentMaxDepth > 2) {
     warnings.push({
       type: 'deep_cascade',
@@ -3196,7 +3235,7 @@ async function simulateCascadeImpact(
       severity: currentMaxDepth > 5 ? 'high' : 'medium'
     });
   }
-  
+
   if (circularDeps.size > 0) {
     warnings.push({
       type: 'circular_dependency',
@@ -3204,7 +3243,7 @@ async function simulateCascadeImpact(
       severity: 'medium'
     });
   }
-  
+
   const result: {
     targetTable: string;
     whereClause?: string;
@@ -3248,7 +3287,7 @@ async function getAllForeignKeysForDatabase(
   nodes: {
     id: string;
     label: string;
-    columns: {name: string; type: string; isPK: boolean}[];
+    columns: { name: string; type: string; isPK: boolean }[];
     rowCount: number;
   }[];
   edges: {
@@ -3274,11 +3313,11 @@ async function getAllForeignKeysForDatabase(
   const tableListResult = await executeQueryViaAPI(dbId, tableListQuery, env);
   const allTables = (tableListResult.results as { name: string; type: string }[])
     .filter(t => !t.name.startsWith('sqlite_') && !t.name.startsWith('_cf_') && t.type === 'table');
-  
+
   const nodes: {
     id: string;
     label: string;
-    columns: {name: string; type: string; isPK: boolean}[];
+    columns: { name: string; type: string; isPK: boolean }[];
     rowCount: number;
   }[] = [];
   const edges: {
@@ -3299,19 +3338,19 @@ async function getAllForeignKeysForDatabase(
     pk: number;
   }[]> = {};
   const processedConstraints = new Set<string>();
-  
+
   // Process tables in batches to reduce total time while avoiding rate limits
   // Batch size of 5 provides good balance between speed and API pressure
   const BATCH_SIZE = 5;
-  
+
   for (let i = 0; i < allTables.length; i += BATCH_SIZE) {
     const batch = allTables.slice(i, i + BATCH_SIZE);
-    
+
     // Process batch in parallel
     const batchResults = await Promise.all(
       batch.map(async (table) => {
         const sanitizedTable = sanitizeIdentifier(table.name);
-        
+
         try {
           // Execute schema, count, and FK queries in parallel for this table
           const [schemaResult, countResult, fkResult] = await Promise.all([
@@ -3319,7 +3358,7 @@ async function getAllForeignKeysForDatabase(
             executeQueryViaAPI(dbId, `SELECT COUNT(*) as count FROM "${sanitizedTable}"`, env),
             executeQueryViaAPI(dbId, `PRAGMA foreign_key_list("${sanitizedTable}")`, env)
           ]);
-          
+
           const columns = schemaResult.results as {
             cid: number;
             name: string;
@@ -3328,10 +3367,10 @@ async function getAllForeignKeysForDatabase(
             dflt_value: string | null;
             pk: number;
           }[];
-          
+
           const countRow = countResult.results[0] as { count: number } | undefined;
           const rowCount = countRow?.count ?? 0;
-          
+
           const fks = fkResult.results as {
             id: number;
             seq: number;
@@ -3342,7 +3381,7 @@ async function getAllForeignKeysForDatabase(
             on_delete: string;
             match: string;
           }[];
-          
+
           return {
             tableName: table.name,
             columns,
@@ -3362,11 +3401,11 @@ async function getAllForeignKeysForDatabase(
         }
       })
     );
-    
+
     // Process batch results
     for (const result of batchResults) {
       if (!result) continue;
-      
+
       nodes.push({
         id: result.tableName,
         label: result.tableName,
@@ -3377,7 +3416,7 @@ async function getAllForeignKeysForDatabase(
         })),
         rowCount: result.rowCount
       });
-      
+
       // Store full schema if requested (for ER diagram)
       if (includeSchemas) {
         schemas[result.tableName] = result.columns.map(col => ({
@@ -3389,13 +3428,13 @@ async function getAllForeignKeysForDatabase(
           pk: col.pk
         }));
       }
-      
+
       // Process foreign keys
       for (const fk of result.fks) {
         // Generate unique constraint ID
         // Use double underscore as separator to handle column names with single underscores
         const constraintId = `fk__${result.tableName}__${fk.from}__${fk.table}__${fk.to}`;
-        
+
         if (!processedConstraints.has(constraintId)) {
           edges.push({
             id: constraintId,
@@ -3411,7 +3450,7 @@ async function getAllForeignKeysForDatabase(
       }
     }
   }
-  
+
   // Return with schemas only when requested
   if (includeSchemas) {
     return { nodes, edges, schemas };
@@ -3445,7 +3484,7 @@ async function getForeignKeyGraphForCycleDetection(
   const tableListResult = await executeQueryViaAPI(dbId, tableListQuery, env);
   const allTables = (tableListResult.results as { name: string; type: string }[])
     .filter(t => !t.name.startsWith('sqlite_') && !t.name.startsWith('_cf_') && t.type === 'table');
-  
+
   // Build minimal nodes (no schema/row count queries needed for cycle detection)
   const nodes = allTables.map(table => ({
     id: table.name,
@@ -3453,7 +3492,7 @@ async function getForeignKeyGraphForCycleDetection(
     columns: [] as never[],
     rowCount: 0
   }));
-  
+
   const edges: {
     id: string;
     source: string;
@@ -3464,19 +3503,19 @@ async function getForeignKeyGraphForCycleDetection(
     onUpdate: string;
   }[] = [];
   const processedConstraints = new Set<string>();
-  
+
   // Process FK queries in parallel batches to reduce total time
   // Batch size of 10 is safe since these are lightweight PRAGMA calls
   const BATCH_SIZE = 10;
-  
+
   for (let i = 0; i < allTables.length; i += BATCH_SIZE) {
     const batch = allTables.slice(i, i + BATCH_SIZE);
-    
+
     // Process batch in parallel
     const batchResults = await Promise.all(
       batch.map(async (table) => {
         const sanitizedTable = sanitizeIdentifier(table.name);
-        
+
         try {
           const fkQuery = `PRAGMA foreign_key_list("${sanitizedTable}")`;
           const fkResult = await executeQueryViaAPI(dbId, fkQuery, env);
@@ -3490,7 +3529,7 @@ async function getForeignKeyGraphForCycleDetection(
             on_delete: string;
             match: string;
           }[];
-          
+
           return { tableName: table.name, fks };
         } catch (err) {
           // Skip tables that can't be queried (e.g., FTS5 virtual tables)
@@ -3505,14 +3544,14 @@ async function getForeignKeyGraphForCycleDetection(
         }
       })
     );
-    
+
     // Process batch results
     for (const result of batchResults) {
       if (!result) continue;
-      
+
       for (const fk of result.fks) {
         const constraintId = `fk__${result.tableName}__${fk.from}__${fk.table}__${fk.to}`;
-        
+
         if (!processedConstraints.has(constraintId)) {
           edges.push({
             id: constraintId,
@@ -3528,13 +3567,13 @@ async function getForeignKeyGraphForCycleDetection(
       }
     }
   }
-  
+
   logInfo(`Built lightweight FK graph for cycle detection: ${String(nodes.length)} tables, ${String(edges.length)} edges`, {
     module: 'tables',
     operation: 'fk_graph_lightweight',
     databaseId: dbId
   });
-  
+
   return { nodes, edges };
 }
 
@@ -3555,7 +3594,7 @@ async function addForeignKeyConstraint(
   env: Env
 ): Promise<void> {
   const { sourceTable, sourceColumn, targetTable, targetColumn, onDelete, onUpdate, constraintName } = params;
-  
+
   // Validate constraint actions
   const validActions = ['CASCADE', 'RESTRICT', 'SET NULL', 'SET DEFAULT', 'NO ACTION'];
   if (!validActions.includes(onDelete.toUpperCase())) {
@@ -3564,11 +3603,11 @@ async function addForeignKeyConstraint(
   if (!validActions.includes(onUpdate.toUpperCase())) {
     throw new Error(`Invalid ON UPDATE action: ${onUpdate}`);
   }
-  
+
   // Validate column types match
   const sourceSchema = await executeQueryViaAPI(dbId, `PRAGMA table_info("${sanitizeIdentifier(sourceTable)}")`, env);
   const targetSchema = await executeQueryViaAPI(dbId, `PRAGMA table_info("${sanitizeIdentifier(targetTable)}")`, env);
-  
+
   interface ColumnInfoResult {
     cid: number;
     name: string;
@@ -3577,24 +3616,24 @@ async function addForeignKeyConstraint(
     dflt_value: string | null;
     pk: number;
   }
-  
+
   const sourceCol = (sourceSchema.results as ColumnInfoResult[]).find((c) => c.name === sourceColumn);
   const targetCol = (targetSchema.results as ColumnInfoResult[]).find((c) => c.name === targetColumn);
-  
+
   if (!sourceCol) {
     throw new Error(`Column ${sourceColumn} not found in table ${sourceTable}`);
   }
   if (!targetCol) {
     throw new Error(`Column ${targetColumn} not found in table ${targetTable}`);
   }
-  
+
   // Check if target column is a primary key or has unique constraint
   if (targetCol.pk === 0) {
     // Check for unique index
     const indexQuery = `PRAGMA index_list("${sanitizeIdentifier(targetTable)}")`;
     const indexResult = await executeQueryViaAPI(dbId, indexQuery, env);
     const indexes = indexResult.results as { name: string; unique: number }[];
-    
+
     let hasUniqueIndex = false;
     for (const index of indexes.filter(i => i.unique === 1)) {
       const indexInfoQuery = `PRAGMA index_info("${sanitizeIdentifier(index.name)}")`;
@@ -3605,12 +3644,12 @@ async function addForeignKeyConstraint(
         break;
       }
     }
-    
+
     if (!hasUniqueIndex) {
       throw new Error(`Target column ${targetColumn} must have a UNIQUE constraint or be a PRIMARY KEY`);
     }
   }
-  
+
   // Check for orphaned rows
   const orphanQuery = `
     SELECT COUNT(*) as count 
@@ -3623,11 +3662,11 @@ async function addForeignKeyConstraint(
   const orphanResult = await executeQueryViaAPI(dbId, orphanQuery, env);
   const orphanRow = orphanResult.results[0] as { count: number } | undefined;
   const orphanCount = orphanRow?.count ?? 0;
-  
+
   if (orphanCount > 0) {
     throw new Error(`Cannot add foreign key: ${String(orphanCount)} rows in ${sourceTable} reference non-existent rows in ${targetTable}`);
   }
-  
+
   // Recreate table with foreign key constraint
   const constraint: {
     columns: string[];
@@ -3644,7 +3683,7 @@ async function addForeignKeyConstraint(
     onUpdate,
   };
   if (constraintName) constraint.name = constraintName;
-  
+
   await recreateTableWithForeignKey(dbId, sourceTable, {
     action: 'add',
     constraint
@@ -3672,7 +3711,7 @@ async function modifyForeignKeyConstraint(
   if (parts.length < 5 || parts[0] !== 'fk' || !sourceTable || !sourceColumn || !targetTable || !targetColumn) {
     throw new Error('Invalid constraint name format. Expected: fk__sourceTable__sourceColumn__targetTable__targetColumn');
   }
-  
+
   // Get current constraint to preserve values not being changed
   const fkQuery = `PRAGMA foreign_key_list("${sanitizeIdentifier(sourceTable)}")`;
   const fkResult = await executeQueryViaAPI(dbId, fkQuery, env);
@@ -3685,15 +3724,15 @@ async function modifyForeignKeyConstraint(
     on_update: string;
     on_delete: string;
   }[];
-  
+
   const currentFk = fks.find(fk => fk.table === targetTable && fk.from === sourceColumn && fk.to === targetColumn);
   if (!currentFk) {
     throw new Error(`Foreign key constraint not found`);
   }
-  
+
   const onDelete = params.onDelete?.toUpperCase() ?? currentFk.on_delete ?? 'NO ACTION';
   const onUpdate = params.onUpdate?.toUpperCase() ?? currentFk.on_update ?? 'NO ACTION';
-  
+
   // Recreate table with modified constraint
   await recreateTableWithForeignKey(dbId, sourceTable, {
     action: 'modify',
@@ -3727,18 +3766,18 @@ async function deleteForeignKeyConstraint(
   const sourceColumn = parts[2];
   const targetTable = parts[3];
   const targetColumn = parts[4];
-  
+
   if (parts.length < 5 || parts[0] !== 'fk' || !sourceTable || !sourceColumn || !targetTable || !targetColumn) {
     throw new Error(`Invalid constraint name format: ${constraintName}. Expected format: fk__table__column__refTable__refColumn`);
   }
-  
+
   logInfo(`Deleting FK constraint: ${sourceTable}.${sourceColumn} -> ${targetTable}.${targetColumn}`, {
     module: 'tables',
     operation: 'fk_delete_parse',
     databaseId: dbId,
     metadata: { constraintName, sourceTable, sourceColumn, targetTable, targetColumn }
   });
-  
+
   // Recreate table without the constraint
   await recreateTableWithForeignKey(dbId, sourceTable, {
     action: 'remove',
@@ -3777,7 +3816,7 @@ async function recreateTableWithForeignKey(
   const sanitizedTable = sanitizeIdentifier(tableName);
   const tempTableName = `${tableName}_temp_${String(Date.now())}`;
   const sanitizedTempTable = sanitizeIdentifier(tempTableName);
-  
+
   try {
     // 1. Get current CREATE TABLE statement
     // Note: sqlite_master.name stores the table name without quotes
@@ -3785,34 +3824,34 @@ async function recreateTableWithForeignKey(
     const createResult = await executeQueryViaAPI(dbId, createQuery, env);
     const createRow = createResult.results[0] as { sql: string } | undefined;
     const createSql = createRow?.sql;
-    
+
     if (!createSql) {
       throw new Error(`Table "${tableName}" not found in database`);
     }
-    
+
     logInfo(`Original CREATE TABLE SQL for FK modification`, {
       module: 'tables',
       operation: 'fk_recreate',
       databaseId: dbId,
       metadata: { tableName, action: modification.action, sqlLength: createSql.length }
     });
-    
+
     // 2. Parse and modify the CREATE TABLE statement
     // Handle both quoted and unquoted table names: CREATE TABLE "tablename" or CREATE TABLE tablename
     let newCreateSql = createSql.replace(
-      new RegExp(`CREATE TABLE\\s+["']?${sanitizedTable}["']?`, 'i'), 
+      new RegExp(`CREATE TABLE\\s+["']?${sanitizedTable}["']?`, 'i'),
       `CREATE TABLE "${sanitizedTempTable}"`
     );
-    
+
     // Remove old constraint if modifying or removing
     if (modification.action === 'modify' || modification.action === 'remove') {
       const oldConst = modification.oldConstraint ?? modification.constraint;
       const colName = oldConst.columns[0] ?? '';
       const refTbl = oldConst.refTable;
       const refCol = oldConst.refColumns[0] ?? '';
-      
+
       const originalSql = newCreateSql;
-      
+
       // Pattern 1: CONSTRAINT name FOREIGN KEY ("col") REFERENCES "table" ("col") ON DELETE/UPDATE...
       // Handles: CONSTRAINT "name", CONSTRAINT name, with optional quotes
       const fkPatternConstraint = new RegExp(
@@ -3820,14 +3859,14 @@ async function recreateTableWithForeignKey(
         'gi'
       );
       newCreateSql = newCreateSql.replace(fkPatternConstraint, '');
-      
+
       // Pattern 2: FOREIGN KEY ("col") REFERENCES "table" ("col") without CONSTRAINT keyword
       const fkPatternNoConstraint = new RegExp(
         `\\s*,?\\s*FOREIGN KEY\\s*\\(\\s*["'\`]?${colName}["'\`]?\\s*\\)\\s*REFERENCES\\s*["'\`]?${refTbl}["'\`]?\\s*\\(\\s*["'\`]?${refCol}["'\`]?\\s*\\)(?:\\s+ON\\s+(?:DELETE|UPDATE)\\s+(?:NO ACTION|CASCADE|RESTRICT|SET NULL|SET DEFAULT))*`,
         'gi'
       );
       newCreateSql = newCreateSql.replace(fkPatternNoConstraint, '');
-      
+
       // Pattern 3: Inline FK reference in column definition
       // e.g., user_id INTEGER REFERENCES users(id) ON DELETE CASCADE
       const inlineFkPattern = new RegExp(
@@ -3835,24 +3874,24 @@ async function recreateTableWithForeignKey(
         'gi'
       );
       newCreateSql = newCreateSql.replace(inlineFkPattern, '$1');
-      
+
       // Check if any FK was actually removed
       if (newCreateSql === originalSql) {
         logWarning(`No FK constraint matched in CREATE TABLE SQL`, {
           module: 'tables',
           operation: 'fk_remove',
           databaseId: dbId,
-          metadata: { 
-            tableName, 
-            colName, 
-            refTbl, 
+          metadata: {
+            tableName,
+            colName,
+            refTbl,
             refCol,
             createSqlPreview: createSql.substring(0, 500)
           }
         });
         throw new Error(`Could not find foreign key constraint ${colName} -> ${refTbl}(${refCol}) in table "${tableName}". The constraint may have been defined inline or with different quoting.`);
       }
-      
+
       // Clean up any trailing commas before closing paren
       newCreateSql = newCreateSql.replace(/,(\s*\))/g, '$1');
       // Clean up any leading commas after opening paren or column definition
@@ -3860,7 +3899,7 @@ async function recreateTableWithForeignKey(
       // Clean up double commas
       newCreateSql = newCreateSql.replace(/,\s*,/g, ',');
     }
-    
+
     // Add new constraint if adding or modifying
     if (modification.action === 'add' || modification.action === 'modify') {
       const { columns, refTable, refColumns, onDelete, onUpdate, name } = modification.constraint;
@@ -3870,32 +3909,32 @@ async function recreateTableWithForeignKey(
       const constraintName = name ?? `fk_${sanitizedTableForConstraint}_${sanitizedColumnsForConstraint}`;
       const sanitizedRefTable = sanitizeIdentifier(refTable);
       const fkClause = `CONSTRAINT "${constraintName}" FOREIGN KEY (${columns.map(c => `"${c}"`).join(', ')}) REFERENCES "${sanitizedRefTable}" (${refColumns.map(c => `"${c}"`).join(', ')})${onDelete ? ` ON DELETE ${onDelete}` : ''}${onUpdate ? ` ON UPDATE ${onUpdate}` : ''}`;
-      
+
       // Insert before closing parenthesis
       newCreateSql = newCreateSql.replace(/\)(\s*;?\s*)$/i, `, ${fkClause})$1`);
     }
-    
+
     // 3-4. Create temp table and copy data in a single batch with FK checks disabled
     // D1 requires multi-statement batches to maintain PRAGMA state
     const batchSql = `PRAGMA foreign_keys = OFF; ${newCreateSql}; INSERT INTO "${sanitizedTempTable}" SELECT * FROM "${sanitizedTable}"; PRAGMA foreign_keys = ON;`;
     await executeQueryViaAPI(dbId, batchSql, env);
-    
+
     // 5. Get indexes
     const indexQuery = `SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name='${sanitizedTable}' AND sql IS NOT NULL`;
     const indexResult = await executeQueryViaAPI(dbId, indexQuery, env);
     const indexes = (indexResult.results as { sql: string }[]).map(r => r.sql);
-    
+
     // 6. Drop original table
     await executeQueryViaAPI(dbId, `DROP TABLE "${sanitizedTable}"`, env);
-    
+
     // 7. Rename temporary table
     await executeQueryViaAPI(dbId, `ALTER TABLE "${sanitizedTempTable}" RENAME TO "${sanitizedTable}"`, env);
-    
+
     // 8. Recreate indexes
     for (const indexSql of indexes) {
       await executeQueryViaAPI(dbId, indexSql, env);
     }
-    
+
   } catch (err) {
     // Attempt cleanup if temporary table exists
     try {
@@ -3916,7 +3955,7 @@ async function executeQueryViaAPI(
   env: Env
 ): Promise<{ results: unknown[]; meta: Record<string, unknown>; success: boolean }> {
   const requestBody = JSON.stringify({ sql: query, params: [] });
-  
+
   // Debug log: show query length and body for troubleshooting
   logInfo(`D1 API request - query length: ${query.length}, body length: ${requestBody.length}`, {
     module: 'tables',
@@ -3924,28 +3963,28 @@ async function executeQueryViaAPI(
     databaseId,
     metadata: { queryLength: query.length, bodyLength: requestBody.length }
   });
-  
+
   const response = await fetch(
     `https://api.cloudflare.com/client/v4/accounts/${env.ACCOUNT_ID}/d1/database/${databaseId}/query`,
     {
       method: 'POST',
       headers: {
-      'Authorization': `Bearer ${env.API_KEY}`,
-      'Content-Type': 'application/json'
-    },
+        'Authorization': `Bearer ${env.API_KEY}`,
+        'Content-Type': 'application/json'
+      },
       body: requestBody
     }
   );
-  
+
   if (!response.ok) {
     const errorText = await response.text();
     logWarning(`Query error: ${errorText}`, { module: 'tables', operation: 'query', databaseId: databaseId, metadata: { status: response.status } });
     throw new Error(`Query failed: ${String(response.status)}`);
   }
-  
+
   const rawData: unknown = await response.json();
   const data = rawData as D1APIResponse;
-  
+
   // REST API returns array of results, take the first one
   const firstResult = data.result[0];
   if (!firstResult) {

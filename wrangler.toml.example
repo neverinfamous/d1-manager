@@ -63,6 +63,15 @@ new_classes = ["BackupDO"]
 crons = ["0 * * * *"]  # Every hour at minute 0
 
 # ============================================
+# AI SEARCH INTEGRATION (OPTIONAL)
+# ============================================
+# Enable semantic search over database schemas and data
+# Requires an AI Search instance pointing to your BACKUP_BUCKET
+# Create instance: Cloudflare Dashboard > AI > AI Search
+[ai]
+binding = "AI"
+
+# ============================================
 # OBSERVABILITY (OPTIONAL)
 # ============================================
 # Enable OpenTelemetry export for traces and logs

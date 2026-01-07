@@ -3,6 +3,7 @@ import type { Env, R2BackupParams, R2TableBackupParams, R2RestoreParams, R2Backu
 import { logError, logInfo, logWarning } from '../utils/error-logger';
 import { completeJob, updateJobProgress } from '../routes/jobs';
 import { CF_API } from '../types';
+import { triggerWebhooks, createBackupCompletePayload, createRestoreCompletePayload } from '../utils/webhooks';
 
 /**
  * Durable Object for handling async D1 backup/restore operations to R2
@@ -134,7 +135,7 @@ export class BackupDO {
       }
 
       const exportStartData = await exportResponse.json() as ExportStartResult;
-      
+
       if (!exportStartData.success) {
         const errorMsg = exportStartData.errors?.[0]?.message ?? 'Export failed';
         throw new Error(errorMsg);
@@ -158,9 +159,9 @@ export class BackupDO {
           const pollResponse = await fetch(exportUrl, {
             method: 'POST',
             headers: cfHeaders,
-            body: JSON.stringify({ 
+            body: JSON.stringify({
               output_format: 'polling',
-              current_bookmark: bookmark 
+              current_bookmark: bookmark
             })
           });
 
@@ -277,6 +278,14 @@ export class BackupDO {
         databaseId,
         metadata: { jobId, backupPath, size: metadata.size }
       });
+
+      // Trigger backup_complete webhook
+      void triggerWebhooks(
+        this.env,
+        'backup_complete',
+        createBackupCompletePayload(databaseId, databaseName, backupPath, metadata.size, userEmail ?? null),
+        this.isLocalDev
+      );
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -520,7 +529,7 @@ export class BackupDO {
       };
 
       const importUrl = `${CF_API}/accounts/${this.env.ACCOUNT_ID}/d1/database/${databaseId}/import`;
-      
+
       // Init upload - requires etag
       const initResponse = await fetch(importUrl, {
         method: 'POST',
@@ -543,7 +552,7 @@ export class BackupDO {
         const errorMsg = initData.errors?.[0]?.message ?? initResponse.statusText;
         throw new Error(`Failed to initialize import: ${errorMsg}`);
       }
-      
+
       if (!initData.result?.upload_url) {
         throw new Error('Failed to get upload URL for import');
       }
@@ -620,7 +629,7 @@ export class BackupDO {
         });
 
         const pollData = await pollResponse.json() as ImportResult;
-        
+
         // Check if import completed
         if (pollData.result?.success === true) {
           logInfo(`Import completed successfully`, {
@@ -675,11 +684,20 @@ export class BackupDO {
         module: 'backup_do',
         operation: 'database_restore',
         databaseId,
-        metadata: { 
-          jobId, 
+        metadata: {
+          jobId,
           backupPath
         }
       });
+
+      // Trigger restore_complete webhook
+      // Note: We don't have databaseName in restore params, using empty string
+      void triggerWebhooks(
+        this.env,
+        'restore_complete',
+        createRestoreCompletePayload(databaseId, '', backupPath, 0, userEmail ?? null),
+        this.isLocalDev
+      );
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -732,8 +750,8 @@ function buildCreateStatement(tableName: string, columns: { name: string; type: 
  * Helper: Build INSERT statement
  */
 function buildInsertStatement(
-  tableName: string, 
-  columns: { name: string }[], 
+  tableName: string,
+  columns: { name: string }[],
   row: Record<string, unknown>
 ): string {
   const columnNames = columns.map(c => `"${c.name}"`).join(', ');

@@ -6,6 +6,7 @@ export interface Env {
   METADATA: D1Database
   BACKUP_BUCKET?: R2Bucket
   BACKUP_DO?: DurableObjectNamespace
+  AI?: Ai  // Workers AI binding for AI Search (AutoRAG)
   CF_EMAIL: string
   API_KEY: string
   ACCOUNT_ID: string
@@ -200,14 +201,35 @@ export interface IndexAnalysisResult {
 
 /**
  * Webhook event types for D1 Manager
+ *
+ * 13-event webhook engine for granular external integrations.
+ * Aligned with KV Manager webhook architecture for fleet consistency.
  */
 export type WebhookEventType =
+  // Database lifecycle
   | 'database_create'
   | 'database_delete'
-  | 'database_export'
-  | 'database_import'
+  // Table DDL operations
+  | 'table_create'
+  | 'table_delete'
+  | 'table_update'
+  // R2 snapshot lifecycle
+  | 'backup_complete'
+  | 'restore_complete'
+  // Data transfer operations
+  | 'import_complete'
+  | 'export_complete'
+  // DDL query execution
+  | 'schema_change'
+  // Bulk operations
+  | 'bulk_delete_complete'
+  // Job lifecycle
   | 'job_failed'
-  | 'batch_complete';
+  | 'batch_complete'
+  // Backward-compatible aliases (legacy)
+  | 'database_export'
+  | 'database_import';
+
 
 /**
  * Webhook record from D1 metadata database
@@ -281,7 +303,7 @@ export interface StructuredError {
 /**
  * Source of the backup - tracks what operation triggered the backup
  */
-export type R2BackupSource = 
+export type R2BackupSource =
   | 'manual'           // User-initiated from database card
   | 'rename_database'  // Before database rename operation
   | 'strict_mode'      // Before enabling STRICT mode on table
@@ -597,5 +619,131 @@ export interface D1AnalyticsResult {
       }[];
     }[];
   };
+}
+
+// ============================================
+// AI Search Types
+// ============================================
+
+/**
+ * AI Search instance information
+ */
+export interface AISearchInstance {
+  name: string;
+  description?: string;
+  created_at?: string;
+  modified_at?: string;
+  status?: 'active' | 'indexing' | 'paused' | 'error';
+  data_source?: {
+    type: 'r2' | 'website';
+    bucket_name?: string;
+    domain?: string;
+  };
+  vectorize_index?: string;
+  embedding_model?: string;
+  generation_model?: string;
+}
+
+/**
+ * Result from listing AI Search instances
+ */
+export interface AISearchInstancesListResult {
+  rags: AISearchInstance[];
+}
+
+/**
+ * D1 database compatibility analysis for AI Search
+ */
+export interface AISearchCompatibility {
+  databaseId: string;
+  databaseName: string;
+  totalTables: number;
+  totalRows: number;
+  exportableContent: {
+    schemaSize: number;
+    dataSize: number;
+    relationshipCount: number;
+  };
+  lastExport?: string;
+  exportPath?: string;
+}
+
+/**
+ * AI Search export status
+ */
+export interface AISearchExportStatus {
+  databaseId: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  progress?: {
+    tablesProcessed: number;
+    totalTables: number;
+    currentTable?: string;
+  };
+  exportPath?: string;
+  error?: string;
+  completedAt?: string;
+}
+
+/**
+ * AI Search query request
+ */
+export interface AISearchQueryRequest {
+  query: string;
+  rewrite_query?: boolean;
+  max_num_results?: number;
+  score_threshold?: number;
+  reranking?: {
+    enabled: boolean;
+    model?: string;
+  };
+  stream?: boolean;
+}
+
+/**
+ * AI Search result item
+ */
+export interface AISearchResult {
+  file_id: string;
+  filename: string;
+  score: number;
+  attributes?: {
+    modified_date?: number;
+    folder?: string;
+  };
+  content: {
+    id: string;
+    type: string;
+    text: string;
+  }[];
+}
+
+/**
+ * AI Search response
+ */
+export interface AISearchResponse {
+  response?: string;  // AI-generated response (for ai-search endpoint)
+  data: AISearchResult[];
+  has_more: boolean;
+  next_page: string | null;
+}
+
+/**
+ * AI Search sync trigger response
+ */
+export interface AISearchSyncResponse {
+  success: boolean;
+  message?: string;
+  job_id?: string;
+}
+
+/**
+ * Create AI Search instance request body
+ */
+export interface CreateAISearchBody {
+  name: string;
+  description?: string;
+  bucketName: string;
+  embeddingModel?: string;
+  generationModel?: string;
 }
 

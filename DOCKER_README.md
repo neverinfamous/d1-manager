@@ -1,11 +1,11 @@
 # D1 Database Manager
 
-Last Updated January 6, 2026 - Production/Stable v2.0.0
+Last Updated January 7, 2026 - Production/Stable v2.1.0
 
 [![GitHub](https://img.shields.io/badge/GitHub-neverinfamous/d1--manager-blue?logo=github)](https://github.com/neverinfamous/d1-manager)
 [![Docker Pulls](https://img.shields.io/docker/pulls/writenotenow/d1-manager)](https://hub.docker.com/r/writenotenow/d1-manager)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-![Version](https://img.shields.io/badge/version-v2.0.0-green)
+![Version](https://img.shields.io/badge/version-v2.1.0-green)
 ![Status](https://img.shields.io/badge/status-Production%2FStable-brightgreen)
 [![Security](https://img.shields.io/badge/Security-Enhanced-green.svg)](https://github.com/neverinfamous/d1-manager/blob/main/SECURITY.md)
 [![CodeQL](https://img.shields.io/badge/CodeQL-Passing-brightgreen.svg)](https://github.com/neverinfamous/d1-manager/security/code-scanning)
@@ -67,6 +67,7 @@ This Docker image provides a modern, full-featured web application for managing 
 - CSV export
 
 ### Advanced Features
+- NEW! **AI Search Integration** *(Cloudflare Workers only)* - Semantic search over database schemas and data using Cloudflare AI Search (AutoRAG). Export databases to R2 for indexing, then query with natural language or get AI-generated SQL suggestions
 - **Unified Backup & Restore Hub** *(Cloudflare Workers only)* - Undo history and R2 backups in one dialog with bulk restore/download/delete, backup counts, source tags, and orphaned-backup visibility
 - **Scheduled R2 Backups** *(Cloudflare Workers only)* - Daily/weekly/monthly schedules with per-database controls, next-run previews, last-run status, and job history integration
 - **Foreign Key Visualizer & ER Diagram** - Interactive graphs with fullscreen mode, export (PNG/SVG/JSON), alphabetized dropdowns, and dual layouts (hierarchical/force-directed)
@@ -76,6 +77,7 @@ This Docker image provides a modern, full-featured web application for managing 
 - **FTS5 Full-Text Search** - Manage virtual tables, convert to/from regular tables, dedicated FTS5 search mode in main Search tab, and quick actions on FTS5 table cards
 - **Index Analyzer** - Smart index recommendations plus "Create All Indexes" one-click apply with progress tracking
 - **Metrics Dashboard** - Query volume (reads/writes), P90 latency, rows read, and storage trends via GraphQL Analytics with time range selector (24h/7d/30d)
+- NEW! **Health Dashboard** - System health score, backup coverage alerts, failed backup tracking, and replication status overview
 - **Time Travel** - View bookmarks, checkpoint history, manual checkpoint capture, and CLI restore commands
 - **Read Replication** - Enable/disable global read replicas with D1 Sessions API info
 - **Constraint Validator** - Validate foreign key, NOT NULL, and UNIQUE constraints across database with guided fix workflow
@@ -321,8 +323,8 @@ docker-compose pull && docker-compose up -d
 | Tag | Description |
 |-----|-------------|
 | `latest` | Latest stable release |
-| `v2.0.0` | Specific version (recommended for production) |
-| `v1.2.0` | Previous stable release |
+| `v2.1.0` | Specific version (recommended for production) |
+| `v2.0.0` | Previous stable release |
 | `sha-XXXXXX` | Commit SHA for reproducible builds |
 
 ---

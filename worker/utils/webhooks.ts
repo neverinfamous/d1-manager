@@ -102,9 +102,9 @@ export async function getWebhooksForEvent(
         const events = JSON.parse(webhook.events) as string[];
         return events.includes(event);
       } catch {
-      return false;
-    }
-  });
+        return false;
+      }
+    });
   } catch (error) {
     logWarning(`Failed to get webhooks: ${error instanceof Error ? error.message : String(error)}`, {
       module: 'webhooks',
@@ -136,7 +136,7 @@ export async function triggerWebhooks(
 
   try {
     const webhooks = await getWebhooksForEvent(env.METADATA, event);
-    
+
     if (webhooks.length === 0) {
       return;
     }
@@ -212,27 +212,113 @@ export function createDatabaseDeletePayload(
   };
 }
 
+// ============================================
+// Table DDL Operation Payloads
+// ============================================
+
 /**
- * Create webhook payload for database export events
+ * Create webhook payload for table creation events
  */
-export function createDatabaseExportPayload(
+export function createTableCreatePayload(
   databaseId: string,
   databaseName: string,
+  tableName: string,
+  userEmail: string | null
+): Record<string, unknown> {
+  return {
+    database_id: databaseId,
+    database_name: databaseName,
+    table_name: tableName,
+    user_email: userEmail,
+  };
+}
+
+/**
+ * Create webhook payload for table deletion events
+ */
+export function createTableDeletePayload(
+  databaseId: string,
+  databaseName: string,
+  tableName: string,
+  userEmail: string | null
+): Record<string, unknown> {
+  return {
+    database_id: databaseId,
+    database_name: databaseName,
+    table_name: tableName,
+    user_email: userEmail,
+  };
+}
+
+/**
+ * Create webhook payload for table update events (ALTER TABLE)
+ */
+export function createTableUpdatePayload(
+  databaseId: string,
+  databaseName: string,
+  tableName: string,
+  changeType: string,
+  userEmail: string | null
+): Record<string, unknown> {
+  return {
+    database_id: databaseId,
+    database_name: databaseName,
+    table_name: tableName,
+    change_type: changeType,
+    user_email: userEmail,
+  };
+}
+
+// ============================================
+// R2 Snapshot Lifecycle Payloads
+// ============================================
+
+/**
+ * Create webhook payload for backup complete events
+ */
+export function createBackupCompletePayload(
+  databaseId: string,
+  databaseName: string,
+  backupPath: string,
   sizeBytes: number,
   userEmail: string | null
 ): Record<string, unknown> {
   return {
     database_id: databaseId,
     database_name: databaseName,
+    backup_path: backupPath,
     size_bytes: sizeBytes,
     user_email: userEmail,
   };
 }
 
 /**
- * Create webhook payload for database import events
+ * Create webhook payload for restore complete events
  */
-export function createDatabaseImportPayload(
+export function createRestoreCompletePayload(
+  databaseId: string,
+  databaseName: string,
+  backupPath: string,
+  tablesRestored: number,
+  userEmail: string | null
+): Record<string, unknown> {
+  return {
+    database_id: databaseId,
+    database_name: databaseName,
+    backup_path: backupPath,
+    tables_restored: tablesRestored,
+    user_email: userEmail,
+  };
+}
+
+// ============================================
+// Data Transfer Operation Payloads
+// ============================================
+
+/**
+ * Create webhook payload for import complete events
+ */
+export function createImportCompletePayload(
   databaseId: string,
   databaseName: string,
   numQueries: number | undefined,
@@ -245,6 +331,77 @@ export function createDatabaseImportPayload(
     user_email: userEmail,
   };
 }
+
+/**
+ * Create webhook payload for export complete events
+ */
+export function createExportCompletePayload(
+  databaseId: string,
+  databaseName: string,
+  sizeBytes: number,
+  format: string,
+  userEmail: string | null
+): Record<string, unknown> {
+  return {
+    database_id: databaseId,
+    database_name: databaseName,
+    size_bytes: sizeBytes,
+    format,
+    user_email: userEmail,
+  };
+}
+
+// ============================================
+// DDL Query Execution Payloads
+// ============================================
+
+/**
+ * Create webhook payload for schema change events (DDL only)
+ */
+export function createSchemaChangePayload(
+  databaseId: string,
+  databaseName: string,
+  ddlType: 'CREATE' | 'ALTER' | 'DROP',
+  objectType: 'TABLE' | 'INDEX' | 'VIEW' | 'TRIGGER',
+  objectName: string,
+  userEmail: string | null
+): Record<string, unknown> {
+  return {
+    database_id: databaseId,
+    database_name: databaseName,
+    ddl_type: ddlType,
+    object_type: objectType,
+    object_name: objectName,
+    user_email: userEmail,
+  };
+}
+
+// ============================================
+// Bulk Operation Payloads
+// ============================================
+
+/**
+ * Create webhook payload for bulk delete complete events
+ */
+export function createBulkDeleteCompletePayload(
+  databaseId: string,
+  databaseName: string,
+  tableName: string,
+  rowsDeleted: number,
+  userEmail: string | null
+): Record<string, unknown> {
+  return {
+    database_id: databaseId,
+    database_name: databaseName,
+    table_name: tableName,
+    rows_deleted: rowsDeleted,
+    user_email: userEmail,
+  };
+}
+
+// ============================================
+// Job Lifecycle Payloads
+// ============================================
 
 /**
  * Create webhook payload for job failure events
@@ -280,6 +437,46 @@ export function createBatchCompletePayload(
     total,
     success,
     failed,
+    user_email: userEmail,
+  };
+}
+
+// ============================================
+// Legacy Alias Payloads (Backward Compatibility)
+// ============================================
+
+/**
+ * Create webhook payload for database export events (legacy alias)
+ * @deprecated Use createExportCompletePayload instead
+ */
+export function createDatabaseExportPayload(
+  databaseId: string,
+  databaseName: string,
+  sizeBytes: number,
+  userEmail: string | null
+): Record<string, unknown> {
+  return {
+    database_id: databaseId,
+    database_name: databaseName,
+    size_bytes: sizeBytes,
+    user_email: userEmail,
+  };
+}
+
+/**
+ * Create webhook payload for database import events (legacy alias)
+ * @deprecated Use createImportCompletePayload instead
+ */
+export function createDatabaseImportPayload(
+  databaseId: string,
+  databaseName: string,
+  numQueries: number | undefined,
+  userEmail: string | null
+): Record<string, unknown> {
+  return {
+    database_id: databaseId,
+    database_name: databaseName,
+    num_queries: numQueries,
     user_email: userEmail,
   };
 }

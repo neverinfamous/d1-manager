@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Table, RefreshCw, Plus, Search, Loader2, Copy, Download, Trash2, Pencil, AlertTriangle, Network, Sparkles, Zap, Clock, Globe, Upload, Check, Shield, Cloud, LayoutGrid, LayoutList, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Table, RefreshCw, Plus, Search, Loader2, Copy, Download, Trash2, Pencil, AlertTriangle, Network, Sparkles, Zap, Clock, Globe, Upload, Check, Shield, Cloud, LayoutGrid, LayoutList, RotateCcw, BrainCircuit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -38,6 +38,7 @@ import { ReadReplicationInfo } from './ReadReplicationInfo';
 import { ImportTableDialog } from './ImportTableDialog';
 import { BackupProgressDialog } from './BackupProgressDialog';
 import { TableListView, type TableActionHandlers } from './TableListView';
+import { AISearchPanel } from './AISearchPanel';
 import { GridSortSelect, type SortOption } from './GridSortSelect';
 import { ErrorMessage } from '@/components/ui/error-message';
 import { validateIdentifier } from '@/lib/sqlValidator';
@@ -73,21 +74,21 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSchemaDesigner, setShowSchemaDesigner] = useState(false);
-  const [activeTab, setActiveTab] = useState<'tables' | 'relationships' | 'circular' | 'fts5' | 'performance' | 'time-travel' | 'replication'>(
-    initialTab === 'fts5' ? 'fts5' : 'tables'
+  const [activeTab, setActiveTab] = useState<'tables' | 'relationships' | 'circular' | 'fts5' | 'performance' | 'time-travel' | 'replication' | 'ai-search'>(
+    initialTab === 'fts5' ? 'fts5' : initialTab === 'ai-search' ? 'ai-search' : 'tables'
   );
   const [relationshipsView, setRelationshipsView] = useState<'editor' | 'diagram'>('editor');
-  
+
   // Table view mode (grid/list)
   const [tableViewMode, setTableViewMode] = useState<TableViewMode>(getStoredTableViewMode);
-  
+
   // Table grid sort state
   const [tableGridSortField, setTableGridSortField] = useState<string>('name');
   const [tableGridSortDirection, setTableGridSortDirection] = useState<'asc' | 'desc'>('asc');
-  
+
   // Selection state
   const [selectedTables, setSelectedTables] = useState<string[]>([]);
-  
+
   // Rename dialog state
   const [renameDialogState, setRenameDialogState] = useState<{
     tableName: string;
@@ -95,7 +96,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
     isRenaming: boolean;
     error?: string;
   } | null>(null);
-  
+
   // Clone dialog state
   const [cloneDialogState, setCloneDialogState] = useState<{
     tableNames: string[];
@@ -104,7 +105,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
     progress?: { current: number; total: number };
     error?: string;
   } | null>(null);
-  
+
   // Export dialog state
   const [exportDialogState, setExportDialogState] = useState<{
     tableNames: string[];
@@ -113,7 +114,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
     progress?: number;
     error?: string;
   } | null>(null);
-  
+
   // Delete dialog state
   const [deleteDialogState, setDeleteDialogState] = useState<{
     tableNames: string[];
@@ -180,7 +181,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
       blockers: string[];
     };
   } | null>(null);
-  
+
   // Convert FTS5 to regular table dialog state
   const [convertFts5Dialog, setConvertFts5Dialog] = useState<{
     tableName: string;
@@ -193,7 +194,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
     isConverting: boolean;
     error?: string;
   } | null>(null);
-  
+
   // Cascade simulator state
   const [showCascadeSimulator, setShowCascadeSimulator] = useState(false);
   const [cascadeSimulatorTable, setCascadeSimulatorTable] = useState<string>('');
@@ -340,7 +341,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
     // Reload tables (skip cache to get fresh data after creation)
     await loadTables(true);
   };
-  
+
   // Selection handlers
   const toggleTableSelection = (tableName: string): void => {
     setSelectedTables(prev => {
@@ -351,11 +352,11 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
       }
     });
   };
-  
+
   const selectAllTables = (): void => {
     setSelectedTables(filteredTables.map(table => table.name));
   };
-  
+
   const clearSelection = (): void => {
     setSelectedTables([]);
   };
@@ -372,7 +373,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
       return newMode;
     });
   };
-  
+
   // Rename handler
   const handleRenameClick = (tableName: string): void => {
     setRenameDialogState({
@@ -381,41 +382,41 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
       isRenaming: false
     });
   };
-  
+
   const handleRenameTable = async (): Promise<void> => {
     if (!renameDialogState) return;
-    
+
     const newName = renameDialogState.newName.trim();
-    
+
     if (!newName) {
       setRenameDialogState(prev => prev ? { ...prev, error: 'Table name is required' } : null);
       return;
     }
-    
+
     if (newName === renameDialogState.tableName) {
       setRenameDialogState(prev => prev ? { ...prev, error: 'New name must be different from the current name' } : null);
       return;
     }
-    
+
     // Validate table name format
     const nameValidation = validateIdentifier(newName, 'table');
     if (!nameValidation.isValid) {
-      const errorMsg = nameValidation.suggestion 
+      const errorMsg = nameValidation.suggestion
         ? `${nameValidation.error}. ${nameValidation.suggestion}`
         : nameValidation.error ?? 'Invalid table name';
       setRenameDialogState(prev => prev ? { ...prev, error: errorMsg } : null);
       return;
     }
-    
+
     // Check if a table with this name already exists
     if (tables.some(t => t.name.toLowerCase() === newName.toLowerCase())) {
-      setRenameDialogState(prev => prev ? { 
-        ...prev, 
-        error: `A table named "${newName}" already exists in this database. Please choose a different name.` 
+      setRenameDialogState(prev => prev ? {
+        ...prev,
+        error: `A table named "${newName}" already exists in this database. Please choose a different name.`
       } : null);
       return;
     }
-    
+
     setRenameDialogState(prev => {
       if (!prev) return null;
       const { error: _error, ...rest } = prev;
@@ -423,7 +424,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
       return { ...rest, isRenaming: true };
     });
     setError(null);
-    
+
     try {
       await api.renameTable(databaseId, renameDialogState.tableName, newName);
       await loadTables(true); // Skip cache after rename
@@ -436,26 +437,26 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
       } : null);
     }
   };
-  
+
   // Clone handlers
   const handleCloneClick = (): void => {
     if (selectedTables.length === 0) return;
-    
+
     const cloneNames: Record<string, string> = {};
     selectedTables.forEach(name => {
       cloneNames[name] = `${name}_copy`;
     });
-    
+
     setCloneDialogState({
       tableNames: selectedTables,
       cloneNames,
       isCloning: false
     });
   };
-  
+
   const handleCloneTables = async (): Promise<void> => {
     if (!cloneDialogState) return;
-    
+
     // Validate all names
     for (const oldName of cloneDialogState.tableNames) {
       const newName = cloneDialogState.cloneNames[oldName];
@@ -468,7 +469,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
         return;
       }
     }
-    
+
     setCloneDialogState(prev => {
       if (!prev) return null;
       const { error: _error, ...rest } = prev;
@@ -476,7 +477,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
       return { ...rest, isCloning: true };
     });
     setError(null);
-    
+
     try {
       const tablesToClone = cloneDialogState.tableNames
         .filter(name => cloneDialogState.cloneNames[name])
@@ -484,18 +485,18 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
           name,
           newName: cloneDialogState.cloneNames[name] ?? name
         }));
-      
+
       const result = await api.cloneTables(databaseId, tablesToClone, (current, total) => {
         setCloneDialogState(prev => prev ? {
           ...prev,
           progress: { current, total }
         } : null);
       });
-      
+
       if (result.failed.length > 0) {
         setError(`Some tables failed to clone:\n${result.failed.map(f => `${f.name}: ${f.error}`).join('\n')}`);
       }
-      
+
       await loadTables(true); // Skip cache after clone
       clearSelection();
       setCloneDialogState(null);
@@ -507,21 +508,21 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
       } : null);
     }
   };
-  
+
   // Export handlers
   const handleExportClick = (): void => {
     if (selectedTables.length === 0) return;
-    
+
     setExportDialogState({
       tableNames: selectedTables,
       format: 'sql',
       isExporting: false
     });
   };
-  
+
   const handleExportTables = async (): Promise<void> => {
     if (!exportDialogState) return;
-    
+
     setExportDialogState(prev => {
       if (!prev) return null;
       const { error: _error, ...rest } = prev;
@@ -529,7 +530,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
       return { ...rest, isExporting: true };
     });
     setError(null);
-    
+
     try {
       const firstTableName = exportDialogState.tableNames[0];
       if (exportDialogState.tableNames.length === 1 && firstTableName) {
@@ -539,7 +540,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
           setExportDialogState(prev => prev ? { ...prev, progress } : null);
         });
       }
-      
+
       clearSelection();
       setExportDialogState(null);
     } catch (err) {
@@ -550,17 +551,17 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
       } : null);
     }
   };
-  
+
   // Delete handlers
   const handleDeleteClick = async (): Promise<void> => {
     if (selectedTables.length === 0) return;
-    
+
     setDeleteDialogState({
       tableNames: selectedTables,
       isDeleting: false,
       loadingDependencies: true
     });
-    
+
     // Fetch dependencies
     try {
       const deps = await api.getTableDependencies(databaseId, selectedTables);
@@ -611,7 +612,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
 
   const handleStartR2TableBackup = async (): Promise<void> => {
     if (!r2BackupDialogTable || !r2BackupStatus?.configured) return;
-    
+
     setR2BackupDialogLoading(true);
     try {
       const result = await backupTableToR2(databaseId, databaseName, r2BackupDialogTable, 'sql', 'table_backup');
@@ -633,7 +634,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
     setR2RestoreLoading(true);
     setR2RestoreError(null);
     setR2RestoreSelected(null);
-    
+
     try {
       const allBackups = await listR2Backups(databaseId);
       // Filter to only show backups for this specific table
@@ -648,7 +649,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
 
   const handleTableRestore = async (): Promise<void> => {
     if (!r2RestoreSelected || !r2RestoreDialogTable) return;
-    
+
     setR2RestoreIsRestoring(true);
     setR2RestoreError(null);
 
@@ -697,7 +698,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
       isBackingUp: false,
       isValidating: true,
     });
-    
+
     // Fetch validation data asynchronously
     api.checkStrictCompatibility(databaseId, tableName)
       .then(validation => {
@@ -720,16 +721,16 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
     if (!strictDialogState?.confirmed) return;
 
     const tableToConvert = strictDialogState.tableName;
-    
+
     // Backup is now triggered immediately via buttons in the dialog
     // The backupFirst flag indicates if a backup was completed
-    
+
     setStrictDialogState({
       ...strictDialogState,
       isConverting: true,
       isBackingUp: false,
     });
-    
+
     try {
       await api.convertToStrict(databaseId, tableToConvert);
       await loadTables(true); // Skip cache after STRICT conversion
@@ -794,7 +795,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
       isDeleting: false,
       loadingDependencies: true
     });
-    
+
     // Fetch dependencies
     try {
       const deps = await api.getTableDependencies(databaseId, [tableName]);
@@ -811,10 +812,10 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
       } : null);
     }
   };
-  
+
   const handleDeleteTables = async (): Promise<void> => {
     if (!deleteDialogState) return;
-    
+
     // Require backup confirmation
     if (!deleteDialogState.backupConfirmed) {
       setDeleteDialogState(prev => prev ? {
@@ -823,7 +824,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
       } : null);
       return;
     }
-    
+
     setDeleteDialogState(prev => {
       if (!prev) return null;
       const { error: _error, ...rest } = prev;
@@ -831,7 +832,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
       return { ...rest, isDeleting: true };
     });
     setError(null);
-    
+
     try {
       const result = await api.deleteTables(databaseId, deleteDialogState.tableNames, (current, total) => {
         setDeleteDialogState(prev => prev ? {
@@ -839,15 +840,15 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
           progress: { current, total }
         } : null);
       });
-      
+
       if (result.failed.length > 0) {
         setError(`Some tables failed to delete:\n${result.failed.map(f => `${f.name}: ${f.error}`).join('\n')}`);
       }
-      
+
       await loadTables(true); // Skip cache after delete
       clearSelection();
       setDeleteDialogState(null);
-      
+
       // Notify parent of undo able operation
       if (onUndoableOperation) {
         onUndoableOperation();
@@ -863,9 +864,9 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
 
   const handleDeleteTableBackup = async (): Promise<void> => {
     if (!deleteDialogState) return;
-    
+
     setDeleteDialogState(prev => prev ? { ...prev, isExporting: true } : null);
-    
+
     try {
       const firstTableName = deleteDialogState.tableNames[0];
       if (deleteDialogState.tableNames.length === 1 && firstTableName) {
@@ -885,7 +886,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
 
   const handleR2TableBackup = async (): Promise<void> => {
     if (!deleteDialogState?.tableNames.length || deleteDialogState.tableNames.length !== 1) return;
-    
+
     const tableName = deleteDialogState.tableNames[0];
     if (!tableName) return;
 
@@ -991,6 +992,14 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
               <Globe className="h-4 w-4 mr-2" />
               Replication
             </Button>
+            <Button
+              variant={activeTab === 'ai-search' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setActiveTab('ai-search')}
+            >
+              <BrainCircuit className="h-4 w-4 mr-2" />
+              AI Search
+            </Button>
           </div>
           {activeTab === 'tables' && (
             <>
@@ -1029,7 +1038,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
               </Button>
             </div>
           </div>
-          
+
           {relationshipsView === 'editor' ? (
             <ForeignKeyVisualizer databaseId={databaseId} onTableSelect={onSelectTable} />
           ) : (
@@ -1037,7 +1046,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
           )}
         </>
       ) : activeTab === 'circular' ? (
-        <CircularDependencyDetector 
+        <CircularDependencyDetector
           databaseId={databaseId}
           onNavigateToRelationships={() => {
             setRelationshipsView('editor');
@@ -1045,9 +1054,9 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
           }}
         />
       ) : activeTab === 'fts5' ? (
-        <FTS5Manager 
-          databaseId={databaseId} 
-          databaseName={databaseName} 
+        <FTS5Manager
+          databaseId={databaseId}
+          databaseName={databaseName}
           onNavigateToTables={() => setActiveTab('tables')}
           onConvertFTS5ToTable={(tableName) => {
             setConvertFts5Dialog({
@@ -1069,6 +1078,8 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
         <TimeTravelInfo databaseId={databaseId} databaseName={databaseName} />
       ) : activeTab === 'replication' ? (
         <ReadReplicationInfo databaseId={databaseId} databaseName={databaseName} />
+      ) : activeTab === 'ai-search' ? (
+        <AISearchPanel databaseId={databaseId} databaseName={databaseName} />
       ) : (
         <>
           {/* Search Bar */}
@@ -1167,322 +1178,321 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
             </div>
           )}
 
-      {/* Loading State */}
-      {loading && (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
-      )}
+          {/* Loading State */}
+          {loading && (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          )}
 
-      {/* Error State */}
-      <ErrorMessage error={error} variant="card" />
+          {/* Error State */}
+          <ErrorMessage error={error} variant="card" />
 
-      {/* Tables Grid/List */}
-      {!loading && !error && (
-        <>
-          {filteredTables.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <Table className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">
-                  {searchQuery ? 'No tables found' : 'No tables yet'}
-                </h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  {searchQuery
-                    ? 'Try adjusting your search query'
-                    : 'Create your first table to get started'}
-                </p>
-                {!searchQuery && (
-                  <Button onClick={() => setShowSchemaDesigner(true)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Table
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-          ) : (
+          {/* Tables Grid/List */}
+          {!loading && !error && (
             <>
-              {/* Table action handlers for both grid and list views */}
-              {(() => {
-                const tableActionHandlers: TableActionHandlers = {
-                  onBrowse: onSelectTable,
-                  onRename: handleRenameClick,
-                  onClone: handleSingleClone,
-                  onImport: handleSingleImport,
-                  onExport: handleSingleExport,
-                  onFts5: (tableName, isFts5) => {
-                    if (isFts5) {
-                      handleConvertFts5Click(tableName);
-                    } else {
-                      setActiveTab('fts5');
-                    }
-                  },
-                  onStrict: handleStrictClick,
-                  onR2Backup: handleSingleR2BackupClick,
-                  onR2Restore: (tableName) => void handleSingleR2RestoreClick(tableName),
-                  onDelete: (tableName) => void handleSingleDelete(tableName),
-                };
+              {filteredTables.length === 0 ? (
+                <Card>
+                  <CardContent className="flex flex-col items-center justify-center py-12">
+                    <Table className="h-12 w-12 text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">
+                      {searchQuery ? 'No tables found' : 'No tables yet'}
+                    </h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      {searchQuery
+                        ? 'Try adjusting your search query'
+                        : 'Create your first table to get started'}
+                    </p>
+                    {!searchQuery && (
+                      <Button onClick={() => setShowSchemaDesigner(true)}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Create Table
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+              ) : (
+                <>
+                  {/* Table action handlers for both grid and list views */}
+                  {(() => {
+                    const tableActionHandlers: TableActionHandlers = {
+                      onBrowse: onSelectTable,
+                      onRename: handleRenameClick,
+                      onClone: handleSingleClone,
+                      onImport: handleSingleImport,
+                      onExport: handleSingleExport,
+                      onFts5: (tableName, isFts5) => {
+                        if (isFts5) {
+                          handleConvertFts5Click(tableName);
+                        } else {
+                          setActiveTab('fts5');
+                        }
+                      },
+                      onStrict: handleStrictClick,
+                      onR2Backup: handleSingleR2BackupClick,
+                      onR2Restore: (tableName) => void handleSingleR2RestoreClick(tableName),
+                      onDelete: (tableName) => void handleSingleDelete(tableName),
+                    };
 
-                return tableViewMode === 'list' ? (
-                  <TableListView
-                    tables={filteredTables}
-                    selectedTables={selectedTables}
-                    tableColors={tableColors}
-                    fts5TableNames={fts5TableNames}
-                    r2BackupConfigured={r2BackupStatus?.configured ?? false}
-                    onToggleSelection={toggleTableSelection}
-                    onSelectAll={selectAllTables}
-                    onClearSelection={clearSelection}
-                    onColorChange={handleTableColorChange}
-                    actionHandlers={tableActionHandlers}
-                  />
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {filteredTables.map((table) => {
-                      const isSelected = selectedTables.includes(table.name);
-                      const colorConfig = getColorConfig(tableColors[table.name] ?? null);
-                      return (
-                        <Card
-                          key={table.name}
-                          className={`hover:shadow-lg transition-shadow relative overflow-hidden ${
-                            isSelected ? 'ring-2 ring-primary' : ''
-                          }`}
-                        >
-                          {/* Color indicator bar */}
-                          {colorConfig && (
-                            <div 
-                              className={`absolute left-0 top-0 bottom-0 w-1 ${colorConfig.bgClass}`}
-                              aria-hidden="true"
-                            />
-                          )}
-                          <div className={`absolute top-4 z-10 ${colorConfig ? 'left-5' : 'left-4'}`}>
-                            <Checkbox
-                              checked={isSelected}
-                              onCheckedChange={() => toggleTableSelection(table.name)}
-                              onClick={(e) => e.stopPropagation()}
-                              aria-label={`Select table ${table.name}`}
-                            />
-                          </div>
-                          <CardHeader className={`pb-3 ${colorConfig ? 'pl-14' : 'pl-12'}`}>
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <Table className="h-5 w-5 text-primary" />
-                                <CardTitle className="text-base">{table.name}</CardTitle>
-                              </div>
-                              <div className="flex items-center gap-1.5">
-                                {table.strict === 1 && (
-                                  <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 flex items-center gap-1" title="STRICT mode enabled - type checking enforced">
-                                    <Shield className="h-3 w-3" />
-                                    STRICT
-                                  </span>
-                                )}
-                                {fts5TableNames.has(table.name) && (
-                                  <span className="text-xs px-2 py-1 rounded-full bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 flex items-center gap-1">
-                                    <Sparkles className="h-3 w-3" />
-                                    FTS5
-                                  </span>
-                                )}
-                                <DatabaseColorPicker
-                                  value={tableColors[table.name] ?? null}
-                                  onChange={(color) => handleTableColorChange(table.name, color)}
+                    return tableViewMode === 'list' ? (
+                      <TableListView
+                        tables={filteredTables}
+                        selectedTables={selectedTables}
+                        tableColors={tableColors}
+                        fts5TableNames={fts5TableNames}
+                        r2BackupConfigured={r2BackupStatus?.configured ?? false}
+                        onToggleSelection={toggleTableSelection}
+                        onSelectAll={selectAllTables}
+                        onClearSelection={clearSelection}
+                        onColorChange={handleTableColorChange}
+                        actionHandlers={tableActionHandlers}
+                      />
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {filteredTables.map((table) => {
+                          const isSelected = selectedTables.includes(table.name);
+                          const colorConfig = getColorConfig(tableColors[table.name] ?? null);
+                          return (
+                            <Card
+                              key={table.name}
+                              className={`hover:shadow-lg transition-shadow relative overflow-hidden ${isSelected ? 'ring-2 ring-primary' : ''
+                                }`}
+                            >
+                              {/* Color indicator bar */}
+                              {colorConfig && (
+                                <div
+                                  className={`absolute left-0 top-0 bottom-0 w-1 ${colorConfig.bgClass}`}
+                                  aria-hidden="true"
+                                />
+                              )}
+                              <div className={`absolute top-4 z-10 ${colorConfig ? 'left-5' : 'left-4'}`}>
+                                <Checkbox
+                                  checked={isSelected}
+                                  onCheckedChange={() => toggleTableSelection(table.name)}
+                                  onClick={(e) => e.stopPropagation()}
+                                  aria-label={`Select table ${table.name}`}
                                 />
                               </div>
-                            </div>
-                          </CardHeader>
-                          <CardContent className={colorConfig ? 'pl-5' : ''}>
-                            <div className="space-y-2 text-sm mb-4">
-                              <div className="flex justify-between">
-                                <span className="text-muted-foreground">Type:</span>
-                                <span className="font-medium capitalize">{table.type}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-muted-foreground">Columns:</span>
-                                <span className="font-medium">{table.ncol}</span>
-                              </div>
-                              {typeof table.row_count === 'number' && (
-                                <div className="flex justify-between">
-                                  <span className="text-muted-foreground">Rows:</span>
-                                  <span className="font-medium">{table.row_count.toLocaleString()}</span>
+                              <CardHeader className={`pb-3 ${colorConfig ? 'pl-14' : 'pl-12'}`}>
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <Table className="h-5 w-5 text-primary" />
+                                    <CardTitle className="text-base">{table.name}</CardTitle>
+                                  </div>
+                                  <div className="flex items-center gap-1.5">
+                                    {table.strict === 1 && (
+                                      <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 flex items-center gap-1" title="STRICT mode enabled - type checking enforced">
+                                        <Shield className="h-3 w-3" />
+                                        STRICT
+                                      </span>
+                                    )}
+                                    {fts5TableNames.has(table.name) && (
+                                      <span className="text-xs px-2 py-1 rounded-full bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 flex items-center gap-1">
+                                        <Sparkles className="h-3 w-3" />
+                                        FTS5
+                                      </span>
+                                    )}
+                                    <DatabaseColorPicker
+                                      value={tableColors[table.name] ?? null}
+                                      onChange={(color) => handleTableColorChange(table.name, color)}
+                                    />
+                                  </div>
                                 </div>
-                              )}
-                              {table.type === 'table' && (
-                                <>
+                              </CardHeader>
+                              <CardContent className={colorConfig ? 'pl-5' : ''}>
+                                <div className="space-y-2 text-sm mb-4">
                                   <div className="flex justify-between">
-                                    <span className="text-muted-foreground">Without rowid:</span>
-                                    <span className="font-medium">{table.wr ? 'Yes' : 'No'}</span>
+                                    <span className="text-muted-foreground">Type:</span>
+                                    <span className="font-medium capitalize">{table.type}</span>
                                   </div>
                                   <div className="flex justify-between">
-                                    <span className="text-muted-foreground">Strict:</span>
-                                    <span className="font-medium">{table.strict ? 'Yes' : 'No'}</span>
+                                    <span className="text-muted-foreground">Columns:</span>
+                                    <span className="font-medium">{table.ncol}</span>
                                   </div>
-                                </>
-                              )}
-                            </div>
-                            {/* Action Buttons - Row 1: Browse, Rename, Clone, Import, Export */}
-                            <div className="flex justify-center gap-1 mb-1">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => onSelectTable(table.name)}
-                                aria-label="Browse table"
-                                title="Browse"
-                              >
-                                <Table className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleRenameClick(table.name);
-                                }}
-                                aria-label="Rename table"
-                                title="Rename"
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleSingleClone(table.name);
-                                }}
-                                aria-label="Clone table"
-                                title="Clone"
-                              >
-                                <Copy className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleSingleImport(table.name);
-                                }}
-                                aria-label="Import data into table"
-                                title="Import"
-                              >
-                                <Upload className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleSingleExport(table.name);
-                                }}
-                                aria-label="Export table"
-                                title="Export"
-                              >
-                                <Download className="h-4 w-4" />
-                              </Button>
-                            </div>
-                            {/* Action Buttons - Row 2: FTS5/Convert, STRICT mode, Delete */}
-                            <div className="flex justify-center gap-1">
-                              {table.type === 'table' && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setActiveTab('fts5');
-                                  }}
-                                  aria-label="Full-text search (FTS5)"
-                                  title="Convert to FTS5"
-                                  className="hover:bg-purple-100 hover:text-purple-700 hover:border-purple-300 dark:hover:bg-purple-900/30 dark:hover:text-purple-300 dark:hover:border-purple-700"
-                                >
-                                  <Sparkles className="h-4 w-4" />
-                                </Button>
-                              )}
-                              {table.type === 'virtual' && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleConvertFts5Click(table.name);
-                                  }}
-                                  aria-label="Convert FTS5 to regular table"
-                                  title="Convert to Regular Table"
-                                  className="hover:bg-purple-100 hover:text-purple-700 hover:border-purple-300 dark:hover:bg-purple-900/30 dark:hover:text-purple-300 dark:hover:border-purple-700"
-                                >
-                                  <Sparkles className="h-4 w-4" />
-                                </Button>
-                              )}
-                              {table.strict !== 1 && table.type === 'table' && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleStrictClick(table.name, table.strict === 1);
-                                  }}
-                                  aria-label="Convert to STRICT mode"
-                                  title="Enable STRICT mode"
-                                  className="hover:bg-blue-500/10 hover:text-blue-600 hover:border-blue-500"
-                                >
-                                  <Shield className="h-4 w-4" />
-                                </Button>
-                              )}
-                              {/* R2 Backup button */}
-                              {r2BackupStatus?.configured && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleSingleR2BackupClick(table.name);
-                                  }}
-                                  aria-label="Backup table to R2"
-                                  title="Backup to R2"
-                                  className="hover:bg-blue-500/10 hover:text-blue-600 hover:border-blue-500"
-                                >
-                                  <Cloud className="h-4 w-4" />
-                                </Button>
-                              )}
-                              {/* R2 Restore button */}
-                              {r2BackupStatus?.configured && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    void handleSingleR2RestoreClick(table.name);
-                                  }}
-                                  aria-label="Restore table from R2"
-                                  title="Restore from R2"
-                                  className="hover:bg-green-500/10 hover:text-green-600 hover:border-green-500"
-                                >
-                                  <RotateCcw className="h-4 w-4" />
-                                </Button>
-                              )}
-                              {/* Delete button - last */}
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  void handleSingleDelete(table.name);
-                                }}
-                                aria-label="Delete table"
-                                title="Delete"
-                                className="hover:bg-destructive/10 hover:text-destructive hover:border-destructive"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
-                  </div>
-                );
-              })()}
+                                  {typeof table.row_count === 'number' && (
+                                    <div className="flex justify-between">
+                                      <span className="text-muted-foreground">Rows:</span>
+                                      <span className="font-medium">{table.row_count.toLocaleString()}</span>
+                                    </div>
+                                  )}
+                                  {table.type === 'table' && (
+                                    <>
+                                      <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Without rowid:</span>
+                                        <span className="font-medium">{table.wr ? 'Yes' : 'No'}</span>
+                                      </div>
+                                      <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Strict:</span>
+                                        <span className="font-medium">{table.strict ? 'Yes' : 'No'}</span>
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
+                                {/* Action Buttons - Row 1: Browse, Rename, Clone, Import, Export */}
+                                <div className="flex justify-center gap-1 mb-1">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => onSelectTable(table.name)}
+                                    aria-label="Browse table"
+                                    title="Browse"
+                                  >
+                                    <Table className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleRenameClick(table.name);
+                                    }}
+                                    aria-label="Rename table"
+                                    title="Rename"
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleSingleClone(table.name);
+                                    }}
+                                    aria-label="Clone table"
+                                    title="Clone"
+                                  >
+                                    <Copy className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleSingleImport(table.name);
+                                    }}
+                                    aria-label="Import data into table"
+                                    title="Import"
+                                  >
+                                    <Upload className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleSingleExport(table.name);
+                                    }}
+                                    aria-label="Export table"
+                                    title="Export"
+                                  >
+                                    <Download className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                                {/* Action Buttons - Row 2: FTS5/Convert, STRICT mode, Delete */}
+                                <div className="flex justify-center gap-1">
+                                  {table.type === 'table' && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setActiveTab('fts5');
+                                      }}
+                                      aria-label="Full-text search (FTS5)"
+                                      title="Convert to FTS5"
+                                      className="hover:bg-purple-100 hover:text-purple-700 hover:border-purple-300 dark:hover:bg-purple-900/30 dark:hover:text-purple-300 dark:hover:border-purple-700"
+                                    >
+                                      <Sparkles className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                  {table.type === 'virtual' && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleConvertFts5Click(table.name);
+                                      }}
+                                      aria-label="Convert FTS5 to regular table"
+                                      title="Convert to Regular Table"
+                                      className="hover:bg-purple-100 hover:text-purple-700 hover:border-purple-300 dark:hover:bg-purple-900/30 dark:hover:text-purple-300 dark:hover:border-purple-700"
+                                    >
+                                      <Sparkles className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                  {table.strict !== 1 && table.type === 'table' && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleStrictClick(table.name, table.strict === 1);
+                                      }}
+                                      aria-label="Convert to STRICT mode"
+                                      title="Enable STRICT mode"
+                                      className="hover:bg-blue-500/10 hover:text-blue-600 hover:border-blue-500"
+                                    >
+                                      <Shield className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                  {/* R2 Backup button */}
+                                  {r2BackupStatus?.configured && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleSingleR2BackupClick(table.name);
+                                      }}
+                                      aria-label="Backup table to R2"
+                                      title="Backup to R2"
+                                      className="hover:bg-blue-500/10 hover:text-blue-600 hover:border-blue-500"
+                                    >
+                                      <Cloud className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                  {/* R2 Restore button */}
+                                  {r2BackupStatus?.configured && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        void handleSingleR2RestoreClick(table.name);
+                                      }}
+                                      aria-label="Restore table from R2"
+                                      title="Restore from R2"
+                                      className="hover:bg-green-500/10 hover:text-green-600 hover:border-green-500"
+                                    >
+                                      <RotateCcw className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                  {/* Delete button - last */}
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      void handleSingleDelete(table.name);
+                                    }}
+                                    aria-label="Delete table"
+                                    title="Delete"
+                                    className="hover:bg-destructive/10 hover:text-destructive hover:border-destructive"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                </>
+              )}
             </>
           )}
-        </>
-      )}
         </>
       )}
 
@@ -1526,7 +1536,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
                   Checking compatibility...
                 </div>
               )}
-              
+
               {/* Blockers - Cannot Convert */}
               {!strictDialogState.isValidating && strictDialogState.validation?.blockers && strictDialogState.validation.blockers.length > 0 && (
                 <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 space-y-3">
@@ -1543,7 +1553,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
                   </div>
                 </div>
               )}
-              
+
               {/* Already STRICT notice */}
               {!strictDialogState.isValidating && strictDialogState.validation?.isAlreadyStrict && (
                 <div className="bg-green-50 dark:bg-green-950/50 border border-green-200 dark:border-green-800 rounded-lg p-4">
@@ -1553,7 +1563,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
                   </div>
                 </div>
               )}
-              
+
               {/* Show conversion UI only if compatible */}
               {!strictDialogState.isValidating && strictDialogState.validation?.compatible && (
                 <>
@@ -1571,7 +1581,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
                       </ul>
                     </div>
                   )}
-                  
+
                   <div className="bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 rounded-lg p-4 space-y-3">
                     <h4 className="font-medium text-blue-900 dark:text-blue-100">What is STRICT mode?</h4>
                     <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1.5 list-disc list-inside">
@@ -1581,7 +1591,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
                       <li>Only allows types: INTEGER, REAL, TEXT, BLOB, ANY</li>
                     </ul>
                   </div>
-                  
+
                   <div className="bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 rounded-lg p-4 space-y-3">
                     <div className="flex items-start gap-2">
                       <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
@@ -1595,7 +1605,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
                       </div>
                     </div>
                   </div>
-                  
+
                   {/* Backup Recommendation */}
                   <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-900 rounded-lg p-4">
                     <h4 className="text-sm font-semibold text-blue-800 dark:text-blue-200 mb-2">
@@ -1604,7 +1614,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
                     <p className="text-xs text-blue-700 dark:text-blue-300 mb-3">
                       Before converting, we highly recommend creating a backup of your table in case anything goes wrong during the conversion process.
                     </p>
-                    
+
                     {/* Backup Format Selection */}
                     <div className="flex items-center gap-3 mb-3">
                       <span className="text-xs font-medium text-blue-800 dark:text-blue-200">Format:</span>
@@ -1628,7 +1638,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
                         </div>
                       </RadioGroup>
                     </div>
-                    
+
                     {/* Backup Buttons - trigger immediate backup */}
                     <div className="flex gap-2">
                       {r2BackupStatus?.configured && (
@@ -1695,7 +1705,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
                         Download Backup
                       </Button>
                     </div>
-                    
+
                     {/* Backup completed indicator */}
                     {strictDialogState.backupFirst && !strictDialogState.isBackingUp && (
                       <p className="text-xs text-green-600 dark:text-green-400 mt-2 flex items-center gap-1">
@@ -1703,7 +1713,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
                       </p>
                     )}
                   </div>
-                  
+
                   <div className="flex items-center gap-2">
                     <Checkbox
                       id="strict-confirm"
@@ -1717,7 +1727,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
                   </div>
                 </>
               )}
-              
+
               <ErrorMessage error={strictDialogState.error} variant="inline" showTitle />
             </div>
             <DialogFooter>
@@ -1770,10 +1780,10 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
                 Convert "{convertFts5Dialog.tableName}" to a regular SQLite table
               </DialogDescription>
             </DialogHeader>
-            
+
             <div className="py-4 space-y-4">
               <ErrorMessage error={convertFts5Dialog.error} variant="inline" />
-              
+
               <div className="space-y-2">
                 <Label htmlFor="fts5-new-table-name">New Table Name</Label>
                 <Input
@@ -1784,7 +1794,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
                   disabled={convertFts5Dialog.isConverting || convertFts5Dialog.isBackingUp}
                 />
               </div>
-              
+
               {/* Backup Recommendation */}
               <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-900 rounded-lg p-4">
                 <h4 className="text-sm font-semibold text-blue-800 dark:text-blue-200 mb-2">
@@ -1793,7 +1803,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
                 <p className="text-xs text-blue-700 dark:text-blue-300 mb-3">
                   Before converting, we highly recommend creating a backup of your table in case anything goes wrong during the conversion process.
                 </p>
-                
+
                 {/* Backup Buttons - trigger immediate backup (SQL only for FTS5 tables) */}
                 <div className="flex gap-2">
                   {r2BackupStatus?.configured && (
@@ -1858,7 +1868,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
                     Download Backup
                   </Button>
                 </div>
-                
+
                 {/* Backup completed indicator */}
                 {convertFts5Dialog.backupFirst && !convertFts5Dialog.isBackingUp && (
                   <p className="text-xs text-green-600 dark:text-green-400 mt-2 flex items-center gap-1">
@@ -1866,7 +1876,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
                   </p>
                 )}
               </div>
-              
+
               <div className="flex items-center gap-2">
                 <Checkbox
                   id="fts5-delete-original"
@@ -1883,7 +1893,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
                   </p>
                 </div>
               </div>
-              
+
               <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 rounded-md">
                 <p className="text-sm text-amber-800 dark:text-amber-200">
                   <strong>Note:</strong> Converting removes full-text search capabilities.
@@ -1891,7 +1901,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
                 </p>
               </div>
             </div>
-            
+
             <DialogFooter>
               <Button
                 variant="outline"
@@ -2154,7 +2164,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
                     <p className="text-sm">
                       Table: <strong>{firstTableName}</strong>
                     </p>
-                    
+
                     <div>
                       <Button
                         variant="outline"
@@ -2169,7 +2179,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
                         Preview the full cascade impact of deleting this table
                       </p>
                     </div>
-                    
+
                     {tableDeps && (
                       <TableDependenciesView
                         tableName={firstTableName}
@@ -2184,14 +2194,14 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
               {!deleteDialogState.loadingDependencies && deleteDialogState.tableNames.length > 1 && (
                 <div className="space-y-4">
                   <p className="text-sm font-medium">Tables to delete ({deleteDialogState.tableNames.length}):</p>
-                  
+
                   {deleteDialogState.dependencies && (
                     <Accordion type="multiple" className="w-full">
                       {deleteDialogState.tableNames.map((tableName) => {
                         const deps = deleteDialogState.dependencies?.[tableName];
                         const hasDeps = deps && (deps.inbound.length > 0 || deps.outbound.length > 0);
                         const depCount = deps ? deps.inbound.length + deps.outbound.length : 0;
-                        
+
                         return (
                           <AccordionItem key={tableName} value={tableName}>
                             <AccordionTrigger className="hover:no-underline">
@@ -2231,7 +2241,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
                     💾 Recommended: Create a backup first
                   </h4>
                   <p className="text-xs text-blue-700 dark:text-blue-300 mb-3">
-                    {deleteDialogState.tableNames.length === 1 
+                    {deleteDialogState.tableNames.length === 1
                       ? 'Backup your table before deletion so you can recover the data if needed.'
                       : 'Export your tables before deletion so you can recover the data if needed.'}
                   </p>
@@ -2358,9 +2368,9 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
                   (deleteDialogState.isR2Backing ?? false) ||
                   (deleteDialogState.loadingDependencies ?? false) ||
                   !deleteDialogState.backupConfirmed ||
-                  (deleteDialogState.dependencies && 
-                   Object.values(deleteDialogState.dependencies).some(dep => dep.inbound.length > 0 || dep.outbound.length > 0) &&
-                   !deleteDialogState.confirmDependencies)
+                  (deleteDialogState.dependencies &&
+                    Object.values(deleteDialogState.dependencies).some(dep => dep.inbound.length > 0 || dep.outbound.length > 0) &&
+                    !deleteDialogState.confirmDependencies)
                 }
               >
                 {deleteDialogState.isDeleting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
@@ -2435,8 +2445,8 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
             <Button variant="outline" onClick={() => setR2BackupDialogTable(null)} disabled={r2BackupDialogLoading}>
               Cancel
             </Button>
-            <Button 
-              onClick={() => void handleStartR2TableBackup()} 
+            <Button
+              onClick={() => void handleStartR2TableBackup()}
               disabled={r2BackupDialogLoading}
               className="bg-blue-600 hover:bg-blue-700"
             >
@@ -2474,7 +2484,7 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
               Select a backup to restore table <strong>{r2RestoreDialogTable}</strong>.
             </DialogDescription>
           </DialogHeader>
-          
+
           {r2RestoreError && (
             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
               <p className="text-sm text-red-600 dark:text-red-400">{r2RestoreError}</p>
@@ -2497,11 +2507,10 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
                 {r2RestoreBackups.map((backup) => (
                   <div
                     key={backup.path}
-                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                      r2RestoreSelected?.path === backup.path
+                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${r2RestoreSelected?.path === backup.path
                         ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
                         : 'border-border hover:bg-accent'
-                    }`}
+                      }`}
                     onClick={() => setR2RestoreSelected(backup)}
                   >
                     <div className="flex-1 min-w-0">
@@ -2563,8 +2572,8 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
           )}
 
           <DialogFooter>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => {
                 setR2RestoreDialogTable(null);
                 setR2RestoreSelected(null);
@@ -2573,8 +2582,8 @@ export function DatabaseView({ databaseId, databaseName, onBack, onSelectTable, 
             >
               Cancel
             </Button>
-            <Button 
-              onClick={() => void handleTableRestore()} 
+            <Button
+              onClick={() => void handleTableRestore()}
               disabled={!r2RestoreSelected || r2RestoreIsRestoring}
               className="bg-green-600 hover:bg-green-700"
             >
