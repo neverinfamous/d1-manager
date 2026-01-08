@@ -207,6 +207,36 @@ npm ls glob --all
 - [CVE-2025-60876](https://nvd.nist.gov/vuln/detail/CVE-2025-60876)
 - [Alpine Security Tracker](https://security.alpinelinux.org/)
 
+### CVE-2026-22184: zlib Buffer Overflow in untgz (January 2026)
+
+**Status**: ⏳ Awaiting zlib 1.3.1.3 (NOT EXPLOITABLE)
+
+**Severity**: Critical (9.3)
+
+**Description**: Global buffer overflow vulnerability in zlib's `untgz` utility (versions up to 1.3.1-r2). The `TGZfname()` function uses an unbounded `strcpy()` call to copy an attacker-supplied archive name, which can lead to memory corruption, denial of service, and potentially arbitrary code execution if the supplied name exceeds 1024 bytes.
+
+**Impact on D1 Manager**:
+- **Not exploitable** - D1 Manager does not use the `untgz` utility
+- The vulnerable code path is only triggered when processing tar/gzip archives via the `untgz` command-line tool
+- D1 Manager uses `curl` for HTTP operations and Node.js built-in modules for archive handling
+- Risk is theoretical only for this application
+
+**Mitigation**:
+- Fixed version (zlib 1.3.1.3) not yet packaged by any Linux distribution (CVE published Jan 7, 2026)
+- Alpine edge repository does not yet have a patched version
+- Dockerfile documents this as "NOT EXPLOITABLE" with monitoring note
+- Docker builds will automatically pick up the fix when Alpine releases the patch
+
+**Why not switch base images?**
+- Debian bookworm uses older zlib 1.2.13 which may not be affected, but switching would increase image size from ~150MB to ~250MB+
+- The vulnerable component (`untgz`) is not used by this application
+- Will upgrade zlib from Alpine edge repository once 1.3.1.3 is packaged
+
+**References**:
+- [CVE-2026-22184](https://nvd.nist.gov/vuln/detail/CVE-2026-22184)
+- [GitHub Advisory](https://github.com/advisories/GHSA-zlib-untgz-overflow)
+- [Alpine Security Tracker](https://security.alpinelinux.org/)
+
 ---
 
 ## Security Updates

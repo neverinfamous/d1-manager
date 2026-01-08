@@ -83,6 +83,8 @@ RUN cd /tmp && \
 # - npm CLI dependencies: glob@11.1.0, tar@7.5.2 (manually patched in npm's installation)
 # - curl 8.18.0-r0 (from edge): CVE-2025-14819, CVE-2025-14017, CVE-2025-14524 (curl vulnerabilities)
 # - busybox: CVE-2025-60876 (wget CRLF injection) - not exploitable (D1 Manager uses curl, not wget)
+# - zlib: CVE-2026-22184 (buffer overflow in untgz) - NOT EXPLOITABLE (D1 Manager does not use untgz utility)
+#   Fix pending: zlib 1.3.1.3 not yet packaged by Alpine (published Jan 7, 2026)
 # curl 8.18.0 is only available in Alpine edge, so we add edge/main repo temporarily
 RUN apk update && \
     echo "http://dl-cdn.alpinelinux.org/alpine/edge/main" >> /etc/apk/repositories && \
