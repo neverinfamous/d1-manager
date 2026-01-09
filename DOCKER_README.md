@@ -97,110 +97,49 @@ This Docker image provides a modern, full-featured web application for managing 
 
 ## 🚀 Quick Start
 
-### Prerequisites
+### 1. Set Up Metadata Database
 
-- [Node.js](https://nodejs.org/) 18+
-- [Cloudflare account](https://dash.cloudflare.com/sign-up) (for production)
-
-### Local Development
-
-1. **Clone and install:**
+D1 Manager requires a D1 database for job history, color tags, webhooks, and saved queries.
 
 ```bash
+# Authenticate with Cloudflare
+npx wrangler login
+
+# Create the metadata database
+npx wrangler d1 create d1-manager-metadata
+
+# Clone repo and initialize schema
 git clone https://github.com/neverinfamous/d1-manager.git
 cd d1-manager
-npm install
-```
-
-2. **Start the servers (requires 2 terminals):**
-
-**Terminal 1** - Frontend (Vite dev server):
-
-```bash
-npm run dev
-```
-
-**Terminal 2** - Worker API:
-
-```bash
-npx wrangler dev --config wrangler.dev.toml --local
-```
-
-3. **Open http://localhost:5173** - no auth required, mock data included.
-
-> **Note:** The frontend runs on port 5173 (Vite) and the Worker API runs on port 8787 (Wrangler). The frontend proxies API requests to the worker.
-
----
-
-## 🔧 Production Deployment
-
-### 1. Authenticate with Cloudflare
-
-```bash
-npx wrangler login
-```
-
-### 2. Create Metadata Database
-
-```bash
-npx wrangler d1 create d1-manager-metadata
-```
-
-```bash
 npx wrangler d1 execute d1-manager-metadata --remote --file=worker/schema.sql
 ```
 
-### 3. Configure Wrangler
+### 2. Get Cloudflare Credentials
 
-Edit `wrangler.toml` with your `database_id` from step 2:
+| Credential | Where to Find |
+|------------|---------------|
+| `ACCOUNT_ID` | Dashboard URL: `dash.cloudflare.com/{ACCOUNT_ID}/...` |
+| `API_KEY` | [API Tokens](https://dash.cloudflare.com/profile/api-tokens) → Create Token → **Account → D1 → Edit** |
+| `TEAM_DOMAIN` | [Zero Trust](https://one.dash.cloudflare.com/) → Settings → Custom Pages |
+| `POLICY_AUD` | Zero Trust → Access → Applications → Your App → AUD tag |
 
-```toml
-[[d1_databases]]
-binding = "METADATA"
-database_name = "d1-manager-metadata"
-database_id = "YOUR_DATABASE_ID_HERE"  # From step 2
-```
-
-### 4. Set Up R2 Backup Bucket (Optional)
-
-To enable database backups to R2 storage:
+### 3. Run Container
 
 ```bash
-npx wrangler r2 bucket create d1-manager-backups
+docker pull writenotenow/d1-manager:latest
+
+docker run -d \
+  -p 8787:8787 \
+  -e ACCOUNT_ID=your_cloudflare_account_id \
+  -e API_KEY=your_cloudflare_api_token \
+  -e TEAM_DOMAIN=https://yourteam.cloudflareaccess.com \
+  -e POLICY_AUD=your_cloudflare_access_aud_tag \
+  --name d1-manager \
+  --restart unless-stopped \
+  writenotenow/d1-manager:latest
 ```
 
-The `wrangler.toml` includes the R2 and Durable Object configuration needed for backups. Features include:
-- Backup databases to R2 before rename, STRICT mode, or FTS5 conversion operations
-- Manual backup/restore from database cards
-- Full backup history with restore capability
-
-### 5. Set Up Cloudflare Access
-
-1. Go to [Cloudflare Zero Trust](https://one.dash.cloudflare.com/)
-2. Configure authentication (GitHub OAuth, etc.)
-3. Create an Access Application for your domain
-4. Copy the **Application Audience (AUD) tag**
-
-### 6. Create API Token
-
-1. Go to [Cloudflare API Tokens](https://dash.cloudflare.com/profile/api-tokens)
-2. Create Custom Token with **Account → D1 → Edit** permission
-
-### 7. Set Secrets
-
-```bash
-npx wrangler secret put ACCOUNT_ID
-npx wrangler secret put API_KEY
-npx wrangler secret put TEAM_DOMAIN
-npx wrangler secret put POLICY_AUD
-```
-
-### 8. Deploy
-
-```bash
-npm run build
-npx wrangler deploy
-```
+Open **http://localhost:8787**
 
 ---
 
@@ -261,15 +200,10 @@ For R2 backup features, deploy to Cloudflare Workers instead. See the main [READ
 
 ```bash
 docker pull writenotenow/d1-manager:latest
-```
-
-```bash
 docker stop d1-manager && docker rm d1-manager
-```
 
-```bash
 docker run -d \
-  -p 8080:8080 \
+  -p 8787:8787 \
   -e ACCOUNT_ID=your_account_id \
   -e API_KEY=your_api_token \
   -e TEAM_DOMAIN=https://yourteam.cloudflareaccess.com \
@@ -286,14 +220,12 @@ docker run -d \
 Create `docker-compose.yml`:
 
 ```yaml
-version: '3.8'
-
 services:
   d1-manager:
     image: writenotenow/d1-manager:latest
     container_name: d1-manager
     ports:
-      - "8080:8080"
+      - "8787:8787"
     environment:
       - ACCOUNT_ID=${ACCOUNT_ID}
       - API_KEY=${API_KEY}
@@ -301,7 +233,7 @@ services:
       - POLICY_AUD=${POLICY_AUD}
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8787/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -316,16 +248,14 @@ TEAM_DOMAIN=https://yourteam.cloudflareaccess.com
 POLICY_AUD=your_cloudflare_access_aud_tag
 ```
 
-Run:
+Run and upgrade:
 
 ```bash
-docker-compose up -d
-```
+# Start container
+docker compose up -d
 
-Upgrade:
-
-```bash
-docker-compose pull && docker-compose up -d
+# Upgrade to latest
+docker compose pull && docker compose up -d
 ```
 
 ---
@@ -338,7 +268,7 @@ docker-compose pull && docker-compose up -d
 | `API_KEY` | ✅ | API Token with D1 Edit permission |
 | `TEAM_DOMAIN` | ✅ | `https://yourteam.cloudflareaccess.com` |
 | `POLICY_AUD` | ✅ | Cloudflare Access Application AUD tag |
-| `PORT` | ❌ | Port (default: `8080`) |
+| `PORT` | ❌ | Port (default: `8787`) |
 | `NODE_ENV` | ❌ | Environment (default: `production`) |
 
 > **Note:** R2 Backup/Restore is only available when deploying to Cloudflare Workers (not Docker). Docker deployments can still use the Download/Import functionality for local backups.
@@ -349,11 +279,11 @@ docker-compose pull && docker-compose up -d
 
 | Property | Value |
 |----------|-------|
-| Base Image | `node:18-alpine` |
+| Base Image | `node:22-alpine` |
 | Size | ~150MB |
 | Architectures | `linux/amd64`, `linux/arm64` |
-| Port | `8080` |
-| User | Non-root (`node`) |
+| Port | `8787` |
+| User | Non-root (`app`) |
 | Health Endpoint | `/health` |
 
 ---
@@ -373,18 +303,11 @@ docker-compose pull && docker-compose up -d
 
 ```bash
 git clone https://github.com/neverinfamous/d1-manager.git
-```
-
-```bash
 cd d1-manager
-```
 
-```bash
 docker build -t d1-manager:local .
-```
 
-```bash
-docker run -d -p 8080:8080 \
+docker run -d -p 8787:8787 \
   -e ACCOUNT_ID=your_account_id \
   -e API_KEY=your_api_token \
   -e TEAM_DOMAIN=https://yourteam.cloudflareaccess.com \
