@@ -104,33 +104,31 @@ This Docker image provides a modern, full-featured web application for managing 
 
 ### Local Development
 
-   ```bash
+1. **Clone and install:**
+
+```bash
 git clone https://github.com/neverinfamous/d1-manager.git
-   ```
+cd d1-manager
+npm install
+```
 
-   ```bash
-   cd d1-manager
-   ```
+2. **Start the servers (requires 2 terminals):**
 
-   ```bash
-   npm install
-   ```
+**Terminal 1** - Frontend (Vite dev server):
 
-**Start the servers (2 terminals):**
-   
-Terminal 1 - Frontend:
-   
-   ```bash
-   npm run dev
-   ```
-   
-Terminal 2 - Worker API:
-   
-   ```bash
-   npx wrangler dev --config wrangler.dev.toml --local
-   ```
-   
-Open **http://localhost:5173** - no auth required, mock data included.
+```bash
+npm run dev
+```
+
+**Terminal 2** - Worker API:
+
+```bash
+npx wrangler dev --config wrangler.dev.toml --local
+```
+
+3. **Open http://localhost:5173** - no auth required, mock data included.
+
+> **Note:** The frontend runs on port 5173 (Vite) and the Worker API runs on port 8787 (Wrangler). The frontend proxies API requests to the worker.
 
 ---
 
@@ -138,27 +136,30 @@ Open **http://localhost:5173** - no auth required, mock data included.
 
 ### 1. Authenticate with Cloudflare
 
-   ```bash
-   npx wrangler login
-   ```
+```bash
+npx wrangler login
+```
 
 ### 2. Create Metadata Database
 
-   ```bash
-   npx wrangler d1 create d1-manager-metadata
-   ```
+```bash
+npx wrangler d1 create d1-manager-metadata
+```
 
-   ```bash
-   npx wrangler d1 execute d1-manager-metadata --remote --file=worker/schema.sql
-   ```
+```bash
+npx wrangler d1 execute d1-manager-metadata --remote --file=worker/schema.sql
+```
 
 ### 3. Configure Wrangler
 
-```bash
-cp wrangler.toml.example wrangler.toml
-```
+Edit `wrangler.toml` with your `database_id` from step 2:
 
-Edit `wrangler.toml` with your `database_id` from step 2.
+```toml
+[[d1_databases]]
+binding = "METADATA"
+database_name = "d1-manager-metadata"
+database_id = "YOUR_DATABASE_ID_HERE"  # From step 2
+```
 
 ### 4. Set Up R2 Backup Bucket (Optional)
 
@@ -168,7 +169,7 @@ To enable database backups to R2 storage:
 npx wrangler r2 bucket create d1-manager-backups
 ```
 
-The `wrangler.toml.example` already includes the R2 and Durable Object configuration needed for backups. Features include:
+The `wrangler.toml` includes the R2 and Durable Object configuration needed for backups. Features include:
 - Backup databases to R2 before rename, STRICT mode, or FTS5 conversion operations
 - Manual backup/restore from database cards
 - Full backup history with restore capability
@@ -186,32 +187,20 @@ The `wrangler.toml.example` already includes the R2 and Durable Object configura
 2. Create Custom Token with **Account → D1 → Edit** permission
 
 ### 7. Set Secrets
-   
-   ```bash
-   npx wrangler secret put ACCOUNT_ID
-   ```
-   
-   ```bash
-   npx wrangler secret put API_KEY
-   ```
-   
-   ```bash
-   npx wrangler secret put TEAM_DOMAIN
-   ```
-   
-   ```bash
-   npx wrangler secret put POLICY_AUD
-   ```
+
+```bash
+npx wrangler secret put ACCOUNT_ID
+npx wrangler secret put API_KEY
+npx wrangler secret put TEAM_DOMAIN
+npx wrangler secret put POLICY_AUD
+```
 
 ### 8. Deploy
 
-  ```bash
-  npm run build
-  ```
-
-  ```bash
-  npx wrangler deploy
-  ```
+```bash
+npm run build
+npx wrangler deploy
+```
 
 ---
 
