@@ -97,57 +97,121 @@ This Docker image provides a modern, full-featured web application for managing 
 
 ## 🚀 Quick Start
 
-### 1. Set Up Metadata Database
+### Prerequisites
 
-The D1 Manager requires a metadata database for query history, saved queries, and undo history.
+- [Node.js](https://nodejs.org/) 18+
+- [Cloudflare account](https://dash.cloudflare.com/sign-up) (for production)
 
-```bash
-npx wrangler login
-```
+### Local Development
 
-```bash
-npx wrangler d1 create d1-manager-metadata
-```
-
-```bash
+   ```bash
 git clone https://github.com/neverinfamous/d1-manager.git
-```
+   ```
+
+   ```bash
+   cd d1-manager
+   ```
+
+   ```bash
+   npm install
+   ```
+
+**Start the servers (2 terminals):**
+   
+Terminal 1 - Frontend:
+   
+   ```bash
+   npm run dev
+   ```
+   
+Terminal 2 - Worker API:
+   
+   ```bash
+   npx wrangler dev --config wrangler.dev.toml --local
+   ```
+   
+Open **http://localhost:5173** - no auth required, mock data included.
+
+---
+
+## 🔧 Production Deployment
+
+### 1. Authenticate with Cloudflare
+
+   ```bash
+   npx wrangler login
+   ```
+
+### 2. Create Metadata Database
+
+   ```bash
+   npx wrangler d1 create d1-manager-metadata
+   ```
+
+   ```bash
+   npx wrangler d1 execute d1-manager-metadata --remote --file=worker/schema.sql
+   ```
+
+### 3. Configure Wrangler
 
 ```bash
-cd d1-manager
+cp wrangler.toml.example wrangler.toml
 ```
+
+Edit `wrangler.toml` with your `database_id` from step 2.
+
+### 4. Set Up R2 Backup Bucket (Optional)
+
+To enable database backups to R2 storage:
 
 ```bash
-npx wrangler d1 execute d1-manager-metadata --remote --file=worker/schema.sql
+npx wrangler r2 bucket create d1-manager-backups
 ```
 
-### 2. Get Cloudflare Credentials
+The `wrangler.toml.example` already includes the R2 and Durable Object configuration needed for backups. Features include:
+- Backup databases to R2 before rename, STRICT mode, or FTS5 conversion operations
+- Manual backup/restore from database cards
+- Full backup history with restore capability
 
-| Credential | Where to Find |
-|------------|---------------|
-| `ACCOUNT_ID` | Dashboard URL: `dash.cloudflare.com/{ACCOUNT_ID}/...` |
-| `API_KEY` | [API Tokens](https://dash.cloudflare.com/profile/api-tokens) → Create Token → **D1 Edit** permission |
-| `TEAM_DOMAIN` | [Zero Trust](https://one.dash.cloudflare.com/) → Settings → Custom Pages |
-| `POLICY_AUD` | Zero Trust → Access → Applications → Your App → AUD tag |
+### 5. Set Up Cloudflare Access
 
-### 3. Run Container
+1. Go to [Cloudflare Zero Trust](https://one.dash.cloudflare.com/)
+2. Configure authentication (GitHub OAuth, etc.)
+3. Create an Access Application for your domain
+4. Copy the **Application Audience (AUD) tag**
 
-```bash
-docker pull writenotenow/d1-manager:latest
-```
+### 6. Create API Token
 
-```bash
-docker run -d \
-  -p 8080:8080 \
-  -e ACCOUNT_ID=your_cloudflare_account_id \
-  -e API_KEY=your_cloudflare_api_token \
-  -e TEAM_DOMAIN=https://yourteam.cloudflareaccess.com \
-  -e POLICY_AUD=your_cloudflare_access_aud_tag \
-  --name d1-manager \
-  writenotenow/d1-manager:latest
-```
+1. Go to [Cloudflare API Tokens](https://dash.cloudflare.com/profile/api-tokens)
+2. Create Custom Token with **Account → D1 → Edit** permission
 
-Open **http://localhost:8080**
+### 7. Set Secrets
+   
+   ```bash
+   npx wrangler secret put ACCOUNT_ID
+   ```
+   
+   ```bash
+   npx wrangler secret put API_KEY
+   ```
+   
+   ```bash
+   npx wrangler secret put TEAM_DOMAIN
+   ```
+   
+   ```bash
+   npx wrangler secret put POLICY_AUD
+   ```
+
+### 8. Deploy
+
+  ```bash
+  npm run build
+  ```
+
+  ```bash
+  npx wrangler deploy
+  ```
 
 ---
 

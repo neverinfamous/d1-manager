@@ -442,17 +442,6 @@ Configure webhooks in the UI under the **Webhooks** tab.
 
 ---
 
-## 🛠️ Tech Stack
-
-| Frontend | Backend |
-|----------|---------|
-| React 19.2.0 | Cloudflare Workers |
-| TypeScript 5.9.3 | Cloudflare D1 |
-| Vite 7.2.4 | Cloudflare Access |
-| Tailwind CSS + shadcn/ui | Cloudflare R2 + Durable Objects |
-
----
-
 ## 🐞 Troubleshooting
 
 **"Failed to list databases"**

@@ -134,7 +134,23 @@ async function handleApiRequest(request: Request, env: Env, ctx: ExecutionContex
 
   // Allow static assets without authentication (from Workers Assets binding)
   // These are served by Cloudflare's edge network and don't need auth
+  // In local development, ASSETS binding is not available - Vite serves the frontend
   if (!url.pathname.startsWith('/api/')) {
+    // In local development, ASSETS binding is not available - Vite serves the frontend
+    if (!env.ASSETS) {
+      // In localhost dev mode, redirect to Vite dev server
+      if (isLocalhost) {
+        const corsHeaders = getCorsHeaders(request);
+        const textHeaders = new Headers(corsHeaders);
+        textHeaders.set('Content-Type', 'text/plain');
+        return new Response('Development: Frontend at http://localhost:5173', {
+          headers: textHeaders
+        });
+      }
+      // In production, ASSETS must be configured - throw descriptive error
+      throw new Error('ASSETS binding is not configured. Check your wrangler.toml configuration.');
+    }
+
     // Static asset request - serve with optimized cache and security headers
     const assetResponse = await env.ASSETS.fetch(request);
 
@@ -311,6 +327,11 @@ async function handleApiRequest(request: Request, env: Env, ctx: ExecutionContex
     return new Response('Development: Frontend at http://localhost:5173', {
       headers: textHeaders
     });
+  }
+
+  // In production, ASSETS must be configured
+  if (!env.ASSETS) {
+    throw new Error('ASSETS binding is not configured. Check your wrangler.toml configuration.');
   }
 
   // In production, serve from ASSETS binding with cache + security headers

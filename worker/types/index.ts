@@ -2,7 +2,7 @@
 // Custom extensions only below
 
 export interface Env {
-  ASSETS: Fetcher
+  ASSETS?: Fetcher
   METADATA: D1Database
   BACKUP_BUCKET?: R2Bucket
   BACKUP_DO?: DurableObjectNamespace
