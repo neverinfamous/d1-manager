@@ -11,7 +11,7 @@ Last Updated January 9, 2026 - Production/Stable v2.3.0
 [![CodeQL](https://img.shields.io/badge/CodeQL-Passing-brightgreen.svg)](https://github.com/neverinfamous/d1-manager/security/code-scanning)
 [![Type Safety](https://img.shields.io/badge/TypeScript-Strict-blue.svg)](https://github.com/neverinfamous/d1-manager)
 
-This Docker image provides a modern, full-featured web application for managing Cloudflare D1 databases with enterprise-grade authentication via Cloudflare Access (Zero Trust). Run D1 Database Manager in Docker for development, testing, or self-hosted deployments.
+A modern, full-featured web application for managing Cloudflare D1 databases with enterprise-grade authentication via Cloudflare Access (Zero Trust). Self-host on Cloudflare Workers or run locally for development.
 
 **[Live Demo](https://d1.adamic.tech/)** • **[Docker](https://hub.docker.com/r/writenotenow/d1-manager)** • **[Wiki](https://github.com/neverinfamous/d1-manager/wiki)** • **[Changelog](https://github.com/neverinfamous/d1-manager/wiki/Changelog)** • **[Release Article](https://adamic.tech/articles/d1-manager)**
 
@@ -99,36 +99,31 @@ This Docker image provides a modern, full-featured web application for managing 
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) 18+
+- [Node.js](https://nodejs.org/) 20+
 - [Cloudflare account](https://dash.cloudflare.com/sign-up) (for production)
 
 ### Local Development
 
-1. **Clone and install:**
-
 ```bash
+# Clone and install
 git clone https://github.com/neverinfamous/d1-manager.git
 cd d1-manager
 npm install
 ```
 
-2. **Start the servers (requires 2 terminals):**
-
-**Terminal 1** - Frontend (Vite dev server):
+Start both servers in separate terminals:
 
 ```bash
+# Terminal 1: Frontend (Vite)
 npm run dev
 ```
 
-**Terminal 2** - Worker API:
-
 ```bash
+# Terminal 2: Worker (Wrangler)
 npx wrangler dev --config wrangler.dev.toml --local
 ```
 
-3. **Open http://localhost:5173** - no auth required, mock data included.
-
-> **Note:** The frontend runs on port 5173 (Vite) and the Worker API runs on port 8787 (Wrangler). The frontend proxies API requests to the worker.
+Open **http://localhost:5173** — no auth required, mock data included.
 
 ---
 
@@ -144,9 +139,6 @@ npx wrangler login
 
 ```bash
 npx wrangler d1 create d1-manager-metadata
-```
-
-```bash
 npx wrangler d1 execute d1-manager-metadata --remote --file=worker/schema.sql
 ```
 
@@ -312,17 +304,8 @@ crons = ["0 * * * *"]  # Runs hourly to check for due backups
 
 ```bash
 git pull origin main
-```
-
-```bash
 npm install
-```
-
-```bash
 npm run build
-```
-
-```bash
 npx wrangler deploy
 ```
 
@@ -332,10 +315,8 @@ npx wrangler deploy
 
 ```bash
 docker pull writenotenow/d1-manager:latest
-```
 
-```bash
-docker run -d -p 8080:8080 \
+docker run -d -p 8787:8787 \
   -e ACCOUNT_ID=your_account_id \
   -e API_KEY=your_api_token \
   -e TEAM_DOMAIN=https://yourteam.cloudflareaccess.com \
