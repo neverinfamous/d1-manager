@@ -104,8 +104,9 @@ A modern, full-featured web application for managing Cloudflare D1 databases wit
 
 ### Local Development
 
+Clone and install:
+
 ```bash
-# Clone and install
 git clone https://github.com/neverinfamous/d1-manager.git
 cd d1-manager
 npm install
@@ -113,13 +114,15 @@ npm install
 
 Start both servers in separate terminals:
 
+**Terminal 1** — Frontend (Vite):
+
 ```bash
-# Terminal 1: Frontend (Vite)
 npm run dev
 ```
 
+**Terminal 2** — Worker (Wrangler):
+
 ```bash
-# Terminal 2: Worker (Wrangler)
 npx wrangler dev --config wrangler.dev.toml --local
 ```
 

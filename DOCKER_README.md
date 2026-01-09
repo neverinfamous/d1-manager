@@ -101,14 +101,21 @@ This Docker image provides a modern, full-featured web application for managing 
 
 D1 Manager requires a D1 database for job history, color tags, webhooks, and saved queries.
 
+Authenticate with Cloudflare:
+
 ```bash
-# Authenticate with Cloudflare
 npx wrangler login
+```
 
-# Create the metadata database
+Create the metadata database:
+
+```bash
 npx wrangler d1 create d1-manager-metadata
+```
 
-# Clone repo and initialize schema
+Clone repo and initialize schema:
+
+```bash
 git clone https://github.com/neverinfamous/d1-manager.git
 cd d1-manager
 npx wrangler d1 execute d1-manager-metadata --remote --file=worker/schema.sql
@@ -248,13 +255,15 @@ TEAM_DOMAIN=https://yourteam.cloudflareaccess.com
 POLICY_AUD=your_cloudflare_access_aud_tag
 ```
 
-Run and upgrade:
+Start:
 
 ```bash
-# Start container
 docker compose up -d
+```
 
-# Upgrade to latest
+Upgrade:
+
+```bash
 docker compose pull && docker compose up -d
 ```
 
