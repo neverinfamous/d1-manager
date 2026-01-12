@@ -38,7 +38,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.28.5",
-    "@cloudflare/workers-types": "^4.20260109.0",
+    "@cloudflare/workers-types": "^4.20260111.0",
     "@eslint/js": "^9.13.0",
     "@tailwindcss/postcss": "^4.1.18",
     "@tailwindcss/vite": "^4.1.18",
