@@ -1,11 +1,11 @@
 # D1 Database Manager
 
-Last Updated January 13, 2026 - Production/Stable v2.3.0
+Last Updated January 13, 2026 - Production/Stable v2.4.0
 
 [![GitHub](https://img.shields.io/badge/GitHub-neverinfamous/d1--manager-blue?logo=github)](https://github.com/neverinfamous/d1-manager)
 [![Docker Pulls](https://img.shields.io/docker/pulls/writenotenow/d1-manager)](https://hub.docker.com/r/writenotenow/d1-manager)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-![Version](https://img.shields.io/badge/version-v2.3.0-green)
+![Version](https://img.shields.io/badge/version-v2.4.0-green)
 ![Status](https://img.shields.io/badge/status-Production%2FStable-brightgreen)
 [![Security](https://img.shields.io/badge/Security-Enhanced-green.svg)](https://github.com/neverinfamous/d1-manager/blob/main/SECURITY.md)
 [![CodeQL](https://img.shields.io/badge/CodeQL-Passing-brightgreen.svg)](https://github.com/neverinfamous/d1-manager/security/code-scanning)
@@ -301,8 +301,8 @@ docker compose pull && docker compose up -d
 | Tag | Description |
 |-----|-------------|
 | `latest` | Latest stable release |
-| `v2.3.0` | Specific version (recommended for production) |
-| `v2.2.0` | Previous stable release |
+| `v2.4.0` | Specific version (recommended for production) |
+| `v2.3.0` | Previous stable release |
 | `sha-XXXXXX` | Commit SHA for reproducible builds |
 
 ---
