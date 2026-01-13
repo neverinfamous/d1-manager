@@ -1,8 +1,15 @@
 import React, { useState } from 'react';
-import { GitCompare, Loader2, ChevronDown, ChevronRight, Plus, Minus, AlertCircle } from 'lucide-react';
+import { GitCompare, Loader2, ChevronDown, ChevronRight, Plus, Minus, AlertCircle, FileCode } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { listTables, getTableSchema, type ColumnInfo } from '@/services/api';
+import { listTables, getTableSchema, getFullDatabaseSchema, executeQuery, type ColumnInfo } from '@/services/api';
+import { MigrationScriptDialog } from '@/components/MigrationScriptDialog';
+import {
+  type ExtendedSchemaDiff,
+  type MigrationStep,
+  compareFullSchemas,
+  generateMigrationSteps
+} from '@/lib/schema-diff-generator';
 
 interface DatabaseComparisonProps {
   databases: { uuid: string; name: string }[];
@@ -31,6 +38,9 @@ export function DatabaseComparison({ databases, preSelectedDatabases, onClose: _
   const [expandedTables, setExpandedTables] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [autoRan, setAutoRan] = useState(false);
+  const [showMigrationDialog, setShowMigrationDialog] = useState(false);
+  const [migrationSteps, setMigrationSteps] = useState<MigrationStep[]>([]);
+  const [generatingMigration, setGeneratingMigration] = useState(false);
 
   // Auto-run comparison when pre-selected databases are provided
   React.useEffect(() => {
@@ -204,6 +214,48 @@ export function DatabaseComparison({ databases, preSelectedDatabases, onClose: _
     unchanged: diffs.filter(d => d.status === 'unchanged').length
   };
 
+  const handleGenerateMigration = async (): Promise<void> => {
+    if (!leftDb || !rightDb) return;
+
+    try {
+      setGeneratingMigration(true);
+      setError(null);
+
+      // Fetch full schema for both databases
+      const [leftSchema, rightSchema] = await Promise.all([
+        getFullDatabaseSchema(leftDb),
+        getFullDatabaseSchema(rightDb)
+      ]);
+
+      // Compare schemas and generate migration steps
+      const extendedDiffs: ExtendedSchemaDiff[] = compareFullSchemas(leftSchema, rightSchema);
+      const steps = generateMigrationSteps(extendedDiffs);
+
+      setMigrationSteps(steps);
+      setShowMigrationDialog(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to generate migration script');
+    } finally {
+      setGeneratingMigration(false);
+    }
+  };
+
+  const handleApplyMigration = async (sql: string, targetDbId: string): Promise<void> => {
+    // Split SQL by semicolons and execute each statement
+    const statements = sql
+      .split(';')
+      .map(s => s.trim())
+      .filter(s => s.length > 0 && !s.startsWith('--'));
+
+    for (const statement of statements) {
+      if (statement.length > 0) {
+        await executeQuery(targetDbId, statement + ';');
+      }
+    }
+  };
+
+  const hasChanges = stats.added > 0 || stats.removed > 0 || stats.modified > 0;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -330,8 +382,46 @@ export function DatabaseComparison({ databases, preSelectedDatabases, onClose: _
                   <span className="font-medium">Right:</span> {rightDbName}
                 </div>
               </div>
+
+              {/* Generate Migration Script Button */}
+              {hasChanges && (
+                <div className="mt-4 pt-4 border-t">
+                  <Button
+                    onClick={() => void handleGenerateMigration()}
+                    disabled={generatingMigration}
+                    className="w-full"
+                  >
+                    {generatingMigration ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden="true" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <FileCode className="h-4 w-4 mr-2" aria-hidden="true" />
+                        Generate Migration Script
+                      </>
+                    )}
+                  </Button>
+                  <p className="text-xs text-muted-foreground mt-2 text-center">
+                    Generates SQL to migrate {leftDbName} → {rightDbName}
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
+
+          {/* Migration Script Dialog */}
+          <MigrationScriptDialog
+            open={showMigrationDialog}
+            onClose={() => setShowMigrationDialog(false)}
+            steps={migrationSteps}
+            leftDbName={leftDbName}
+            rightDbName={rightDbName}
+            leftDbId={leftDb}
+            rightDbId={rightDb}
+            onApply={handleApplyMigration}
+          />
 
           {/* Detailed Differences */}
           <Card>

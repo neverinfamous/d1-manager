@@ -1669,6 +1669,79 @@ export const api = new APIService()
 export const listTables = (databaseId: string, skipCache = false): Promise<TableInfo[]> => api.listTables(databaseId, skipCache)
 export const getTableSchema = (databaseId: string, tableName: string, skipCache = false): Promise<ColumnInfo[]> => api.getTableSchema(databaseId, tableName, skipCache)
 export const getTableForeignKeys = (databaseId: string, tableName: string, skipCache = false): Promise<{ column: string; refTable: string; refColumn: string; onDelete: string | null; onUpdate: string | null }[]> => api.getTableForeignKeys(databaseId, tableName, skipCache)
+
+// Full schema types for database comparison
+export interface FullSchemaColumn {
+  cid: number
+  name: string
+  type: string
+  notnull: number
+  dflt_value: string | null
+  pk: number
+}
+
+export interface FullSchemaTable {
+  name: string
+  type: string
+  strict: number
+  columns: FullSchemaColumn[]
+}
+
+export interface FullSchemaIndex {
+  table: string
+  name: string
+  unique: number
+  columns: string[]
+  partial?: number
+}
+
+export interface FullSchemaTrigger {
+  name: string
+  table: string
+  sql: string
+}
+
+export interface FullSchemaForeignKey {
+  table: string
+  column: string
+  refTable: string
+  refColumn: string
+  onDelete: string
+  onUpdate: string
+}
+
+export interface FullDatabaseSchema {
+  tables: FullSchemaTable[]
+  indexes: FullSchemaIndex[]
+  triggers: FullSchemaTrigger[]
+  foreignKeys: FullSchemaForeignKey[]
+}
+
+/**
+ * Get full database schema for comparison and migration script generation
+ * Returns tables with columns, indexes, triggers, and foreign keys
+ */
+export const getFullDatabaseSchema = async (databaseId: string): Promise<FullDatabaseSchema> => {
+  const WORKER_API = import.meta.env.VITE_WORKER_API || window.location.origin
+
+  const response = await fetch(`${WORKER_API}/api/tables/${databaseId}/schema-full`, {
+    method: 'GET',
+    credentials: 'include'
+  })
+
+  if (!response.ok) {
+    throw new Error(`Failed to get full schema: ${response.statusText}`)
+  }
+
+  const data = await response.json() as { result: FullDatabaseSchema; success: boolean }
+
+  if (data.result === null || data.result === undefined) {
+    throw new Error('No schema data in response')
+  }
+
+  return data.result
+}
+
 export const getTableData = <T = Record<string, unknown>>(
   databaseId: string,
   tableName: string,

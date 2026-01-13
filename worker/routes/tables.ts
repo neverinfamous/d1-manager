@@ -2770,9 +2770,230 @@ export async function handleTableRoutes(
       }
     }
 
+    // Get full database schema for comparison (includes tables, columns, indexes, triggers, FKs)
+    if (request.method === 'GET' && url.pathname === `/api/tables/${dbId}/schema-full`) {
+      logInfo(`Getting full schema for database: ${dbId}`, { module: 'tables', operation: 'schema_full', databaseId: dbId });
+
+      // Mock response for local development
+      if (isLocalDev) {
+        return new Response(JSON.stringify({
+          result: {
+            tables: [
+              {
+                name: 'users',
+                type: 'table',
+                strict: 0,
+                columns: [
+                  { cid: 0, name: 'id', type: 'INTEGER', notnull: 1, dflt_value: null, pk: 1 },
+                  { cid: 1, name: 'email', type: 'TEXT', notnull: 1, dflt_value: null, pk: 0 },
+                  { cid: 2, name: 'name', type: 'TEXT', notnull: 0, dflt_value: null, pk: 0 }
+                ]
+              },
+              {
+                name: 'posts',
+                type: 'table',
+                strict: 0,
+                columns: [
+                  { cid: 0, name: 'id', type: 'INTEGER', notnull: 1, dflt_value: null, pk: 1 },
+                  { cid: 1, name: 'user_id', type: 'INTEGER', notnull: 1, dflt_value: null, pk: 0 },
+                  { cid: 2, name: 'title', type: 'TEXT', notnull: 1, dflt_value: null, pk: 0 }
+                ]
+              }
+            ],
+            indexes: [
+              { table: 'users', name: 'idx_users_email', unique: 1, columns: ['email'] },
+              { table: 'posts', name: 'idx_posts_user_id', unique: 0, columns: ['user_id'] }
+            ],
+            triggers: [],
+            foreignKeys: [
+              { table: 'posts', column: 'user_id', refTable: 'users', refColumn: 'id', onDelete: 'CASCADE', onUpdate: 'NO ACTION' }
+            ]
+          },
+          success: true
+        }), {
+          headers: jsonHeaders(corsHeaders)
+        });
+      }
+
+      try {
+        // Get all tables
+        const tableListResult = await executeQueryViaAPI(dbId, "PRAGMA table_list", env);
+        const allTables = (tableListResult.results as { name: string; type: string; strict: number }[])
+          .filter(t => !t.name.startsWith('sqlite_') && !t.name.startsWith('_cf_'));
+
+        interface ColumnInfo {
+          cid: number;
+          name: string;
+          type: string;
+          notnull: number;
+          dflt_value: string | null;
+          pk: number;
+        }
+
+        interface TableWithColumns {
+          name: string;
+          type: string;
+          strict: number;
+          columns: ColumnInfo[];
+        }
+
+        interface IndexInfo {
+          table: string;
+          name: string;
+          unique: number;
+          columns: string[];
+          partial: number;
+        }
+
+        interface TriggerInfo {
+          name: string;
+          table: string;
+          sql: string;
+        }
+
+        interface ForeignKeyInfo {
+          table: string;
+          column: string;
+          refTable: string;
+          refColumn: string;
+          onDelete: string;
+          onUpdate: string;
+        }
+
+        const tables: TableWithColumns[] = [];
+        const indexes: IndexInfo[] = [];
+        const triggers: TriggerInfo[] = [];
+        const foreignKeys: ForeignKeyInfo[] = [];
+
+        // Process in batches to avoid rate limits
+        const BATCH_SIZE = 5;
+
+        for (let i = 0; i < allTables.length; i += BATCH_SIZE) {
+          const batch = allTables.slice(i, i + BATCH_SIZE);
+
+          const batchResults = await Promise.all(
+            batch.map(async (table) => {
+              const sanitizedTable = sanitizeIdentifier(table.name);
+
+              try {
+                // Execute schema, index, and FK queries in parallel
+                const [schemaResult, indexListResult, fkResult] = await Promise.all([
+                  executeQueryViaAPI(dbId, `PRAGMA table_info("${sanitizedTable}")`, env),
+                  executeQueryViaAPI(dbId, `PRAGMA index_list("${sanitizedTable}")`, env),
+                  executeQueryViaAPI(dbId, `PRAGMA foreign_key_list("${sanitizedTable}")`, env)
+                ]);
+
+                const columns = schemaResult.results as ColumnInfo[];
+                const tableIndexes = indexListResult.results as { seq: number; name: string; unique: number; origin: string; partial: number }[];
+                const fks = fkResult.results as { id: number; seq: number; table: string; from: string; to: string; on_update: string; on_delete: string }[];
+
+                // Get index column details
+                const indexDetails: IndexInfo[] = [];
+                for (const idx of tableIndexes) {
+                  if (idx.origin !== 'pk') { // Skip auto-created PK indexes
+                    try {
+                      const idxInfoResult = await executeQueryViaAPI(dbId, `PRAGMA index_info("${idx.name}")`, env);
+                      const idxCols = (idxInfoResult.results as { name: string }[]).map(c => c.name);
+                      indexDetails.push({
+                        table: table.name,
+                        name: idx.name,
+                        unique: idx.unique,
+                        columns: idxCols,
+                        partial: idx.partial
+                      });
+                    } catch {
+                      // Skip indexes we can't query
+                    }
+                  }
+                }
+
+                return {
+                  table: {
+                    name: table.name,
+                    type: table.type,
+                    strict: table.strict ?? 0,
+                    columns
+                  },
+                  indexes: indexDetails,
+                  foreignKeys: fks.map(fk => ({
+                    table: table.name,
+                    column: fk.from,
+                    refTable: fk.table,
+                    refColumn: fk.to,
+                    onDelete: fk.on_delete || 'NO ACTION',
+                    onUpdate: fk.on_update || 'NO ACTION'
+                  }))
+                };
+              } catch (err) {
+                logWarning(`Skipping table "${table.name}" in schema-full: ${err instanceof Error ? err.message : 'Unknown error'}`, {
+                  module: 'tables',
+                  operation: 'schema_full_table',
+                  databaseId: dbId,
+                  metadata: { tableName: table.name }
+                });
+                return null;
+              }
+            })
+          );
+
+          // Aggregate results
+          for (const result of batchResults) {
+            if (result) {
+              tables.push(result.table);
+              indexes.push(...result.indexes);
+              foreignKeys.push(...result.foreignKeys);
+            }
+          }
+        }
+
+        // Get triggers from sqlite_master
+        try {
+          const triggerResult = await executeQueryViaAPI(
+            dbId,
+            "SELECT name, tbl_name as table_name, sql FROM sqlite_master WHERE type='trigger'",
+            env
+          );
+          const triggerRows = triggerResult.results as { name: string; table_name: string; sql: string }[];
+          for (const t of triggerRows) {
+            if (t.sql) {
+              triggers.push({
+                name: t.name,
+                table: t.table_name,
+                sql: t.sql
+              });
+            }
+          }
+        } catch {
+          // Triggers query may fail on some databases, continue without them
+        }
+
+        return new Response(JSON.stringify({
+          result: {
+            tables,
+            indexes,
+            triggers,
+            foreignKeys
+          },
+          success: true
+        }), {
+          headers: jsonHeaders(corsHeaders)
+        });
+      } catch (err) {
+        void logError(env, err instanceof Error ? err : String(err), { module: 'tables', operation: 'schema_full', databaseId: dbId }, isLocalDev);
+        return new Response(JSON.stringify({
+          error: 'Failed to get full schema',
+          message: err instanceof Error ? err.message : 'Unknown error'
+        }), {
+          status: 500,
+          headers: jsonHeaders(corsHeaders)
+        });
+      }
+    }
+
     return new Response(JSON.stringify({
       error: 'Route not found'
     }), {
+
       status: 404,
       headers: jsonHeaders(corsHeaders)
     });
