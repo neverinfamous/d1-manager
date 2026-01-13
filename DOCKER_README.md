@@ -1,6 +1,6 @@
 # D1 Database Manager
 
-Last Updated January 12, 2026 - Production/Stable v2.3.0
+Last Updated January 13, 2026 - Production/Stable v2.3.0
 
 [![GitHub](https://img.shields.io/badge/GitHub-neverinfamous/d1--manager-blue?logo=github)](https://github.com/neverinfamous/d1-manager)
 [![Docker Pulls](https://img.shields.io/docker/pulls/writenotenow/d1-manager)](https://hub.docker.com/r/writenotenow/d1-manager)
