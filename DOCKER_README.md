@@ -68,6 +68,7 @@ This Docker image provides a modern, full-featured web application for managing 
 - CSV export
 
 ### Advanced Features
+- NEW! **Schema Comparison with Migration Script Generation** - Compare two databases and generate executable SQL migration scripts with risk classification, copy/download, and apply-to-target functionality
 - NEW! **AI Search Integration** *(Cloudflare Workers only)* - Semantic search over database schemas and data using Cloudflare AI Search (AutoRAG). Export databases to R2 for indexing, then query with natural language or get AI-generated SQL suggestions
 - **Unified Backup & Restore Hub** *(Cloudflare Workers only)* - Undo history and R2 backups in one dialog with bulk restore/download/delete, backup counts, source tags, and orphaned-backup visibility
 - **Scheduled R2 Backups** *(Cloudflare Workers only)* - Daily/weekly/monthly schedules with per-database controls, next-run previews, last-run status, and job history integration

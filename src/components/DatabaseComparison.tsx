@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { GitCompare, Loader2, ChevronDown, ChevronRight, Plus, Minus, AlertCircle, FileCode } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { listTables, getTableSchema, getFullDatabaseSchema, executeQuery, type ColumnInfo } from '@/services/api';
+import { listTables, getTableSchema, getFullDatabaseSchema, executeQuery, type ColumnInfo, type FullDatabaseSchema } from '@/services/api';
 import { MigrationScriptDialog } from '@/components/MigrationScriptDialog';
 import {
   type ExtendedSchemaDiff,
@@ -241,6 +241,27 @@ export function DatabaseComparison({ databases, preSelectedDatabases, onClose: _
   };
 
   const handleApplyMigration = async (sql: string, targetDbId: string): Promise<void> => {
+    // Fetch target database schema to enable idempotent operations
+    let targetSchema: FullDatabaseSchema | null = null;
+    try {
+      targetSchema = await getFullDatabaseSchema(targetDbId);
+    } catch {
+      // If we can't fetch schema, proceed without idempotency checks
+      console.warn('Could not fetch target schema for idempotency check');
+    }
+
+    // Build a set of existing columns for quick lookup: "tableName.columnName"
+    const existingColumns = new Set<string>();
+    const existingTables = new Set<string>();
+    if (targetSchema) {
+      for (const table of targetSchema.tables) {
+        existingTables.add(table.name.toLowerCase());
+        for (const col of table.columns) {
+          existingColumns.add(`${table.name.toLowerCase()}.${col.name.toLowerCase()}`);
+        }
+      }
+    }
+
     // Normalize line endings (CRLF to LF) and strip comment lines
     const normalizedSql = sql
       .replace(/\r\n/g, '\n')  // Normalize CRLF to LF
@@ -259,14 +280,47 @@ export function DatabaseComparison({ databases, preSelectedDatabases, onClose: _
       .filter(s => s.length > 0);
 
     let statementIndex = 0;
+    let skippedCount = 0;
+
     for (const statement of statements) {
       statementIndex++;
+      const upperStatement = statement.toUpperCase();
+
+      // Check for ADD COLUMN and skip if column already exists
+      if (upperStatement.includes('ALTER TABLE') && upperStatement.includes('ADD COLUMN')) {
+        // Parse: ALTER TABLE "tableName" ADD COLUMN "columnName" ...
+        const addColMatch = /ALTER\s+TABLE\s+["']?(\w+)["']?\s+ADD\s+COLUMN\s+["']?(\w+)["']?/i.exec(statement);
+        if (addColMatch) {
+          const tableName = addColMatch[1]?.toLowerCase() ?? '';
+          const columnName = addColMatch[2]?.toLowerCase() ?? '';
+          const key = `${tableName}.${columnName}`;
+          if (existingColumns.has(key)) {
+            skippedCount++;
+            continue; // Skip - column already exists
+          }
+        }
+      }
+
+      // Check for DROP TABLE IF EXISTS on non-existent tables (harmless but skip for cleaner output)
+      // Actually, DROP TABLE IF EXISTS is designed to be idempotent, so we let it run
+
       try {
         await executeQuery(targetDbId, statement + ';', undefined, true);
       } catch (err) {
         const preview = statement.length > 100 ? statement.substring(0, 100) + '...' : statement;
-        throw new Error(`Migration failed at statement ${statementIndex}/${statements.length}: ${err instanceof Error ? err.message : 'Unknown error'}\n\nStatement: ${preview}`);
+        const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+
+        // Check for duplicate column error and provide helpful message
+        if (errorMsg.includes('duplicate column name')) {
+          throw new Error(`Migration failed at statement ${statementIndex}/${statements.length}: Column already exists (run "Compare" again to refresh schema)\n\nStatement: ${preview}`);
+        }
+
+        throw new Error(`Migration failed at statement ${statementIndex}/${statements.length}: ${errorMsg}\n\nStatement: ${preview}`);
       }
+    }
+
+    if (skippedCount > 0) {
+      console.log(`Migration: Skipped ${skippedCount} statements (already applied)`);
     }
   };
 
