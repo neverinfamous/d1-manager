@@ -241,15 +241,31 @@ export function DatabaseComparison({ databases, preSelectedDatabases, onClose: _
   };
 
   const handleApplyMigration = async (sql: string, targetDbId: string): Promise<void> => {
-    // Split SQL by semicolons and execute each statement
-    const statements = sql
+    // Normalize line endings (CRLF to LF) and strip comment lines
+    const normalizedSql = sql
+      .replace(/\r\n/g, '\n')  // Normalize CRLF to LF
+      .replace(/\r/g, '\n');   // Handle any standalone CR
+
+    const sqlWithoutComments = normalizedSql
+      .split('\n')
+      .filter(line => !line.trim().startsWith('--'))
+      .join('\n')
+      .replace(/\n{3,}/g, '\n\n');  // Collapse multiple blank lines
+
+    // Split by semicolons and filter empty statements
+    const statements = sqlWithoutComments
       .split(';')
       .map(s => s.trim())
-      .filter(s => s.length > 0 && !s.startsWith('--'));
+      .filter(s => s.length > 0);
 
+    let statementIndex = 0;
     for (const statement of statements) {
-      if (statement.length > 0) {
-        await executeQuery(targetDbId, statement + ';');
+      statementIndex++;
+      try {
+        await executeQuery(targetDbId, statement + ';', undefined, true);
+      } catch (err) {
+        const preview = statement.length > 100 ? statement.substring(0, 100) + '...' : statement;
+        throw new Error(`Migration failed at statement ${statementIndex}/${statements.length}: ${err instanceof Error ? err.message : 'Unknown error'}\n\nStatement: ${preview}`);
       }
     }
   };
