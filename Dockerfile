@@ -8,7 +8,7 @@
 # -----------------
 # Stage 1: Builder
 # -----------------
-FROM node:22-alpine AS builder
+FROM node:24-alpine AS builder
 
 WORKDIR /app
 
@@ -53,7 +53,7 @@ RUN npm run build
 # -----------------
 # Stage 2: Runtime
 # -----------------
-FROM node:22-alpine AS runtime
+FROM node:24-alpine AS runtime
 
 WORKDIR /app
 

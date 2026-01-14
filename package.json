@@ -3,6 +3,9 @@
   "private": true,
   "version": "2.4.0",
   "type": "module",
+  "engines": {
+    "node": ">=24.0.0"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
@@ -38,7 +41,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.28.6",
-    "@cloudflare/workers-types": "^4.20260113.0",
+    "@cloudflare/workers-types": "^4.20260114.0",
     "@eslint/js": "^9.13.0",
     "@tailwindcss/postcss": "^4.1.18",
     "@tailwindcss/vite": "^4.1.18",

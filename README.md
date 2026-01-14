@@ -1,6 +1,6 @@
 # D1 Database Manager for Cloudflare
 
-Last Updated January 13, 2026 - Production/Stable v2.4.0
+Last Updated January 14, 2026 - Production/Stable v2.4.0
 
 [![GitHub](https://img.shields.io/badge/GitHub-neverinfamous/d1--manager-blue?logo=github)](https://github.com/neverinfamous/d1-manager)
 [![Docker Pulls](https://img.shields.io/docker/pulls/writenotenow/d1-manager)](https://hub.docker.com/r/writenotenow/d1-manager)
@@ -100,7 +100,7 @@ A modern, full-featured web application for managing Cloudflare D1 databases wit
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) 20+
+- [Node.js](https://nodejs.org/) 24+ (LTS)
 - [Cloudflare account](https://dash.cloudflare.com/sign-up) (for production)
 
 ### Local Development
