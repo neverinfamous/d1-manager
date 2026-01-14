@@ -247,7 +247,6 @@ export function DatabaseComparison({ databases, preSelectedDatabases, onClose: _
       targetSchema = await getFullDatabaseSchema(targetDbId);
     } catch {
       // If we can't fetch schema, proceed without idempotency checks
-      console.warn('Could not fetch target schema for idempotency check');
     }
 
     // Build a set of existing columns for quick lookup: "tableName.columnName"
@@ -280,7 +279,6 @@ export function DatabaseComparison({ databases, preSelectedDatabases, onClose: _
       .filter(s => s.length > 0);
 
     let statementIndex = 0;
-    let skippedCount = 0;
 
     for (const statement of statements) {
       statementIndex++;
@@ -295,7 +293,6 @@ export function DatabaseComparison({ databases, preSelectedDatabases, onClose: _
           const columnName = addColMatch[2]?.toLowerCase() ?? '';
           const key = `${tableName}.${columnName}`;
           if (existingColumns.has(key)) {
-            skippedCount++;
             continue; // Skip - column already exists
           }
         }
@@ -317,10 +314,6 @@ export function DatabaseComparison({ databases, preSelectedDatabases, onClose: _
 
         throw new Error(`Migration failed at statement ${statementIndex}/${statements.length}: ${errorMsg}\n\nStatement: ${preview}`);
       }
-    }
-
-    if (skippedCount > 0) {
-      console.log(`Migration: Skipped ${skippedCount} statements (already applied)`);
     }
   };
 
