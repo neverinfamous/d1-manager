@@ -37,7 +37,7 @@
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "reactflow": "^11.11.4",
-    "sql-formatter": "^15.6.12"
+    "sql-formatter": "^15.7.0"
   },
   "devDependencies": {
     "@babel/core": "^7.28.6",
