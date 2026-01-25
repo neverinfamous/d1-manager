@@ -1,6 +1,6 @@
 # D1 Database Manager for Cloudflare
 
-Last Updated January 14, 2026 - Production/Stable v2.4.0
+Last Updated January 25, 2026 - Production/Stable v2.4.0
 
 [![GitHub](https://img.shields.io/badge/GitHub-neverinfamous/d1--manager-blue?logo=github)](https://github.com/neverinfamous/d1-manager)
 [![Docker Pulls](https://img.shields.io/docker/pulls/writenotenow/d1-manager)](https://hub.docker.com/r/writenotenow/d1-manager)
@@ -26,6 +26,7 @@ A modern, full-featured web application for managing Cloudflare D1 databases wit
 ## 🎯 Features
 
 ### Database Management
+
 - Create, rename, clone, delete, and optimize databases
 - **Export Database** - SQL/JSON/CSV formats with portable schema + data
 - **Import Database** - SQL/JSON/CSV/ZIP with create new or update existing
@@ -42,6 +43,7 @@ A modern, full-featured web application for managing Cloudflare D1 databases wit
 - **Database search filter & job history** - Quickly find databases and audit all operations with full date/time and duration tracking
 
 ### Table Operations
+
 - Visual schema designer with STRICT mode and generated column support
 - NEW! Clone, export (SQL/CSV/JSON), import (CSV/JSON/SQL), and bulk operations
 - Column management (add, modify, rename, delete) with UNIQUE constraint support
@@ -57,6 +59,7 @@ A modern, full-featured web application for managing Cloudflare D1 databases wit
 - **Table color tags** - Assign colors for visual organization
 
 ### Query Console
+
 - **Tabbed interface** - Query, SQL Diff, Drizzle ORM, and Query Builder in dedicated tabs
 - **Drizzle ORM Console** - Introspect schemas, view migration status/history, generate SQL, push changes (with dry-run), and export TypeScript schema
 - **SQL Formatter** - One-click formatting with SQLite-aware sql-formatter library
@@ -68,6 +71,7 @@ A modern, full-featured web application for managing Cloudflare D1 databases wit
 - CSV export
 
 ### Advanced Features
+
 - NEW! **Schema Comparison with Migration Script Generation** - Compare two databases and generate executable SQL migration scripts with risk classification, copy/download, and apply-to-target functionality
 - NEW! **AI Search Integration** - Semantic search over database schemas and data using Cloudflare AI Search (AutoRAG). Export databases to R2 for indexing, then query with natural language or get AI-generated SQL suggestions
 - **Unified Backup & Restore Hub** - Undo history and R2 backups in one dialog with bulk restore/download/delete, backup counts, source tags, and orphaned-backup visibility
@@ -86,6 +90,7 @@ A modern, full-featured web application for managing Cloudflare D1 databases wit
 - **Constraint Validator** - Validate foreign key, NOT NULL, and UNIQUE constraints across database with guided fix workflow
 
 ### Webhook Notifications
+
 - **Event-driven webhooks** - Send HTTP notifications on key database events
 - **Configurable events** - database_create, database_delete, database_export, database_import, job_failed, batch_complete
 - **HMAC signatures** - Optional secret-based request signing for security
@@ -166,6 +171,7 @@ npx wrangler r2 bucket create d1-manager-backups
 ```
 
 The `wrangler.toml` includes the R2 and Durable Object configuration needed for backups. Features include:
+
 - Backup databases to R2 before rename, STRICT mode, or FTS5 conversion operations
 - Manual backup/restore from database cards
 - Full backup history with restore capability
@@ -211,6 +217,7 @@ D1 Manager includes an automated migration system. When you upgrade to a new ver
 3. **Done!** - Migrations are applied safely with rollback on failure
 
 The app automatically handles:
+
 - Fresh installations (applies all migrations)
 - Legacy installations (detects existing tables and marks appropriate migrations as applied)
 - Incremental upgrades (only applies new migrations)
@@ -229,13 +236,13 @@ Or apply individual migrations:
 npx wrangler d1 execute d1-manager-metadata --remote --file=worker/migrations/002_add_color_tags.sql
 ```
 
-| Migration | When to Run |
-|-----------|-------------|
-| `001_add_job_history.sql` | If you don't have job history tables yet |
-| `002_add_color_tags.sql` | If you don't have color tags yet |
+| Migration                          | When to Run                                         |
+| ---------------------------------- | --------------------------------------------------- |
+| `001_add_job_history.sql`          | If you don't have job history tables yet            |
+| `002_add_color_tags.sql`           | If you don't have color tags yet                    |
 | `003_add_error_message_column.sql` | If you have job history but no error_message column |
-| `004_add_webhooks.sql` | If you don't have the webhooks table yet |
-| `005_add_scheduled_backups.sql` | If you don't have the scheduled_backups table yet |
+| `004_add_webhooks.sql`             | If you don't have the webhooks table yet            |
+| `005_add_scheduled_backups.sql`    | If you don't have the scheduled_backups table yet   |
 
 > **Note:** New installations should use the automated migration system or `schema.sql`.
 
@@ -243,13 +250,13 @@ npx wrangler d1 execute d1-manager-metadata --remote --file=worker/migrations/00
 
 When upgrading, check if new wrangler.toml bindings are required:
 
-| Version | Required Bindings |
-|---------|-------------------|
-| v1.0.0 | `METADATA` (D1 database) |
-| v1.1.0 | Same as v1.0.0 |
+| Version | Required Bindings                                                                       |
+| ------- | --------------------------------------------------------------------------------------- |
+| v1.0.0  | `METADATA` (D1 database)                                                                |
+| v1.1.0  | Same as v1.0.0                                                                          |
 | v1.2.0+ | `METADATA` (D1), `BACKUP_BUCKET` (R2, optional), `BACKUP_DO` (Durable Object, optional) |
-| v2.0.0 | Same as v1.2.0 (optional cron trigger for scheduled backups) |
-| v2.1.0 | Same as v2.0.0 (optional `[ai]` binding for AI Search) |
+| v2.0.0  | Same as v1.2.0 (optional cron trigger for scheduled backups)                            |
+| v2.1.0  | Same as v2.0.0 (optional `[ai]` binding for AI Search)                                  |
 
 ### ⚠️ Important: Durable Object Setup for R2 Backups
 
@@ -334,34 +341,34 @@ See [DOCKER_README.md](DOCKER_README.md) for complete Docker instructions.
 
 ## 📋 API Reference
 
-| Endpoint | Description |
-|----------|-------------|
-| `GET /api/databases` | List databases |
-| `POST /api/databases` | Create database |
-| `DELETE /api/databases/:dbId` | Delete database |
-| `PUT /api/databases/:dbId/replication` | Set read replication mode |
-| `GET /api/tables/:dbId/list` | List tables |
-| `GET /api/tables/:dbId/foreign-keys` | Get FK graph with optional schemas and cycles |
-| `POST /api/tables/:dbId/:tableName/strict-check` | Validate STRICT mode compatibility |
-| `POST /api/query/:dbId/execute` | Execute SQL |
-| `GET /api/webhooks` | List configured webhooks |
-| `POST /api/webhooks` | Create a new webhook |
-| `PUT /api/webhooks/:id` | Update a webhook |
-| `DELETE /api/webhooks/:id` | Delete a webhook |
-| `POST /api/webhooks/:id/test` | Send a test webhook |
-| `GET /api/migrations/status` | Get migration status |
-| `POST /api/migrations/apply` | Apply pending migrations |
-| `GET /api/metrics` | Get D1 analytics (query volume, latency, storage) |
-| `GET /api/scheduled-backups` | List all scheduled backups |
-| `POST /api/scheduled-backups` | Create or update a scheduled backup |
-| `DELETE /api/scheduled-backups/:dbId` | Delete a scheduled backup |
-| `POST /api/drizzle/:dbId/introspect` | Introspect database and generate Drizzle schema |
-| `GET /api/drizzle/:dbId/migrations` | Get Drizzle migration status |
-| `POST /api/drizzle/:dbId/push` | Push schema changes to database (supports dry-run) |
-| `POST /api/drizzle/:dbId/check` | Validate schema against database state |
-| `GET /api/drizzle/:dbId/export` | Export Drizzle schema as TypeScript file |
-| `GET /api/r2-backup/orphaned` | List backups from deleted databases |
-| `DELETE /api/r2-backup/:databaseId/bulk` | Bulk delete R2 backups |
+| Endpoint                                         | Description                                        |
+| ------------------------------------------------ | -------------------------------------------------- |
+| `GET /api/databases`                             | List databases                                     |
+| `POST /api/databases`                            | Create database                                    |
+| `DELETE /api/databases/:dbId`                    | Delete database                                    |
+| `PUT /api/databases/:dbId/replication`           | Set read replication mode                          |
+| `GET /api/tables/:dbId/list`                     | List tables                                        |
+| `GET /api/tables/:dbId/foreign-keys`             | Get FK graph with optional schemas and cycles      |
+| `POST /api/tables/:dbId/:tableName/strict-check` | Validate STRICT mode compatibility                 |
+| `POST /api/query/:dbId/execute`                  | Execute SQL                                        |
+| `GET /api/webhooks`                              | List configured webhooks                           |
+| `POST /api/webhooks`                             | Create a new webhook                               |
+| `PUT /api/webhooks/:id`                          | Update a webhook                                   |
+| `DELETE /api/webhooks/:id`                       | Delete a webhook                                   |
+| `POST /api/webhooks/:id/test`                    | Send a test webhook                                |
+| `GET /api/migrations/status`                     | Get migration status                               |
+| `POST /api/migrations/apply`                     | Apply pending migrations                           |
+| `GET /api/metrics`                               | Get D1 analytics (query volume, latency, storage)  |
+| `GET /api/scheduled-backups`                     | List all scheduled backups                         |
+| `POST /api/scheduled-backups`                    | Create or update a scheduled backup                |
+| `DELETE /api/scheduled-backups/:dbId`            | Delete a scheduled backup                          |
+| `POST /api/drizzle/:dbId/introspect`             | Introspect database and generate Drizzle schema    |
+| `GET /api/drizzle/:dbId/migrations`              | Get Drizzle migration status                       |
+| `POST /api/drizzle/:dbId/push`                   | Push schema changes to database (supports dry-run) |
+| `POST /api/drizzle/:dbId/check`                  | Validate schema against database state             |
+| `GET /api/drizzle/:dbId/export`                  | Export Drizzle schema as TypeScript file           |
+| `GET /api/r2-backup/orphaned`                    | List backups from deleted databases                |
+| `DELETE /api/r2-backup/:databaseId/bulk`         | Bulk delete R2 backups                             |
 
 📚 **Full API docs:** [Wiki - API Reference](https://github.com/neverinfamous/d1-manager/wiki/API-Reference)
 
@@ -383,13 +390,13 @@ Cloudflare Workers natively supports exporting OpenTelemetry-compliant traces an
 
 **Common OTLP Endpoints:**
 
-| Provider | Traces Endpoint | Logs Endpoint |
-|----------|-----------------|---------------|
-| Grafana Cloud | `https://otlp-gateway-{region}.grafana.net/otlp/v1/traces` | `https://otlp-gateway-{region}.grafana.net/otlp/v1/logs` |
-| Honeycomb | `https://api.honeycomb.io/v1/traces` | `https://api.honeycomb.io/v1/logs` |
-| Axiom | `https://api.axiom.co/v1/traces` | `https://api.axiom.co/v1/logs` |
-| Sentry | `https://{HOST}/api/{PROJECT_ID}/integration/otlp/v1/traces` | `https://{HOST}/api/{PROJECT_ID}/integration/otlp/v1/logs` |
-| Datadog | Coming soon | `https://otlp.{SITE}.datadoghq.com/v1/logs` |
+| Provider      | Traces Endpoint                                              | Logs Endpoint                                              |
+| ------------- | ------------------------------------------------------------ | ---------------------------------------------------------- |
+| Grafana Cloud | `https://otlp-gateway-{region}.grafana.net/otlp/v1/traces`   | `https://otlp-gateway-{region}.grafana.net/otlp/v1/logs`   |
+| Honeycomb     | `https://api.honeycomb.io/v1/traces`                         | `https://api.honeycomb.io/v1/logs`                         |
+| Axiom         | `https://api.axiom.co/v1/traces`                             | `https://api.axiom.co/v1/logs`                             |
+| Sentry        | `https://{HOST}/api/{PROJECT_ID}/integration/otlp/v1/traces` | `https://{HOST}/api/{PROJECT_ID}/integration/otlp/v1/logs` |
+| Datadog       | Coming soon                                                  | `https://otlp.{SITE}.datadoghq.com/v1/logs`                |
 
 **Step 2: Update wrangler.toml**
 
@@ -419,10 +426,12 @@ Configure webhooks in the UI under the **Webhooks** tab.
 ## 🐞 Troubleshooting
 
 **"Failed to list databases"**
+
 - Verify `ACCOUNT_ID` is correct
 - Ensure API token has **D1 Edit** permission (not just Read)
 
 **Authentication loop**
+
 - Check `TEAM_DOMAIN` includes `https://`
 - Verify `POLICY_AUD` matches your Access application
 

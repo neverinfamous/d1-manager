@@ -1,9 +1,9 @@
 ---
 name: Bug Report
 about: Report a bug to help us improve D1 Database Manager
-title: '[BUG] '
+title: "[BUG] "
 labels: bug
-assignees: ''
+assignees: ""
 ---
 
 ## 🐛 Bug Description
@@ -34,12 +34,14 @@ If applicable, add screenshots to help explain your problem.
 ## 🖥️ Environment
 
 **Desktop:**
+
 - OS: [e.g., Windows 11, macOS 13, Ubuntu 22.04]
 - Browser: [e.g., Chrome 120, Firefox 121, Safari 17]
 - Node.js Version: [e.g., 18.18.0]
 - D1 Manager Version: [e.g., latest, commit hash]
 
 **Deployment:**
+
 - [ ] Local development (localhost)
 - [ ] Production (Cloudflare Workers)
 - [ ] Custom deployment
@@ -70,4 +72,3 @@ If you have an idea of what might be causing the issue or how to fix it, please 
 - [ ] I have provided all the information requested above
 - [ ] I have included screenshots/logs where applicable
 - [ ] I am using the latest version of D1 Database Manager
-

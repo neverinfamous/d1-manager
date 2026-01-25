@@ -1,24 +1,24 @@
-import { ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
+} from "@/components/ui/select";
 
 export interface SortOption {
-  value: string
-  label: string
+  value: string;
+  label: string;
 }
 
 interface GridSortSelectProps {
-  options: SortOption[]
-  value: string
-  direction: 'asc' | 'desc'
-  onValueChange: (value: string) => void
-  onDirectionToggle: () => void
+  options: SortOption[];
+  value: string;
+  direction: "asc" | "desc";
+  onValueChange: (value: string) => void;
+  onDirectionToggle: () => void;
 }
 
 /**
@@ -52,16 +52,19 @@ export function GridSortSelect({
         size="sm"
         onClick={onDirectionToggle}
         className="h-9 w-9 p-0"
-        aria-label={direction === 'asc' ? 'Sort ascending' : 'Sort descending'}
-        title={direction === 'asc' ? 'Sort ascending (click to reverse)' : 'Sort descending (click to reverse)'}
+        aria-label={direction === "asc" ? "Sort ascending" : "Sort descending"}
+        title={
+          direction === "asc"
+            ? "Sort ascending (click to reverse)"
+            : "Sort descending (click to reverse)"
+        }
       >
-        {direction === 'asc' ? (
+        {direction === "asc" ? (
           <ArrowUp className="h-4 w-4" />
         ) : (
           <ArrowDown className="h-4 w-4" />
         )}
       </Button>
     </div>
-  )
+  );
 }
-

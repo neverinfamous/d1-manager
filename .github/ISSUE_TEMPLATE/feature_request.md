@@ -1,9 +1,9 @@
 ---
 name: Feature Request
 about: Suggest a new feature or enhancement for D1 Database Manager
-title: '[FEATURE] '
+title: "[FEATURE] "
 labels: enhancement
-assignees: ''
+assignees: ""
 ---
 
 ## 🚀 Feature Description
@@ -84,4 +84,3 @@ Add any other context, screenshots, or examples about the feature request here.
 - [ ] I have provided a clear description of the feature
 - [ ] I have explained the use case and benefits
 - [ ] I have considered alternatives
-

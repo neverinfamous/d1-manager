@@ -1,12 +1,25 @@
-import { useState, useCallback } from 'react';
-import { Table, Pencil, Copy, Upload, Download, Sparkles, Shield, Trash2, ChevronUp, ChevronDown, Cloud, RotateCcw } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { DatabaseColorPicker } from './DatabaseColorPicker';
-import type { TableInfo, DatabaseColor } from '../services/api';
+import { useState, useCallback } from "react";
+import {
+  Table,
+  Pencil,
+  Copy,
+  Upload,
+  Download,
+  Sparkles,
+  Shield,
+  Trash2,
+  ChevronUp,
+  ChevronDown,
+  Cloud,
+  RotateCcw,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { DatabaseColorPicker } from "./DatabaseColorPicker";
+import type { TableInfo, DatabaseColor } from "../services/api";
 
-type SortField = 'name' | 'type' | 'ncol' | 'row_count';
-type SortDirection = 'asc' | 'desc';
+type SortField = "name" | "type" | "ncol" | "row_count";
+type SortDirection = "asc" | "desc";
 
 // Sort icon component - defined outside to avoid recreation during render
 function SortIcon({
@@ -19,7 +32,7 @@ function SortIcon({
   sortDirection: SortDirection;
 }): React.JSX.Element | null {
   if (sortField !== field) return null;
-  return sortDirection === 'asc' ? (
+  return sortDirection === "asc" ? (
     <ChevronUp className="h-4 w-4 inline-block ml-1" />
   ) : (
     <ChevronDown className="h-4 w-4 inline-block ml-1" />
@@ -33,7 +46,7 @@ function SortableHeader({
   sortDirection,
   onSort,
   children,
-  className = '',
+  className = "",
 }: {
   field: SortField;
   sortField: SortField;
@@ -47,11 +60,21 @@ function SortableHeader({
       scope="col"
       className={`px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer hover:bg-muted/50 select-none ${className}`}
       onClick={() => onSort(field)}
-      aria-sort={sortField === field ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
+      aria-sort={
+        sortField === field
+          ? sortDirection === "asc"
+            ? "ascending"
+            : "descending"
+          : "none"
+      }
     >
       <span className="flex items-center">
         {children}
-        <SortIcon field={field} sortField={sortField} sortDirection={sortDirection} />
+        <SortIcon
+          field={field}
+          sortField={sortField}
+          sortDirection={sortDirection}
+        />
       </span>
     </th>
   );
@@ -95,38 +118,42 @@ export function TableListView({
   onColorChange,
   actionHandlers,
 }: TableListViewProps): React.JSX.Element {
-  const [sortField, setSortField] = useState<SortField>('name');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [sortField, setSortField] = useState<SortField>("name");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
 
-  const handleSort = useCallback((field: SortField): void => {
-    if (sortField === field) {
-      setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
-    } else {
-      setSortField(field);
-      setSortDirection('asc');
-    }
-  }, [sortField]);
+  const handleSort = useCallback(
+    (field: SortField): void => {
+      if (sortField === field) {
+        setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+      } else {
+        setSortField(field);
+        setSortDirection("asc");
+      }
+    },
+    [sortField],
+  );
 
   const sortedTables = [...tables].sort((a, b) => {
     let comparison = 0;
     switch (sortField) {
-      case 'name':
-        comparison = (a.name ?? '').localeCompare(b.name ?? '');
+      case "name":
+        comparison = (a.name ?? "").localeCompare(b.name ?? "");
         break;
-      case 'type':
-        comparison = (a.type ?? '').localeCompare(b.type ?? '');
+      case "type":
+        comparison = (a.type ?? "").localeCompare(b.type ?? "");
         break;
-      case 'ncol':
+      case "ncol":
         comparison = (a.ncol ?? 0) - (b.ncol ?? 0);
         break;
-      case 'row_count':
+      case "row_count":
         comparison = (a.row_count ?? 0) - (b.row_count ?? 0);
         break;
     }
-    return sortDirection === 'asc' ? comparison : -comparison;
+    return sortDirection === "asc" ? comparison : -comparison;
   });
 
-  const allSelected = tables.length > 0 && selectedTables.length === tables.length;
+  const allSelected =
+    tables.length > 0 && selectedTables.length === tables.length;
 
   return (
     <div className="overflow-x-auto border rounded-lg bg-card">
@@ -143,7 +170,9 @@ export function TableListView({
                     onClearSelection();
                   }
                 }}
-                aria-label={allSelected ? 'Deselect all tables' : 'Select all tables'}
+                aria-label={
+                  allSelected ? "Deselect all tables" : "Select all tables"
+                }
               />
             </th>
             <th scope="col" className="px-3 py-3 w-3">
@@ -181,13 +210,22 @@ export function TableListView({
             >
               Rows
             </SortableHeader>
-            <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            <th
+              scope="col"
+              className="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
+            >
               Without rowid
             </th>
-            <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            <th
+              scope="col"
+              className="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
+            >
               Strict
             </th>
-            <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            <th
+              scope="col"
+              className="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
+            >
               Actions
             </th>
           </tr>
@@ -201,7 +239,7 @@ export function TableListView({
             return (
               <tr
                 key={table.name}
-                className={`hover:bg-muted/50 transition-colors ${isSelected ? 'bg-primary/5' : ''}`}
+                className={`hover:bg-muted/50 transition-colors ${isSelected ? "bg-primary/5" : ""}`}
               >
                 {/* Checkbox */}
                 <td className="px-3 py-2">
@@ -231,13 +269,19 @@ export function TableListView({
                       {table.name}
                     </button>
                     {isStrict && (
-                      <span className="text-xs px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 flex items-center gap-0.5" title="STRICT mode enabled">
+                      <span
+                        className="text-xs px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 flex items-center gap-0.5"
+                        title="STRICT mode enabled"
+                      >
                         <Shield className="h-2.5 w-2.5" />
                         STRICT
                       </span>
                     )}
                     {isFts5 && (
-                      <span className="text-xs px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 flex items-center gap-0.5" title="FTS5 virtual table">
+                      <span
+                        className="text-xs px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 flex items-center gap-0.5"
+                        title="FTS5 virtual table"
+                      >
                         <Sparkles className="h-2.5 w-2.5" />
                         FTS5
                       </span>
@@ -257,17 +301,19 @@ export function TableListView({
 
                 {/* Rows */}
                 <td className="px-3 py-2 text-muted-foreground">
-                  {typeof table.row_count === 'number' ? table.row_count.toLocaleString() : '—'}
+                  {typeof table.row_count === "number"
+                    ? table.row_count.toLocaleString()
+                    : "—"}
                 </td>
 
                 {/* Without rowid */}
                 <td className="px-3 py-2 text-muted-foreground">
-                  {table.wr ? 'Yes' : 'No'}
+                  {table.wr ? "Yes" : "No"}
                 </td>
 
                 {/* Strict */}
                 <td className="px-3 py-2 text-muted-foreground">
-                  {table.strict ? 'Yes' : 'No'}
+                  {table.strict ? "Yes" : "No"}
                 </td>
 
                 {/* Actions */}
@@ -368,7 +414,7 @@ export function TableListView({
                       </Button>
                     )}
                     {/* FTS5/Convert button - show for tables and virtual tables */}
-                    {(table.type === 'table' || table.type === 'virtual') && (
+                    {(table.type === "table" || table.type === "virtual") && (
                       <Button
                         variant="ghost"
                         size="icon"
@@ -377,14 +423,22 @@ export function TableListView({
                           e.stopPropagation();
                           actionHandlers.onFts5(table.name, isFts5);
                         }}
-                        aria-label={isFts5 ? 'Convert FTS5 to regular table' : 'FTS5 Search'}
-                        title={isFts5 ? 'Convert to Regular Table' : 'Convert to FTS5'}
+                        aria-label={
+                          isFts5
+                            ? "Convert FTS5 to regular table"
+                            : "FTS5 Search"
+                        }
+                        title={
+                          isFts5
+                            ? "Convert to Regular Table"
+                            : "Convert to FTS5"
+                        }
                       >
                         <Sparkles className="h-3.5 w-3.5" />
                       </Button>
                     )}
                     {/* STRICT mode button - only show for non-strict regular tables */}
-                    {!isStrict && table.type === 'table' && (
+                    {!isStrict && table.type === "table" && (
                       <Button
                         variant="ghost"
                         size="icon"
@@ -428,4 +482,3 @@ export function TableListView({
     </div>
   );
 }
-

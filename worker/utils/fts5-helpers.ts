@@ -1,6 +1,6 @@
 /**
  * FTS5 Helper Functions
- * 
+ *
  * Utility functions for building FTS5 queries, parsing configurations,
  * and handling FTS5-specific operations.
  */
@@ -12,33 +12,47 @@ import type {
   FTS5SearchParams,
   FTS5CreateFromTableParams,
   FTS5Trigger,
-} from '../types/fts5';
+} from "../types/fts5";
 
 /**
  * Build CREATE VIRTUAL TABLE statement for FTS5
  */
 export function buildFTS5CreateStatement(config: FTS5TableConfig): string {
-  const { tableName, columns, tokenizer, prefixIndex, contentTable, contentRowId, unindexed } = config;
-  
+  const {
+    tableName,
+    columns,
+    tokenizer,
+    prefixIndex,
+    contentTable,
+    contentRowId,
+    unindexed,
+  } = config;
+
   // Build column list with optional unindexed modifier
-  const columnDefs = columns.map(col => {
-    const isUnindexed = unindexed?.includes(col);
-    return isUnindexed ? `${col} UNINDEXED` : col;
-  }).join(', ');
-  
+  const columnDefs = columns
+    .map((col) => {
+      const isUnindexed = unindexed?.includes(col);
+      return isUnindexed ? `${col} UNINDEXED` : col;
+    })
+    .join(", ");
+
   // Build FTS5 options
   const options: string[] = [];
-  
+
   // Add tokenizer
   const tokenizerStr = buildTokenizerString(tokenizer);
   options.push(`tokenize='${tokenizerStr}'`);
-  
+
   // Add prefix index
-  if (prefixIndex?.enabled && prefixIndex.lengths && prefixIndex.lengths.length > 0) {
-    const prefixStr = prefixIndex.lengths.join(' ');
+  if (
+    prefixIndex?.enabled &&
+    prefixIndex.lengths &&
+    prefixIndex.lengths.length > 0
+  ) {
+    const prefixStr = prefixIndex.lengths.join(" ");
     options.push(`prefix='${prefixStr}'`);
   }
-  
+
   // Add content table (external content)
   if (contentTable) {
     options.push(`content='${contentTable}'`);
@@ -46,69 +60,69 @@ export function buildFTS5CreateStatement(config: FTS5TableConfig): string {
       options.push(`content_rowid='${contentRowId}'`);
     }
   }
-  
+
   // Combine everything
-  const optionsStr = options.length > 0 ? ', ' + options.join(', ') : '';
-  
+  const optionsStr = options.length > 0 ? ", " + options.join(", ") : "";
+
   return `CREATE VIRTUAL TABLE "${tableName}" USING fts5(${columnDefs}${optionsStr});`;
 }
 
 /**
  * Build tokenizer string with parameters
- * 
+ *
  * Note: In FTS5, 'porter' is a stemmer filter that wraps another tokenizer.
  * It must be specified as 'porter unicode61' or 'porter ascii', not just 'porter'.
  */
 export function buildTokenizerString(config: TokenizerConfig): string {
   const { type, parameters } = config;
-  
+
   // Porter is a wrapper tokenizer - it needs a base tokenizer (default: unicode61)
   // Syntax: "porter unicode61" or "porter ascii"
-  if (type === 'porter') {
-    const baseTokenizer = 'unicode61';
+  if (type === "porter") {
+    const baseTokenizer = "unicode61";
     const params: string[] = [];
-    
+
     if (parameters?.remove_diacritics !== undefined) {
       params.push(`remove_diacritics ${String(parameters.remove_diacritics)}`);
     }
-    
+
     if (params.length > 0) {
-      return `porter ${baseTokenizer} ${params.join(' ')}`;
+      return `porter ${baseTokenizer} ${params.join(" ")}`;
     }
     return `porter ${baseTokenizer}`;
   }
-  
+
   if (!parameters || Object.keys(parameters).length === 0) {
     return type;
   }
-  
+
   const params: string[] = [];
-  
+
   if (parameters.remove_diacritics !== undefined) {
     params.push(`remove_diacritics ${String(parameters.remove_diacritics)}`);
   }
-  
+
   if (parameters.categories) {
     params.push(`categories '${parameters.categories}'`);
   }
-  
+
   if (parameters.tokenchars) {
     params.push(`tokenchars '${parameters.tokenchars}'`);
   }
-  
+
   if (parameters.separators) {
     params.push(`separators '${parameters.separators}'`);
   }
-  
-  if (parameters.case_sensitive !== undefined && type === 'trigram') {
+
+  if (parameters.case_sensitive !== undefined && type === "trigram") {
     params.push(`case_sensitive ${String(parameters.case_sensitive)}`);
   }
-  
+
   if (params.length === 0) {
     return type;
   }
-  
-  return `${type} ${params.join(' ')}`;
+
+  return `${type} ${params.join(" ")}`;
 }
 
 /**
@@ -116,66 +130,74 @@ export function buildTokenizerString(config: TokenizerConfig): string {
  */
 export function isFTS5Table(createSql: string | null): boolean {
   if (!createSql) return false;
-  return createSql.toLowerCase().includes('using fts5');
+  return createSql.toLowerCase().includes("using fts5");
 }
 
 /**
  * Extract FTS5 configuration from CREATE TABLE SQL
  */
-export function extractFTS5Config(createSql: string): Partial<FTS5TableConfig> | null {
+export function extractFTS5Config(
+  createSql: string,
+): Partial<FTS5TableConfig> | null {
   if (!isFTS5Table(createSql)) return null;
-  
+
   const config: Partial<FTS5TableConfig> = {};
-  
+
   // Extract table name
-  const tableNameMatch = /CREATE\s+VIRTUAL\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?["']?(\w+)["']?/i.exec(createSql);
+  const tableNameMatch =
+    /CREATE\s+VIRTUAL\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?["']?(\w+)["']?/i.exec(
+      createSql,
+    );
   if (tableNameMatch?.[1]) {
     config.tableName = tableNameMatch[1];
   }
-  
+
   // Extract tokenizer
   const tokenizerMatch = /tokenize\s*=\s*'([^']+)'/i.exec(createSql);
   if (tokenizerMatch?.[1]) {
     const tokenizerStr = tokenizerMatch[1];
     config.tokenizer = parseTokenizerString(tokenizerStr);
   }
-  
+
   // Extract prefix index
   const prefixMatch = /prefix\s*=\s*'([^']+)'/i.exec(createSql);
   if (prefixMatch?.[1]) {
-    const lengths = prefixMatch[1].split(/\s+/).map(l => parseInt(l, 10)).filter(l => !isNaN(l));
+    const lengths = prefixMatch[1]
+      .split(/\s+/)
+      .map((l) => parseInt(l, 10))
+      .filter((l) => !isNaN(l));
     config.prefixIndex = {
       enabled: true,
       lengths,
     };
   }
-  
+
   // Extract content table
   const contentMatch = /content\s*=\s*'([^']+)'/i.exec(createSql);
   if (contentMatch?.[1]) {
     config.contentTable = contentMatch[1];
   }
-  
+
   // Extract content rowid
   const contentRowIdMatch = /content_rowid\s*=\s*'([^']+)'/i.exec(createSql);
   if (contentRowIdMatch?.[1]) {
     config.contentRowId = contentRowIdMatch[1];
   }
-  
+
   // Extract columns (this is complex due to UNINDEXED modifiers)
   const columnsMatch = /USING\s+fts5\s*\(([^)]+)\)/i.exec(createSql);
   if (columnsMatch?.[1]) {
     const columnsPart = columnsMatch[1];
     const columns: string[] = [];
     const unindexed: string[] = [];
-    
+
     // Split by comma, but ignore commas inside quotes
-    const parts = columnsPart.split(',').map(p => p.trim());
-    
+    const parts = columnsPart.split(",").map((p) => p.trim());
+
     for (const part of parts) {
       // Skip options (they contain '=')
-      if (part.includes('=')) continue;
-      
+      if (part.includes("=")) continue;
+
       // Check for UNINDEXED modifier
       const unindexedMatch = /(\w+)\s+UNINDEXED/i.exec(part);
       if (unindexedMatch?.[1]) {
@@ -190,13 +212,13 @@ export function extractFTS5Config(createSql: string): Partial<FTS5TableConfig> |
         }
       }
     }
-    
+
     config.columns = columns;
     if (unindexed.length > 0) {
       config.unindexed = unindexed;
     }
   }
-  
+
   return config;
 }
 
@@ -205,37 +227,41 @@ export function extractFTS5Config(createSql: string): Partial<FTS5TableConfig> |
  */
 function parseTokenizerString(tokenizerStr: string): TokenizerConfig {
   const parts = tokenizerStr.trim().split(/\s+/);
-  const type = (parts[0] ?? 'unicode61') as 'unicode61' | 'porter' | 'trigram' | 'ascii';
-  
+  const type = (parts[0] ?? "unicode61") as
+    | "unicode61"
+    | "porter"
+    | "trigram"
+    | "ascii";
+
   if (parts.length === 1) {
     return { type };
   }
-  
+
   // Parse parameters
   const parameters: TokenizerParameters = {};
-  
+
   for (let i = 1; i < parts.length; i++) {
     const param = parts[i];
     const nextParam = parts[i + 1];
-    
-    if (param === 'remove_diacritics' && nextParam !== undefined) {
+
+    if (param === "remove_diacritics" && nextParam !== undefined) {
       parameters.remove_diacritics = parseInt(nextParam, 10);
       i++;
-    } else if (param === 'case_sensitive' && nextParam !== undefined) {
+    } else if (param === "case_sensitive" && nextParam !== undefined) {
       parameters.case_sensitive = parseInt(nextParam, 10);
       i++;
-    } else if (param === 'categories' && nextParam !== undefined) {
-      parameters.categories = nextParam.replace(/['"]/g, '');
+    } else if (param === "categories" && nextParam !== undefined) {
+      parameters.categories = nextParam.replace(/['"]/g, "");
       i++;
-    } else if (param === 'tokenchars' && nextParam !== undefined) {
-      parameters.tokenchars = nextParam.replace(/['"]/g, '');
+    } else if (param === "tokenchars" && nextParam !== undefined) {
+      parameters.tokenchars = nextParam.replace(/['"]/g, "");
       i++;
-    } else if (param === 'separators' && nextParam !== undefined) {
-      parameters.separators = nextParam.replace(/['"]/g, '');
+    } else if (param === "separators" && nextParam !== undefined) {
+      parameters.separators = nextParam.replace(/['"]/g, "");
       i++;
     }
   }
-  
+
   return { type, parameters };
 }
 
@@ -244,126 +270,139 @@ function parseTokenizerString(tokenizerStr: string): TokenizerConfig {
  */
 export function buildFTS5SearchQuery(
   tableName: string,
-  params: FTS5SearchParams
+  params: FTS5SearchParams,
 ): { query: string; includeSnippet: boolean } {
   const {
     query,
     columns,
     limit = 50,
     offset = 0,
-    rankingFunction = 'bm25',
+    rankingFunction = "bm25",
     bm25_k1,
     bm25_b,
     includeSnippet = false,
     snippetOptions,
   } = params;
-  
+
   // Escape single quotes in search query
   const escapedQuery = query.replace(/'/g, "''");
-  
+
   // Build MATCH clause with optional column filter
   let matchClause = `"${tableName}" MATCH '`;
   if (columns && columns.length > 0) {
     // Column filter: {column1 column2} : query
-    matchClause += `{${columns.join(' ')}} : ${escapedQuery}`;
+    matchClause += `{${columns.join(" ")}} : ${escapedQuery}`;
   } else {
     matchClause += escapedQuery;
   }
   matchClause += "'";
-  
+
   // Build SELECT clause
-  const selectParts: string[] = ['*'];
-  
+  const selectParts: string[] = ["*"];
+
   // Add rank
-  if (rankingFunction === 'bm25custom' && (bm25_k1 !== undefined || bm25_b !== undefined)) {
+  if (
+    rankingFunction === "bm25custom" &&
+    (bm25_k1 !== undefined || bm25_b !== undefined)
+  ) {
     const k1 = bm25_k1 ?? 1.2;
     const b = bm25_b ?? 0.75;
-    selectParts.push(`bm25("${tableName}", ${String(k1)}, ${String(b)}) AS rank`);
+    selectParts.push(
+      `bm25("${tableName}", ${String(k1)}, ${String(b)}) AS rank`,
+    );
   } else {
     selectParts.push(`bm25("${tableName}") AS rank`);
   }
-  
+
   // Add snippet if requested
   if (includeSnippet) {
-    const startMark = snippetOptions?.startMark ?? '<mark>';
-    const endMark = snippetOptions?.endMark ?? '</mark>';
-    const ellipsis = snippetOptions?.ellipsis ?? '...';
+    const startMark = snippetOptions?.startMark ?? "<mark>";
+    const endMark = snippetOptions?.endMark ?? "</mark>";
+    const ellipsis = snippetOptions?.ellipsis ?? "...";
     const tokenCount = snippetOptions?.tokenCount ?? 32;
-    
+
     // snippet(table, column_idx, startMark, endMark, ellipsis, tokenCount)
     // Using -1 for column_idx means use all columns
     selectParts.push(
-      `snippet("${tableName}", -1, '${startMark}', '${endMark}', '${ellipsis}', ${String(tokenCount)}) AS snippet`
+      `snippet("${tableName}", -1, '${startMark}', '${endMark}', '${ellipsis}', ${String(tokenCount)}) AS snippet`,
     );
   }
-  
+
   // Build full query
   const sql = `
-    SELECT ${selectParts.join(', ')}
+    SELECT ${selectParts.join(", ")}
     FROM "${tableName}"
     WHERE ${matchClause}
     ORDER BY rank
     LIMIT ${String(limit)} OFFSET ${String(offset)};
   `.trim();
-  
+
   return { query: sql, includeSnippet };
 }
 
 /**
  * Validate tokenizer configuration
  */
-export function validateTokenizerConfig(config: TokenizerConfig): { valid: boolean; error?: string } {
+export function validateTokenizerConfig(config: TokenizerConfig): {
+  valid: boolean;
+  error?: string;
+} {
   const { type, parameters } = config;
-  
+
   // Check valid tokenizer type
-  const validTypes = ['unicode61', 'porter', 'trigram', 'ascii'];
+  const validTypes = ["unicode61", "porter", "trigram", "ascii"];
   if (!validTypes.includes(type)) {
     return { valid: false, error: `Invalid tokenizer type: ${type}` };
   }
-  
+
   if (!parameters) {
     return { valid: true };
   }
-  
+
   // Validate remove_diacritics
   if (parameters.remove_diacritics !== undefined) {
     if (![0, 1, 2].includes(parameters.remove_diacritics)) {
-      return { valid: false, error: 'remove_diacritics must be 0, 1, or 2' };
+      return { valid: false, error: "remove_diacritics must be 0, 1, or 2" };
     }
   }
-  
+
   // Validate case_sensitive (trigram only)
   if (parameters.case_sensitive !== undefined) {
-    if (type !== 'trigram') {
-      return { valid: false, error: 'case_sensitive is only valid for trigram tokenizer' };
+    if (type !== "trigram") {
+      return {
+        valid: false,
+        error: "case_sensitive is only valid for trigram tokenizer",
+      };
     }
     if (![0, 1].includes(parameters.case_sensitive)) {
-      return { valid: false, error: 'case_sensitive must be 0 or 1' };
+      return { valid: false, error: "case_sensitive must be 0 or 1" };
     }
   }
-  
+
   return { valid: true };
 }
 
 /**
  * Generate triggers to keep FTS5 table in sync with content table
  */
-export function generateFTS5SyncTriggers(params: FTS5CreateFromTableParams): FTS5Trigger[] {
+export function generateFTS5SyncTriggers(
+  params: FTS5CreateFromTableParams,
+): FTS5Trigger[] {
   const { sourceTable, ftsTableName, columns } = params;
-  
+
   if (!params.externalContent || !params.createTriggers) {
     return [];
   }
-  
+
   const triggers: FTS5Trigger[] = [];
-  
+
   // INSERT trigger
-  const insertCols = columns.join(', ');
-  const insertNewCols = columns.map(c => `NEW.${c}`).join(', ');
-  
+  const insertCols = columns.join(", ");
+  const insertNewCols = columns.map((c) => `NEW.${c}`).join(", ");
+
   triggers.push({
     name: `${ftsTableName}_ai`,
-    event: 'INSERT',
+    event: "INSERT",
     sql: `
 CREATE TRIGGER "${ftsTableName}_ai" AFTER INSERT ON "${sourceTable}" BEGIN
   INSERT INTO "${ftsTableName}" (rowid, ${insertCols})
@@ -371,33 +410,33 @@ CREATE TRIGGER "${ftsTableName}_ai" AFTER INSERT ON "${sourceTable}" BEGIN
 END;
     `.trim(),
   });
-  
+
   // DELETE trigger
   triggers.push({
     name: `${ftsTableName}_ad`,
-    event: 'DELETE',
+    event: "DELETE",
     sql: `
 CREATE TRIGGER "${ftsTableName}_ad" AFTER DELETE ON "${sourceTable}" BEGIN
   INSERT INTO "${ftsTableName}" ("${ftsTableName}", rowid, ${insertCols})
-  VALUES ('delete', OLD.rowid, ${columns.map(c => `OLD.${c}`).join(', ')});
+  VALUES ('delete', OLD.rowid, ${columns.map((c) => `OLD.${c}`).join(", ")});
 END;
     `.trim(),
   });
-  
+
   // UPDATE trigger
   triggers.push({
     name: `${ftsTableName}_au`,
-    event: 'UPDATE',
+    event: "UPDATE",
     sql: `
 CREATE TRIGGER "${ftsTableName}_au" AFTER UPDATE ON "${sourceTable}" BEGIN
   INSERT INTO "${ftsTableName}" ("${ftsTableName}", rowid, ${insertCols})
-  VALUES ('delete', OLD.rowid, ${columns.map(c => `OLD.${c}`).join(', ')});
+  VALUES ('delete', OLD.rowid, ${columns.map((c) => `OLD.${c}`).join(", ")});
   INSERT INTO "${ftsTableName}" (rowid, ${insertCols})
   VALUES (NEW.rowid, ${insertNewCols});
 END;
     `.trim(),
   });
-  
+
   return triggers;
 }
 
@@ -408,10 +447,10 @@ export function buildFTS5PopulateQuery(
   ftsTableName: string,
   sourceTable: string,
   columns: string[],
-  useRowId = false
+  useRowId = false,
 ): string {
-  const columnList = columns.join(', ');
-  
+  const columnList = columns.join(", ");
+
   if (useRowId) {
     return `INSERT INTO "${ftsTableName}" (rowid, ${columnList}) SELECT rowid, ${columnList} FROM "${sourceTable}";`;
   } else {
@@ -423,12 +462,12 @@ export function buildFTS5PopulateQuery(
  * Escape special regex characters in a string
  */
 function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 /**
  * Sanitize FTS5 search query to prevent SQL injection and handle special characters
- * 
+ *
  * FTS5 special characters:
  * - `*` at end of word = prefix matching (keep if valid)
  * - `-` at start of word = NOT operator (keep if valid)
@@ -440,48 +479,58 @@ function escapeRegex(str: string): string {
  * - `+` = not a standard FTS5 operator
  */
 export function sanitizeFTS5Query(query: string): string {
-  if (!query || typeof query !== 'string') {
-    return '';
+  if (!query || typeof query !== "string") {
+    return "";
   }
-  
+
   let sanitized = query.trim();
-  
+
   // Remove SQL injection attempts
-  const sqlDangerous = [';', '--', '/*', '*/', 'UNION', 'DROP', 'DELETE', 'INSERT', 'UPDATE', 'CREATE'];
+  const sqlDangerous = [
+    ";",
+    "--",
+    "/*",
+    "*/",
+    "UNION",
+    "DROP",
+    "DELETE",
+    "INSERT",
+    "UPDATE",
+    "CREATE",
+  ];
   for (const keyword of sqlDangerous) {
-    const regex = new RegExp(escapeRegex(keyword), 'gi');
-    sanitized = sanitized.replace(regex, '');
+    const regex = new RegExp(escapeRegex(keyword), "gi");
+    sanitized = sanitized.replace(regex, "");
   }
-  
+
   // Remove characters that are not valid in FTS5 queries
   // Keep: alphanumeric, spaces, quotes, parentheses, *, -, ^, :, _
   // Remove: @, #, $, %, &, !, etc.
-  sanitized = sanitized.replace(/[@#$%&!=\\<>]/g, ' ');
-  
+  sanitized = sanitized.replace(/[@#$%&!=\\<>]/g, " ");
+
   // Handle standalone special characters that would cause FTS5 syntax errors
   // Remove standalone * - ^ : + that aren't part of valid expressions
   sanitized = sanitized
-    .replace(/^\*+$/g, '')           // Just asterisks
-    .replace(/^-+$/g, '')            // Just dashes
-    .replace(/^\^+$/g, '')           // Just carets
-    .replace(/^:+$/g, '')            // Just colons
-    .replace(/^\++$/g, '')           // Just plus signs
-    .replace(/\s+\*(?!\w)/g, ' ')    // Standalone * not after word
-    .replace(/(?<!\w)\*\s+/g, ' ')   // Standalone * not before word (except prefix match)
-    .replace(/:\s*$/g, '')           // Trailing colon with nothing after
-    .replace(/^\s*:/g, '')           // Leading colon with nothing before
-    .replace(/\s+:\s+/g, ' ')        // Standalone colon between spaces
-    .replace(/\(\s*\)/g, '')         // Empty parentheses
-    .replace(/"\s*"/g, '');          // Empty quotes
-  
+    .replace(/^\*+$/g, "") // Just asterisks
+    .replace(/^-+$/g, "") // Just dashes
+    .replace(/^\^+$/g, "") // Just carets
+    .replace(/^:+$/g, "") // Just colons
+    .replace(/^\++$/g, "") // Just plus signs
+    .replace(/\s+\*(?!\w)/g, " ") // Standalone * not after word
+    .replace(/(?<!\w)\*\s+/g, " ") // Standalone * not before word (except prefix match)
+    .replace(/:\s*$/g, "") // Trailing colon with nothing after
+    .replace(/^\s*:/g, "") // Leading colon with nothing before
+    .replace(/\s+:\s+/g, " ") // Standalone colon between spaces
+    .replace(/\(\s*\)/g, "") // Empty parentheses
+    .replace(/"\s*"/g, ""); // Empty quotes
+
   // Clean up multiple spaces
-  sanitized = sanitized.replace(/\s+/g, ' ').trim();
-  
+  sanitized = sanitized.replace(/\s+/g, " ").trim();
+
   // If after all sanitization we have only special characters or nothing, return empty
   if (/^[\s*\-^:+()""]*$/.test(sanitized)) {
-    return '';
+    return "";
   }
-  
+
   return sanitized;
 }
-

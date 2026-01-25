@@ -1,6 +1,6 @@
 /**
  * Webhook API Client
- * 
+ *
  * Provides functions for managing webhook configurations via the backend API.
  */
 
@@ -10,22 +10,23 @@ import type {
   WebhooksResponse,
   WebhookResponse,
   WebhookTestResult,
-} from '../types/webhook';
+} from "../types/webhook";
 
-const API_BASE = '/api';
+const API_BASE = "/api";
 
 /**
  * Generic fetch wrapper with error handling
  */
 async function apiFetch<T>(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
 ): Promise<T> {
-  const headers = new Headers({ 'Content-Type': 'application/json' });
+  const headers = new Headers({ "Content-Type": "application/json" });
   if (options.headers) {
-    const optHeaders = options.headers instanceof Headers
-      ? options.headers
-      : new Headers(options.headers as Record<string, string>);
+    const optHeaders =
+      options.headers instanceof Headers
+        ? options.headers
+        : new Headers(options.headers as Record<string, string>);
     optHeaders.forEach((value, key) => headers.set(key, value));
   }
 
@@ -35,8 +36,12 @@ async function apiFetch<T>(
   });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({})) as { error?: string };
-    throw new Error(errorData.error ?? `Request failed: ${String(response.status)}`);
+    const errorData = (await response.json().catch(() => ({}))) as {
+      error?: string;
+    };
+    throw new Error(
+      errorData.error ?? `Request failed: ${String(response.status)}`,
+    );
   }
 
   return response.json() as Promise<T>;
@@ -50,7 +55,7 @@ export const webhookApi = {
    * List all webhooks
    */
   async list(): Promise<Webhook[]> {
-    const data = await apiFetch<WebhooksResponse>('/webhooks');
+    const data = await apiFetch<WebhooksResponse>("/webhooks");
     return data.webhooks;
   },
 
@@ -66,8 +71,8 @@ export const webhookApi = {
    * Create a new webhook
    */
   async create(input: WebhookInput): Promise<Webhook> {
-    const data = await apiFetch<WebhookResponse>('/webhooks', {
-      method: 'POST',
+    const data = await apiFetch<WebhookResponse>("/webhooks", {
+      method: "POST",
       body: JSON.stringify(input),
     });
     return data.webhook;
@@ -78,7 +83,7 @@ export const webhookApi = {
    */
   async update(id: string, input: Partial<WebhookInput>): Promise<Webhook> {
     const data = await apiFetch<WebhookResponse>(`/webhooks/${id}`, {
-      method: 'PUT',
+      method: "PUT",
       body: JSON.stringify(input),
     });
     return data.webhook;
@@ -88,7 +93,7 @@ export const webhookApi = {
    * Delete a webhook
    */
   async delete(id: string): Promise<void> {
-    await apiFetch(`/webhooks/${id}`, { method: 'DELETE' });
+    await apiFetch(`/webhooks/${id}`, { method: "DELETE" });
   },
 
   /**
@@ -96,8 +101,7 @@ export const webhookApi = {
    */
   async test(id: string): Promise<WebhookTestResult> {
     return apiFetch<WebhookTestResult>(`/webhooks/${id}/test`, {
-      method: 'POST',
+      method: "POST",
     });
   },
 };
-

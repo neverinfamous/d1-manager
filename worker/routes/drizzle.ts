@@ -1,11 +1,11 @@
 /**
  * Drizzle Route Handlers
- * 
+ *
  * API endpoints for Drizzle ORM operations including schema introspection,
  * migration management, and schema validation.
  */
 
-import type { Env } from '../types';
+import type { Env } from "../types";
 import {
   introspectDatabase,
   validateDrizzleSchema,
@@ -13,19 +13,23 @@ import {
   generateMigrationPreview,
   type IntrospectionResult,
   type MigrationInfo,
-} from '../utils/drizzle-helpers';
+} from "../utils/drizzle-helpers";
 import {
   parseDrizzleSchema,
   compareSchemas,
   type ParsedTable,
-} from '../utils/drizzle-schema-parser';
-import { isProtectedDatabase, createProtectedDatabaseResponse, getDatabaseInfo } from '../utils/database-protection';
-import { logError, logInfo, logWarning } from '../utils/error-logger';
+} from "../utils/drizzle-schema-parser";
+import {
+  isProtectedDatabase,
+  createProtectedDatabaseResponse,
+  getDatabaseInfo,
+} from "../utils/database-protection";
+import { logError, logInfo, logWarning } from "../utils/error-logger";
 
 // Helper to create response headers with CORS
 function jsonHeaders(corsHeaders: HeadersInit): Headers {
   const headers = new Headers(corsHeaders);
-  headers.set('Content-Type', 'application/json');
+  headers.set("Content-Type", "application/json");
   return headers;
 }
 
@@ -46,31 +50,31 @@ interface D1ApiResponse {
 async function executeD1Query(
   databaseId: string,
   query: string,
-  env: Env
+  env: Env,
 ): Promise<{ results: unknown[]; meta: Record<string, unknown> }> {
   const response = await fetch(
     `https://api.cloudflare.com/client/v4/accounts/${env.ACCOUNT_ID}/d1/database/${databaseId}/query`,
     {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${env.API_KEY}`,
-        'Content-Type': 'application/json'
+        Authorization: `Bearer ${env.API_KEY}`,
+        "Content-Type": "application/json",
       },
-      body: JSON.stringify({ sql: query, params: [] })
-    }
+      body: JSON.stringify({ sql: query, params: [] }),
+    },
   );
-  
+
   if (!response.ok) {
     const errorText = await response.text();
     throw new Error(`D1 query failed: ${response.status} - ${errorText}`);
   }
-  
-  const data = await response.json() as D1ApiResponse;
-  
+
+  const data = (await response.json()) as D1ApiResponse;
+
   if (!data.success || !data.result?.[0]) {
-    throw new Error(data.errors?.[0]?.message ?? 'Unknown D1 error');
+    throw new Error(data.errors?.[0]?.message ?? "Unknown D1 error");
   }
-  
+
   return { results: data.result[0].results, meta: data.result[0].meta ?? {} };
 }
 
@@ -80,38 +84,44 @@ export async function handleDrizzleRoutes(
   url: URL,
   corsHeaders: HeadersInit,
   isLocalDev: boolean,
-  userEmail: string | null
+  userEmail: string | null,
 ): Promise<Response> {
-  logInfo('Handling Drizzle operation', {
-    module: 'drizzle',
-    operation: 'request',
+  logInfo("Handling Drizzle operation", {
+    module: "drizzle",
+    operation: "request",
     ...(userEmail !== null && { userId: userEmail }),
-    metadata: { method: request.method, path: url.pathname }
+    metadata: { method: request.method, path: url.pathname },
   });
-  
+
   // Extract database ID from URL (format: /api/drizzle/:dbId/...)
-  const pathParts = url.pathname.split('/');
+  const pathParts = url.pathname.split("/");
   const dbId = pathParts[3];
-  
+
   if (!dbId) {
-    return new Response(JSON.stringify({ 
-      error: 'Database ID required' 
-    }), { 
-      status: 400,
-      headers: jsonHeaders(corsHeaders)
-    });
+    return new Response(
+      JSON.stringify({
+        error: "Database ID required",
+      }),
+      {
+        status: 400,
+        headers: jsonHeaders(corsHeaders),
+      },
+    );
   }
 
   // Check if accessing a protected database
   if (!isLocalDev) {
     const dbInfo = await getDatabaseInfo(dbId, env);
     if (dbInfo && isProtectedDatabase(dbInfo.name)) {
-      logWarning(`Attempted Drizzle operation on protected database: ${dbInfo.name}`, {
-        module: 'drizzle',
-        operation: 'access_check',
-        databaseId: dbId,
-        databaseName: dbInfo.name
-      });
+      logWarning(
+        `Attempted Drizzle operation on protected database: ${dbInfo.name}`,
+        {
+          module: "drizzle",
+          operation: "access_check",
+          databaseId: dbId,
+          databaseName: dbInfo.name,
+        },
+      );
       return createProtectedDatabaseResponse(corsHeaders);
     }
   }
@@ -120,19 +130,23 @@ export async function handleDrizzleRoutes(
     // ====================================
     // Introspect database schema
     // ====================================
-    if (request.method === 'POST' && url.pathname === `/api/drizzle/${dbId}/introspect`) {
-      logInfo('Introspecting database schema', { 
-        module: 'drizzle', 
-        operation: 'introspect', 
-        databaseId: dbId 
+    if (
+      request.method === "POST" &&
+      url.pathname === `/api/drizzle/${dbId}/introspect`
+    ) {
+      logInfo("Introspecting database schema", {
+        module: "drizzle",
+        operation: "introspect",
+        databaseId: dbId,
       });
-      
+
       // Mock response for local development
       if (isLocalDev) {
-        return new Response(JSON.stringify({
-          result: {
-            success: true,
-            schema: `// Auto-generated Drizzle schema
+        return new Response(
+          JSON.stringify({
+            result: {
+              success: true,
+              schema: `// Auto-generated Drizzle schema
 // Generated by D1 Manager
 
 import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
@@ -147,438 +161,586 @@ export const users = sqliteTable('users', {
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 `,
-            tables: [
-              {
-                name: 'users',
-                columns: [
-                  { name: 'id', type: 'INTEGER', drizzleType: 'integer', isPrimaryKey: true, isAutoIncrement: true, isNotNull: true, defaultValue: null, isUnique: false },
-                  { name: 'name', type: 'TEXT', drizzleType: 'text', isPrimaryKey: false, isAutoIncrement: false, isNotNull: true, defaultValue: null, isUnique: false },
-                  { name: 'email', type: 'TEXT', drizzleType: 'text', isPrimaryKey: false, isAutoIncrement: false, isNotNull: true, defaultValue: null, isUnique: true },
-                  { name: 'created_at', type: 'TEXT', drizzleType: 'text', isPrimaryKey: false, isAutoIncrement: false, isNotNull: false, defaultValue: 'CURRENT_TIMESTAMP', isUnique: false }
-                ],
-                primaryKey: ['id'],
-                foreignKeys: [],
-                indexes: []
-              }
-            ]
+              tables: [
+                {
+                  name: "users",
+                  columns: [
+                    {
+                      name: "id",
+                      type: "INTEGER",
+                      drizzleType: "integer",
+                      isPrimaryKey: true,
+                      isAutoIncrement: true,
+                      isNotNull: true,
+                      defaultValue: null,
+                      isUnique: false,
+                    },
+                    {
+                      name: "name",
+                      type: "TEXT",
+                      drizzleType: "text",
+                      isPrimaryKey: false,
+                      isAutoIncrement: false,
+                      isNotNull: true,
+                      defaultValue: null,
+                      isUnique: false,
+                    },
+                    {
+                      name: "email",
+                      type: "TEXT",
+                      drizzleType: "text",
+                      isPrimaryKey: false,
+                      isAutoIncrement: false,
+                      isNotNull: true,
+                      defaultValue: null,
+                      isUnique: true,
+                    },
+                    {
+                      name: "created_at",
+                      type: "TEXT",
+                      drizzleType: "text",
+                      isPrimaryKey: false,
+                      isAutoIncrement: false,
+                      isNotNull: false,
+                      defaultValue: "CURRENT_TIMESTAMP",
+                      isUnique: false,
+                    },
+                  ],
+                  primaryKey: ["id"],
+                  foreignKeys: [],
+                  indexes: [],
+                },
+              ],
+            },
+            success: true,
+          }),
+          {
+            headers: jsonHeaders(corsHeaders),
           },
-          success: true
-        }), {
-          headers: jsonHeaders(corsHeaders)
-        });
+        );
       }
-      
-      const introspectionResult: IntrospectionResult = await introspectDatabase(dbId, env);
-      
+
+      const introspectionResult: IntrospectionResult = await introspectDatabase(
+        dbId,
+        env,
+      );
+
       if (!introspectionResult.success) {
         // Log detailed error server-side, return generic message to client
-        logWarning(`Introspection failed: ${introspectionResult.error ?? 'Unknown error'}`, {
-          module: 'drizzle',
-          operation: 'introspect',
-          databaseId: dbId
-        });
-        return new Response(JSON.stringify({ 
-          error: 'Introspection failed',
-          success: false
-        }), { 
-          status: 400,
-          headers: jsonHeaders(corsHeaders)
-        });
+        logWarning(
+          `Introspection failed: ${introspectionResult.error ?? "Unknown error"}`,
+          {
+            module: "drizzle",
+            operation: "introspect",
+            databaseId: dbId,
+          },
+        );
+        return new Response(
+          JSON.stringify({
+            error: "Introspection failed",
+            success: false,
+          }),
+          {
+            status: 400,
+            headers: jsonHeaders(corsHeaders),
+          },
+        );
       }
-      
+
       // Return only safe fields, excluding any error information
-      return new Response(JSON.stringify({
-        result: {
+      return new Response(
+        JSON.stringify({
+          result: {
+            success: true,
+            schema: introspectionResult.schema,
+            tables: introspectionResult.tables,
+          },
           success: true,
-          schema: introspectionResult.schema,
-          tables: introspectionResult.tables
+        }),
+        {
+          headers: jsonHeaders(corsHeaders),
         },
-        success: true
-      }), {
-        headers: jsonHeaders(corsHeaders)
-      });
+      );
     }
 
     // ====================================
     // Validate schema syntax
     // ====================================
-    if (request.method === 'POST' && url.pathname === `/api/drizzle/${dbId}/validate`) {
-      const body = await request.json() as { schema: string };
-      
-      logInfo('Validating Drizzle schema', { 
-        module: 'drizzle', 
-        operation: 'validate', 
-        databaseId: dbId 
+    if (
+      request.method === "POST" &&
+      url.pathname === `/api/drizzle/${dbId}/validate`
+    ) {
+      const body = (await request.json()) as { schema: string };
+
+      logInfo("Validating Drizzle schema", {
+        module: "drizzle",
+        operation: "validate",
+        databaseId: dbId,
       });
-      
+
       if (!body.schema) {
-        return new Response(JSON.stringify({ 
-          error: 'Schema content required' 
-        }), { 
-          status: 400,
-          headers: jsonHeaders(corsHeaders)
-        });
+        return new Response(
+          JSON.stringify({
+            error: "Schema content required",
+          }),
+          {
+            status: 400,
+            headers: jsonHeaders(corsHeaders),
+          },
+        );
       }
-      
+
       const validation = validateDrizzleSchema(body.schema);
-      
-      return new Response(JSON.stringify({
-        result: validation,
-        success: true
-      }), {
-        headers: jsonHeaders(corsHeaders)
-      });
+
+      return new Response(
+        JSON.stringify({
+          result: validation,
+          success: true,
+        }),
+        {
+          headers: jsonHeaders(corsHeaders),
+        },
+      );
     }
 
     // ====================================
     // Get migration status
     // ====================================
-    if (request.method === 'GET' && url.pathname === `/api/drizzle/${dbId}/migrations`) {
-      logInfo('Getting migration status', { 
-        module: 'drizzle', 
-        operation: 'migrations', 
-        databaseId: dbId 
+    if (
+      request.method === "GET" &&
+      url.pathname === `/api/drizzle/${dbId}/migrations`
+    ) {
+      logInfo("Getting migration status", {
+        module: "drizzle",
+        operation: "migrations",
+        databaseId: dbId,
       });
-      
+
       // Mock response for local development
       if (isLocalDev) {
-        return new Response(JSON.stringify({
-          result: {
-            hasMigrationsTable: true,
-            appliedMigrations: [
-              { id: 1, hash: 'abc123', created_at: new Date().toISOString() },
-              { id: 2, hash: 'def456', created_at: new Date().toISOString() }
-            ]
+        return new Response(
+          JSON.stringify({
+            result: {
+              hasMigrationsTable: true,
+              appliedMigrations: [
+                { id: 1, hash: "abc123", created_at: new Date().toISOString() },
+                { id: 2, hash: "def456", created_at: new Date().toISOString() },
+              ],
+            },
+            success: true,
+          }),
+          {
+            headers: jsonHeaders(corsHeaders),
           },
-          success: true
-        }), {
-          headers: jsonHeaders(corsHeaders)
-        });
+        );
       }
-      
-      const migrationStatus: MigrationInfo = await getMigrationStatus(dbId, env);
-      
-      return new Response(JSON.stringify({
-        result: migrationStatus,
-        success: true
-      }), {
-        headers: jsonHeaders(corsHeaders)
-      });
+
+      const migrationStatus: MigrationInfo = await getMigrationStatus(
+        dbId,
+        env,
+      );
+
+      return new Response(
+        JSON.stringify({
+          result: migrationStatus,
+          success: true,
+        }),
+        {
+          headers: jsonHeaders(corsHeaders),
+        },
+      );
     }
 
     // ====================================
     // Generate migration preview
     // ====================================
-    if (request.method === 'POST' && url.pathname === `/api/drizzle/${dbId}/generate`) {
-      logInfo('Generating migration preview', { 
-        module: 'drizzle', 
-        operation: 'generate', 
-        databaseId: dbId 
+    if (
+      request.method === "POST" &&
+      url.pathname === `/api/drizzle/${dbId}/generate`
+    ) {
+      logInfo("Generating migration preview", {
+        module: "drizzle",
+        operation: "generate",
+        databaseId: dbId,
       });
-      
+
       // First, introspect current schema
       const currentIntrospection = await introspectDatabase(dbId, env);
-      
+
       if (!currentIntrospection.success || !currentIntrospection.tables) {
-        return new Response(JSON.stringify({ 
-          error: 'Failed to introspect current schema',
-          success: false
-        }), { 
-          status: 400,
-          headers: jsonHeaders(corsHeaders)
-        });
+        return new Response(
+          JSON.stringify({
+            error: "Failed to introspect current schema",
+            success: false,
+          }),
+          {
+            status: 400,
+            headers: jsonHeaders(corsHeaders),
+          },
+        );
       }
-      
+
       // For now, return just the current schema status
       // Full migration generation would require target schema input
-      const preview = generateMigrationPreview(currentIntrospection.tables, currentIntrospection.tables);
-      
-      return new Response(JSON.stringify({
-        result: {
-          currentTables: currentIntrospection.tables.map(t => t.name),
-          preview: preview.summary,
-          statements: preview.statements
+      const preview = generateMigrationPreview(
+        currentIntrospection.tables,
+        currentIntrospection.tables,
+      );
+
+      return new Response(
+        JSON.stringify({
+          result: {
+            currentTables: currentIntrospection.tables.map((t) => t.name),
+            preview: preview.summary,
+            statements: preview.statements,
+          },
+          success: true,
+        }),
+        {
+          headers: jsonHeaders(corsHeaders),
         },
-        success: true
-      }), {
-        headers: jsonHeaders(corsHeaders)
-      });
+      );
     }
 
     // ====================================
     // Compare uploaded schema with database
     // ====================================
-    if (request.method === 'POST' && url.pathname === `/api/drizzle/${dbId}/compare`) {
-      const body = await request.json() as { schemaContent: string };
-      
-      logInfo('Comparing uploaded schema with database', { 
-        module: 'drizzle', 
-        operation: 'compare', 
-        databaseId: dbId 
+    if (
+      request.method === "POST" &&
+      url.pathname === `/api/drizzle/${dbId}/compare`
+    ) {
+      const body = (await request.json()) as { schemaContent: string };
+
+      logInfo("Comparing uploaded schema with database", {
+        module: "drizzle",
+        operation: "compare",
+        databaseId: dbId,
       });
-      
+
       if (!body.schemaContent || body.schemaContent.trim().length === 0) {
-        return new Response(JSON.stringify({ 
-          error: 'Schema content required' 
-        }), { 
-          status: 400,
-          headers: jsonHeaders(corsHeaders)
-        });
+        return new Response(
+          JSON.stringify({
+            error: "Schema content required",
+          }),
+          {
+            status: 400,
+            headers: jsonHeaders(corsHeaders),
+          },
+        );
       }
-      
+
       // Parse the uploaded schema
       const parsedSchema = parseDrizzleSchema(body.schemaContent);
-      
+
       if (!parsedSchema.success && parsedSchema.tables.length === 0) {
-        return new Response(JSON.stringify({ 
-          error: 'Failed to parse schema',
-          details: parsedSchema.errors,
-          success: false
-        }), { 
-          status: 400,
-          headers: jsonHeaders(corsHeaders)
-        });
+        return new Response(
+          JSON.stringify({
+            error: "Failed to parse schema",
+            details: parsedSchema.errors,
+            success: false,
+          }),
+          {
+            status: 400,
+            headers: jsonHeaders(corsHeaders),
+          },
+        );
       }
-      
+
       // Introspect current database
       const currentIntrospection = await introspectDatabase(dbId, env);
-      
+
       if (!currentIntrospection.success || !currentIntrospection.tables) {
-        return new Response(JSON.stringify({ 
-          error: 'Failed to introspect current database',
-          success: false
-        }), { 
-          status: 400,
-          headers: jsonHeaders(corsHeaders)
-        });
+        return new Response(
+          JSON.stringify({
+            error: "Failed to introspect current database",
+            success: false,
+          }),
+          {
+            status: 400,
+            headers: jsonHeaders(corsHeaders),
+          },
+        );
       }
-      
+
       // Convert introspected tables to ParsedTable format for comparison
-      const currentTables: ParsedTable[] = currentIntrospection.tables.map(t => ({
-        name: t.name,
-        variableName: t.name.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase()),
-        columns: t.columns.map(c => ({
-          name: c.name,
-          type: c.type,
-          drizzleType: c.drizzleType,
-          isPrimaryKey: c.isPrimaryKey,
-          isAutoIncrement: c.isAutoIncrement,
-          isNotNull: c.isNotNull,
-          isUnique: c.isUnique,
-          defaultValue: c.defaultValue,
-          references: null
-        }))
-      }));
-      
+      const currentTables: ParsedTable[] = currentIntrospection.tables.map(
+        (t) => ({
+          name: t.name,
+          variableName: t.name.replace(/_([a-z])/g, (_, letter: string) =>
+            letter.toUpperCase(),
+          ),
+          columns: t.columns.map((c) => ({
+            name: c.name,
+            type: c.type,
+            drizzleType: c.drizzleType,
+            isPrimaryKey: c.isPrimaryKey,
+            isAutoIncrement: c.isAutoIncrement,
+            isNotNull: c.isNotNull,
+            isUnique: c.isUnique,
+            defaultValue: c.defaultValue,
+            references: null,
+          })),
+        }),
+      );
+
       // Compare schemas
       const comparison = compareSchemas(parsedSchema.tables, currentTables);
-      
-      return new Response(JSON.stringify({
-        result: {
-          uploadedTables: parsedSchema.tables.map(t => t.name),
-          currentTables: currentTables.map(t => t.name),
-          differences: comparison.differences,
-          sqlStatements: comparison.sqlStatements,
-          summary: comparison.summary,
-          warnings: comparison.warnings,
-          parseErrors: parsedSchema.errors
+
+      return new Response(
+        JSON.stringify({
+          result: {
+            uploadedTables: parsedSchema.tables.map((t) => t.name),
+            currentTables: currentTables.map((t) => t.name),
+            differences: comparison.differences,
+            sqlStatements: comparison.sqlStatements,
+            summary: comparison.summary,
+            warnings: comparison.warnings,
+            parseErrors: parsedSchema.errors,
+          },
+          success: true,
+        }),
+        {
+          headers: jsonHeaders(corsHeaders),
         },
-        success: true
-      }), {
-        headers: jsonHeaders(corsHeaders)
-      });
+      );
     }
 
     // ====================================
     // Check schema against database
     // ====================================
-    if (request.method === 'POST' && url.pathname === `/api/drizzle/${dbId}/check`) {
-      const body = await request.json() as { schema?: string };
-      
-      logInfo('Checking schema against database', { 
-        module: 'drizzle', 
-        operation: 'check', 
-        databaseId: dbId 
+    if (
+      request.method === "POST" &&
+      url.pathname === `/api/drizzle/${dbId}/check`
+    ) {
+      const body = (await request.json()) as { schema?: string };
+
+      logInfo("Checking schema against database", {
+        module: "drizzle",
+        operation: "check",
+        databaseId: dbId,
       });
-      
+
       // Introspect current database
       const currentSchema = await introspectDatabase(dbId, env);
-      
+
       if (!currentSchema.success) {
-        return new Response(JSON.stringify({ 
-          error: 'Failed to introspect database',
-          success: false
-        }), { 
-          status: 400,
-          headers: jsonHeaders(corsHeaders)
-        });
+        return new Response(
+          JSON.stringify({
+            error: "Failed to introspect database",
+            success: false,
+          }),
+          {
+            status: 400,
+            headers: jsonHeaders(corsHeaders),
+          },
+        );
       }
-      
+
       // If schema provided, validate it
       let schemaValidation = null;
       if (body.schema) {
         schemaValidation = validateDrizzleSchema(body.schema);
       }
-      
-      return new Response(JSON.stringify({
-        result: {
-          databaseSchema: currentSchema,
-          schemaValidation,
-          tableCount: currentSchema.tables?.length ?? 0
+
+      return new Response(
+        JSON.stringify({
+          result: {
+            databaseSchema: currentSchema,
+            schemaValidation,
+            tableCount: currentSchema.tables?.length ?? 0,
+          },
+          success: true,
+        }),
+        {
+          headers: jsonHeaders(corsHeaders),
         },
-        success: true
-      }), {
-        headers: jsonHeaders(corsHeaders)
-      });
+      );
     }
 
     // ====================================
     // Push schema changes (execute SQL)
     // ====================================
-    if (request.method === 'POST' && url.pathname === `/api/drizzle/${dbId}/push`) {
-      const body = await request.json() as { statements: string[]; dryRun?: boolean };
-      
-      logInfo('Pushing schema changes', { 
-        module: 'drizzle', 
-        operation: 'push', 
+    if (
+      request.method === "POST" &&
+      url.pathname === `/api/drizzle/${dbId}/push`
+    ) {
+      const body = (await request.json()) as {
+        statements: string[];
+        dryRun?: boolean;
+      };
+
+      logInfo("Pushing schema changes", {
+        module: "drizzle",
+        operation: "push",
         databaseId: dbId,
-        metadata: { statementCount: body.statements?.length ?? 0, dryRun: body.dryRun }
+        metadata: {
+          statementCount: body.statements?.length ?? 0,
+          dryRun: body.dryRun,
+        },
       });
-      
+
       if (body.statements.length === 0) {
-        return new Response(JSON.stringify({ 
-          error: 'No statements provided' 
-        }), { 
-          status: 400,
-          headers: jsonHeaders(corsHeaders)
-        });
+        return new Response(
+          JSON.stringify({
+            error: "No statements provided",
+          }),
+          {
+            status: 400,
+            headers: jsonHeaders(corsHeaders),
+          },
+        );
       }
-      
+
       // Dry run - just return the statements that would be executed
       if (body.dryRun === true) {
-        return new Response(JSON.stringify({
-          result: {
-            statements: body.statements,
-            dryRun: true,
-            message: 'Dry run - no changes applied'
+        return new Response(
+          JSON.stringify({
+            result: {
+              statements: body.statements,
+              dryRun: true,
+              message: "Dry run - no changes applied",
+            },
+            success: true,
+          }),
+          {
+            headers: jsonHeaders(corsHeaders),
           },
-          success: true
-        }), {
-          headers: jsonHeaders(corsHeaders)
-        });
+        );
       }
-      
+
       // Mock response for local development
       if (isLocalDev) {
-        return new Response(JSON.stringify({
-          result: {
-            executedStatements: body.statements.length,
-            success: true
+        return new Response(
+          JSON.stringify({
+            result: {
+              executedStatements: body.statements.length,
+              success: true,
+            },
+            success: true,
+          }),
+          {
+            headers: jsonHeaders(corsHeaders),
           },
-          success: true
-        }), {
-          headers: jsonHeaders(corsHeaders)
-        });
+        );
       }
-      
+
       // Execute statements
-      const results: { statement: string; success: boolean; error?: string }[] = [];
-      
+      const results: { statement: string; success: boolean; error?: string }[] =
+        [];
+
       for (const statement of body.statements) {
         try {
           await executeD1Query(dbId, statement, env);
           results.push({ statement, success: true });
         } catch (error) {
-          results.push({ 
-            statement, 
-            success: false, 
-            error: error instanceof Error ? error.message : String(error) 
+          results.push({
+            statement,
+            success: false,
+            error: error instanceof Error ? error.message : String(error),
           });
           // Stop on first error for safety
           break;
         }
       }
-      
-      const allSucceeded = results.every(r => r.success);
-      
-      return new Response(JSON.stringify({
-        result: {
-          results,
-          executedStatements: results.filter(r => r.success).length,
-          totalStatements: body.statements.length,
-          allSucceeded
+
+      const allSucceeded = results.every((r) => r.success);
+
+      return new Response(
+        JSON.stringify({
+          result: {
+            results,
+            executedStatements: results.filter((r) => r.success).length,
+            totalStatements: body.statements.length,
+            allSucceeded,
+          },
+          success: allSucceeded,
+        }),
+        {
+          status: allSucceeded ? 200 : 400,
+          headers: jsonHeaders(corsHeaders),
         },
-        success: allSucceeded
-      }), {
-        status: allSucceeded ? 200 : 400,
-        headers: jsonHeaders(corsHeaders)
-      });
+      );
     }
 
     // ====================================
     // Apply migration (record in migrations table)
     // ====================================
-    if (request.method === 'POST' && url.pathname === `/api/drizzle/${dbId}/migrate`) {
-      const body = await request.json() as { 
+    if (
+      request.method === "POST" &&
+      url.pathname === `/api/drizzle/${dbId}/migrate`
+    ) {
+      const body = (await request.json()) as {
         statements: string[];
         hash: string;
         dryRun?: boolean;
       };
-      
-      logInfo('Applying migration', { 
-        module: 'drizzle', 
-        operation: 'migrate', 
+
+      logInfo("Applying migration", {
+        module: "drizzle",
+        operation: "migrate",
         databaseId: dbId,
-        metadata: { hash: body.hash, dryRun: body.dryRun }
+        metadata: { hash: body.hash, dryRun: body.dryRun },
       });
-      
+
       if (body.statements.length === 0) {
-        return new Response(JSON.stringify({ 
-          error: 'No migration statements provided' 
-        }), { 
-          status: 400,
-          headers: jsonHeaders(corsHeaders)
-        });
+        return new Response(
+          JSON.stringify({
+            error: "No migration statements provided",
+          }),
+          {
+            status: 400,
+            headers: jsonHeaders(corsHeaders),
+          },
+        );
       }
-      
+
       if (!body.hash) {
-        return new Response(JSON.stringify({ 
-          error: 'Migration hash required' 
-        }), { 
-          status: 400,
-          headers: jsonHeaders(corsHeaders)
-        });
+        return new Response(
+          JSON.stringify({
+            error: "Migration hash required",
+          }),
+          {
+            status: 400,
+            headers: jsonHeaders(corsHeaders),
+          },
+        );
       }
-      
+
       // Dry run mode
       if (body.dryRun) {
-        return new Response(JSON.stringify({
-          result: {
-            statements: body.statements,
-            hash: body.hash,
-            dryRun: true,
-            message: 'Dry run - no changes applied'
+        return new Response(
+          JSON.stringify({
+            result: {
+              statements: body.statements,
+              hash: body.hash,
+              dryRun: true,
+              message: "Dry run - no changes applied",
+            },
+            success: true,
+          }),
+          {
+            headers: jsonHeaders(corsHeaders),
           },
-          success: true
-        }), {
-          headers: jsonHeaders(corsHeaders)
-        });
+        );
       }
-      
+
       // Mock response for local development
       if (isLocalDev) {
-        return new Response(JSON.stringify({
-          result: {
-            migrationApplied: true,
-            hash: body.hash,
-            executedStatements: body.statements.length
+        return new Response(
+          JSON.stringify({
+            result: {
+              migrationApplied: true,
+              hash: body.hash,
+              executedStatements: body.statements.length,
+            },
+            success: true,
+          }),
+          {
+            headers: jsonHeaders(corsHeaders),
           },
-          success: true
-        }), {
-          headers: jsonHeaders(corsHeaders)
-        });
+        );
       }
-      
+
       try {
         // Ensure migrations table exists
         await executeD1Query(
@@ -588,78 +750,95 @@ export type NewUser = typeof users.$inferInsert;
             hash TEXT NOT NULL,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
           )`,
-          env
+          env,
         );
-        
+
         // Check if migration already applied
         const existingMigration = await executeD1Query(
           dbId,
           `SELECT id FROM __drizzle_migrations WHERE hash = '${body.hash}'`,
-          env
+          env,
         );
-        
+
         if ((existingMigration.results as unknown[]).length > 0) {
-          return new Response(JSON.stringify({
-            result: {
-              message: 'Migration already applied',
-              hash: body.hash,
-              skipped: true
+          return new Response(
+            JSON.stringify({
+              result: {
+                message: "Migration already applied",
+                hash: body.hash,
+                skipped: true,
+              },
+              success: true,
+            }),
+            {
+              headers: jsonHeaders(corsHeaders),
             },
-            success: true
-          }), {
-            headers: jsonHeaders(corsHeaders)
-          });
+          );
         }
-        
+
         // Execute migration statements
         for (const statement of body.statements) {
           await executeD1Query(dbId, statement, env);
         }
-        
+
         // Record migration
         await executeD1Query(
           dbId,
           `INSERT INTO __drizzle_migrations (hash) VALUES ('${body.hash}')`,
-          env
+          env,
         );
-        
-        return new Response(JSON.stringify({
-          result: {
-            migrationApplied: true,
-            hash: body.hash,
-            executedStatements: body.statements.length
+
+        return new Response(
+          JSON.stringify({
+            result: {
+              migrationApplied: true,
+              hash: body.hash,
+              executedStatements: body.statements.length,
+            },
+            success: true,
+          }),
+          {
+            headers: jsonHeaders(corsHeaders),
           },
-          success: true
-        }), {
-          headers: jsonHeaders(corsHeaders)
-        });
+        );
       } catch (error) {
-        void logError(env, error instanceof Error ? error : String(error), {
-          module: 'drizzle',
-          operation: 'migrate',
-          databaseId: dbId
-        }, isLocalDev);
-        
-        return new Response(JSON.stringify({ 
-          error: error instanceof Error ? error.message : 'Migration failed',
-          success: false
-        }), { 
-          status: 400,
-          headers: jsonHeaders(corsHeaders)
-        });
+        void logError(
+          env,
+          error instanceof Error ? error : String(error),
+          {
+            module: "drizzle",
+            operation: "migrate",
+            databaseId: dbId,
+          },
+          isLocalDev,
+        );
+
+        return new Response(
+          JSON.stringify({
+            error: error instanceof Error ? error.message : "Migration failed",
+            success: false,
+          }),
+          {
+            status: 400,
+            headers: jsonHeaders(corsHeaders),
+          },
+        );
       }
     }
 
     // ====================================
     // Export schema as TypeScript file
     // ====================================
-    if (request.method === 'GET' && url.pathname === `/api/drizzle/${dbId}/export`) {
-      logInfo('Exporting schema', { 
-        module: 'drizzle', 
-        operation: 'export', 
-        databaseId: dbId 
+    if (
+      request.method === "GET" &&
+      url.pathname === `/api/drizzle/${dbId}/export`
+    ) {
+      logInfo("Exporting schema", {
+        module: "drizzle",
+        operation: "export",
+        databaseId: dbId,
       });
-      
+
       // Mock response for local development
       if (isLocalDev) {
         const mockSchema = `// Auto-generated Drizzle schema
@@ -676,54 +855,66 @@ export const users = sqliteTable('users', {
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 `;
-        
+
         const headers = new Headers(corsHeaders);
-        headers.set('Content-Type', 'text/plain; charset=utf-8');
-        headers.set('Content-Disposition', 'attachment; filename="schema.ts"');
-        
+        headers.set("Content-Type", "text/plain; charset=utf-8");
+        headers.set("Content-Disposition", 'attachment; filename="schema.ts"');
+
         return new Response(mockSchema, { headers });
       }
-      
+
       const introspectionResult = await introspectDatabase(dbId, env);
-      
+
       if (!introspectionResult.success || !introspectionResult.schema) {
-        return new Response(JSON.stringify({ 
-          error: 'Failed to generate schema' 
-        }), { 
-          status: 400,
-          headers: jsonHeaders(corsHeaders)
-        });
+        return new Response(
+          JSON.stringify({
+            error: "Failed to generate schema",
+          }),
+          {
+            status: 400,
+            headers: jsonHeaders(corsHeaders),
+          },
+        );
       }
-      
+
       const headers = new Headers(corsHeaders);
-      headers.set('Content-Type', 'text/plain; charset=utf-8');
-      headers.set('Content-Disposition', 'attachment; filename="schema.ts"');
-      
+      headers.set("Content-Type", "text/plain; charset=utf-8");
+      headers.set("Content-Disposition", 'attachment; filename="schema.ts"');
+
       return new Response(introspectionResult.schema, { headers });
     }
 
     // Route not found
-    return new Response(JSON.stringify({ 
-      error: 'Route not found' 
-    }), { 
-      status: 404,
-      headers: jsonHeaders(corsHeaders)
-    });
-
+    return new Response(
+      JSON.stringify({
+        error: "Route not found",
+      }),
+      {
+        status: 404,
+        headers: jsonHeaders(corsHeaders),
+      },
+    );
   } catch (err) {
-    void logError(env, err instanceof Error ? err : String(err), {
-      module: 'drizzle',
-      operation: 'request',
-      databaseId: dbId
-    }, isLocalDev);
-    
-    return new Response(JSON.stringify({ 
-      error: 'Drizzle operation failed',
-      message: 'Unable to complete Drizzle operation. Please try again.'
-    }), { 
-      status: 500,
-      headers: jsonHeaders(corsHeaders)
-    });
+    void logError(
+      env,
+      err instanceof Error ? err : String(err),
+      {
+        module: "drizzle",
+        operation: "request",
+        databaseId: dbId,
+      },
+      isLocalDev,
+    );
+
+    return new Response(
+      JSON.stringify({
+        error: "Drizzle operation failed",
+        message: "Unable to complete Drizzle operation. Please try again.",
+      }),
+      {
+        status: 500,
+        headers: jsonHeaders(corsHeaders),
+      },
+    );
   }
 }
-

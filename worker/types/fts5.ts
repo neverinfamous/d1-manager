@@ -1,11 +1,11 @@
 /**
  * FTS5 (Full-Text Search 5) Type Definitions
- * 
+ *
  * Type definitions for FTS5 virtual table configuration, search parameters,
  * and result structures.
  */
 
-export type TokenizerType = 'unicode61' | 'porter' | 'trigram' | 'ascii';
+export type TokenizerType = "unicode61" | "porter" | "trigram" | "ascii";
 
 export interface TokenizerParameters {
   // Unicode61 options
@@ -13,10 +13,10 @@ export interface TokenizerParameters {
   categories?: string; // Space-separated list of Unicode categories
   tokenchars?: string; // Additional characters to consider as tokens
   separators?: string; // Characters to treat as separators
-  
+
   // Porter stemmer options (inherits from unicode61)
   // No additional options beyond unicode61
-  
+
   // Trigram options
   case_sensitive?: number; // 0 or 1 (default: 0)
 }
@@ -49,7 +49,7 @@ export interface FTS5TableConfig {
 
 export interface FTS5TableInfo {
   name: string;
-  type: 'fts5';
+  type: "fts5";
   columns: string[];
   tokenizer: TokenizerConfig;
   contentTable?: string;
@@ -63,7 +63,7 @@ export interface FTS5SearchParams {
   columns?: string[]; // Search in specific columns only
   limit?: number;
   offset?: number;
-  rankingFunction?: 'bm25' | 'bm25custom';
+  rankingFunction?: "bm25" | "bm25custom";
   // BM25 parameters (only for bm25custom)
   bm25_k1?: number; // Term frequency saturation (default: 1.2)
   bm25_b?: number; // Length normalization (default: 0.75)
@@ -113,7 +113,6 @@ export interface FTS5CreateFromTableParams {
 
 export interface FTS5Trigger {
   name: string;
-  event: 'INSERT' | 'UPDATE' | 'DELETE';
+  event: "INSERT" | "UPDATE" | "DELETE";
   sql: string;
 }
-

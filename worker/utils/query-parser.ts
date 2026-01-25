@@ -1,11 +1,11 @@
 /**
  * SQL Query Parser for Index Analyzer
- * 
+ *
  * Extracts columns used in WHERE, JOIN, ORDER BY, and GROUP BY clauses
  * from SQL query strings to identify indexing opportunities.
  */
 
-import { logWarning } from './error-logger';
+import { logWarning } from "./error-logger";
 
 export interface ParsedQuery {
   whereColumns: string[];
@@ -15,13 +15,19 @@ export interface ParsedQuery {
   tables: string[];
 }
 
-export type ColumnUsageFrequency = Record<string, Record<string, {
-  whereCount: number;
-  joinCount: number;
-  orderByCount: number;
-  groupByCount: number;
-  totalCount: number;
-}>>;
+export type ColumnUsageFrequency = Record<
+  string,
+  Record<
+    string,
+    {
+      whereCount: number;
+      joinCount: number;
+      orderByCount: number;
+      groupByCount: number;
+      totalCount: number;
+    }
+  >
+>;
 
 /**
  * Parse a SQL query to extract column references
@@ -37,9 +43,9 @@ export function parseQuery(sql: string): ParsedQuery {
 
   // Normalize SQL: remove comments, extra spaces, and normalize to uppercase for parsing
   const normalizedSQL = sql
-    .replace(/--[^\n]*/g, '') // Remove single-line comments
-    .replace(/\/\*[\s\S]*?\*\//g, '') // Remove multi-line comments
-    .replace(/\s+/g, ' ') // Normalize whitespace
+    .replace(/--[^\n]*/g, "") // Remove single-line comments
+    .replace(/\/\*[\s\S]*?\*\//g, "") // Remove multi-line comments
+    .replace(/\s+/g, " ") // Normalize whitespace
     .trim();
 
   // Extract tables from FROM and JOIN clauses
@@ -65,7 +71,7 @@ export function parseQuery(sql: string): ParsedQuery {
  */
 function extractTables(sql: string): string[] {
   const tables: string[] = [];
-  
+
   // Match FROM clause: FROM table_name or FROM table_name AS alias
   const fromMatch = /\bFROM\s+([a-zA-Z_][a-zA-Z0-9_]*)/i.exec(sql);
   if (fromMatch?.[1]) {
@@ -73,7 +79,9 @@ function extractTables(sql: string): string[] {
   }
 
   // Match JOIN clauses: JOIN table_name
-  const joinMatches = sql.matchAll(/\b(?:INNER\s+JOIN|LEFT\s+JOIN|RIGHT\s+JOIN|FULL\s+JOIN|JOIN)\s+([a-zA-Z_][a-zA-Z0-9_]*)/gi);
+  const joinMatches = sql.matchAll(
+    /\b(?:INNER\s+JOIN|LEFT\s+JOIN|RIGHT\s+JOIN|FULL\s+JOIN|JOIN)\s+([a-zA-Z_][a-zA-Z0-9_]*)/gi,
+  );
   for (const match of joinMatches) {
     if (match[1]) {
       tables.push(match[1]);
@@ -88,24 +96,29 @@ function extractTables(sql: string): string[] {
  */
 function extractWhereColumns(sql: string): string[] {
   const columns: string[] = [];
-  
+
   // Find WHERE clause
-  const whereMatch = /\bWHERE\s+(.*?)(?:\bGROUP\s+BY|\bORDER\s+BY|\bLIMIT|\bOFFSET|$)/is.exec(sql);
+  const whereMatch =
+    /\bWHERE\s+(.*?)(?:\bGROUP\s+BY|\bORDER\s+BY|\bLIMIT|\bOFFSET|$)/is.exec(
+      sql,
+    );
   if (!whereMatch?.[1]) return columns;
 
   const whereClause = whereMatch[1];
 
   // Match column references: table.column or column
   // Handles: column = ?, table.column = ?, column IN (...), etc.
-  const columnMatches = whereClause.matchAll(/\b([a-zA-Z_][a-zA-Z0-9_]*\.)?([a-zA-Z_][a-zA-Z0-9_]*)\s*(?:=|<|>|<=|>=|!=|<>|LIKE|IN|IS|BETWEEN)/gi);
-  
+  const columnMatches = whereClause.matchAll(
+    /\b([a-zA-Z_][a-zA-Z0-9_]*\.)?([a-zA-Z_][a-zA-Z0-9_]*)\s*(?:=|<|>|<=|>=|!=|<>|LIKE|IN|IS|BETWEEN)/gi,
+  );
+
   for (const match of columnMatches) {
-    const tableName = match[1] ? match[1].replace('.', '') : null;
+    const tableName = match[1] ? match[1].replace(".", "") : null;
     const columnName = match[2];
-    
+
     // Skip SQL keywords or undefined columns
     if (!columnName || isSQLKeyword(columnName)) continue;
-    
+
     if (tableName) {
       columns.push(`${tableName}.${columnName}`);
     } else {
@@ -121,24 +134,28 @@ function extractWhereColumns(sql: string): string[] {
  */
 function extractJoinColumns(sql: string): string[] {
   const columns: string[] = [];
-  
+
   // Find all JOIN...ON clauses
-  const joinMatches = sql.matchAll(/\b(?:INNER\s+JOIN|LEFT\s+JOIN|RIGHT\s+JOIN|FULL\s+JOIN|JOIN)\s+[a-zA-Z_][a-zA-Z0-9_]*\s+(?:AS\s+[a-zA-Z_][a-zA-Z0-9_]*\s+)?ON\s+(.*?)(?:\bINNER\s+JOIN|\bLEFT\s+JOIN|\bRIGHT\s+JOIN|\bFULL\s+JOIN|\bJOIN|\bWHERE|\bGROUP\s+BY|\bORDER\s+BY|\bLIMIT|$)/gis);
-  
+  const joinMatches = sql.matchAll(
+    /\b(?:INNER\s+JOIN|LEFT\s+JOIN|RIGHT\s+JOIN|FULL\s+JOIN|JOIN)\s+[a-zA-Z_][a-zA-Z0-9_]*\s+(?:AS\s+[a-zA-Z_][a-zA-Z0-9_]*\s+)?ON\s+(.*?)(?:\bINNER\s+JOIN|\bLEFT\s+JOIN|\bRIGHT\s+JOIN|\bFULL\s+JOIN|\bJOIN|\bWHERE|\bGROUP\s+BY|\bORDER\s+BY|\bLIMIT|$)/gis,
+  );
+
   for (const match of joinMatches) {
     const onClause = match[1];
     if (!onClause) continue;
-    
+
     // Extract columns from ON condition: table1.col1 = table2.col2
-    const columnMatches = onClause.matchAll(/\b([a-zA-Z_][a-zA-Z0-9_]*\.)([a-zA-Z_][a-zA-Z0-9_]*)/g);
-    
+    const columnMatches = onClause.matchAll(
+      /\b([a-zA-Z_][a-zA-Z0-9_]*\.)([a-zA-Z_][a-zA-Z0-9_]*)/g,
+    );
+
     for (const colMatch of columnMatches) {
       const tablePrefix = colMatch[1];
       const columnName = colMatch[2];
-      
+
       if (!tablePrefix || !columnName) continue;
-      const tableName = tablePrefix.replace('.', '');
-      
+      const tableName = tablePrefix.replace(".", "");
+
       if (!isSQLKeyword(columnName)) {
         columns.push(`${tableName}.${columnName}`);
       }
@@ -153,7 +170,7 @@ function extractJoinColumns(sql: string): string[] {
  */
 function extractOrderByColumns(sql: string): string[] {
   const columns: string[] = [];
-  
+
   // Find ORDER BY clause
   const orderByMatch = /\bORDER\s+BY\s+(.*?)(?:\bLIMIT|\bOFFSET|$)/is.exec(sql);
   if (!orderByMatch?.[1]) return columns;
@@ -161,17 +178,23 @@ function extractOrderByColumns(sql: string): string[] {
   const orderByClause = orderByMatch[1];
 
   // Match columns: column ASC/DESC or table.column ASC/DESC
-  const columnMatches = orderByClause.matchAll(/\b([a-zA-Z_][a-zA-Z0-9_]*\.)?([a-zA-Z_][a-zA-Z0-9_]*)/g);
-  
+  const columnMatches = orderByClause.matchAll(
+    /\b([a-zA-Z_][a-zA-Z0-9_]*\.)?([a-zA-Z_][a-zA-Z0-9_]*)/g,
+  );
+
   for (const match of columnMatches) {
-    const tableName = match[1] ? match[1].replace('.', '') : null;
+    const tableName = match[1] ? match[1].replace(".", "") : null;
     const columnName = match[2];
-    
+
     // Skip undefined, ASC/DESC keywords
     if (!columnName) continue;
-    if (columnName.toUpperCase() === 'ASC' || columnName.toUpperCase() === 'DESC') continue;
+    if (
+      columnName.toUpperCase() === "ASC" ||
+      columnName.toUpperCase() === "DESC"
+    )
+      continue;
     if (isSQLKeyword(columnName)) continue;
-    
+
     if (tableName) {
       columns.push(`${tableName}.${columnName}`);
     } else {
@@ -187,22 +210,27 @@ function extractOrderByColumns(sql: string): string[] {
  */
 function extractGroupByColumns(sql: string): string[] {
   const columns: string[] = [];
-  
+
   // Find GROUP BY clause
-  const groupByMatch = /\bGROUP\s+BY\s+(.*?)(?:\bHAVING|\bORDER\s+BY|\bLIMIT|\bOFFSET|$)/is.exec(sql);
+  const groupByMatch =
+    /\bGROUP\s+BY\s+(.*?)(?:\bHAVING|\bORDER\s+BY|\bLIMIT|\bOFFSET|$)/is.exec(
+      sql,
+    );
   if (!groupByMatch?.[1]) return columns;
 
   const groupByClause = groupByMatch[1];
 
   // Match columns: column or table.column
-  const columnMatches = groupByClause.matchAll(/\b([a-zA-Z_][a-zA-Z0-9_]*\.)?([a-zA-Z_][a-zA-Z0-9_]*)/g);
-  
+  const columnMatches = groupByClause.matchAll(
+    /\b([a-zA-Z_][a-zA-Z0-9_]*\.)?([a-zA-Z_][a-zA-Z0-9_]*)/g,
+  );
+
   for (const match of columnMatches) {
-    const tableName = match[1] ? match[1].replace('.', '') : null;
+    const tableName = match[1] ? match[1].replace(".", "") : null;
     const columnName = match[2];
-    
+
     if (!columnName || isSQLKeyword(columnName)) continue;
-    
+
     if (tableName) {
       columns.push(`${tableName}.${columnName}`);
     } else {
@@ -218,28 +246,80 @@ function extractGroupByColumns(sql: string): string[] {
  */
 function isSQLKeyword(word: string): boolean {
   const keywords = [
-    'SELECT', 'FROM', 'WHERE', 'JOIN', 'INNER', 'LEFT', 'RIGHT', 'FULL', 'OUTER',
-    'ON', 'AND', 'OR', 'NOT', 'IN', 'LIKE', 'BETWEEN', 'IS', 'NULL', 'AS',
-    'GROUP', 'BY', 'HAVING', 'ORDER', 'ASC', 'DESC', 'LIMIT', 'OFFSET',
-    'INSERT', 'UPDATE', 'DELETE', 'CREATE', 'DROP', 'ALTER', 'TABLE',
-    'INDEX', 'VIEW', 'PRAGMA', 'EXPLAIN', 'DISTINCT', 'COUNT', 'SUM', 'AVG',
-    'MIN', 'MAX', 'CASE', 'WHEN', 'THEN', 'ELSE', 'END', 'CAST', 'UNION',
-    'INTERSECT', 'EXCEPT', 'EXISTS', 'ALL', 'ANY', 'SOME',
+    "SELECT",
+    "FROM",
+    "WHERE",
+    "JOIN",
+    "INNER",
+    "LEFT",
+    "RIGHT",
+    "FULL",
+    "OUTER",
+    "ON",
+    "AND",
+    "OR",
+    "NOT",
+    "IN",
+    "LIKE",
+    "BETWEEN",
+    "IS",
+    "NULL",
+    "AS",
+    "GROUP",
+    "BY",
+    "HAVING",
+    "ORDER",
+    "ASC",
+    "DESC",
+    "LIMIT",
+    "OFFSET",
+    "INSERT",
+    "UPDATE",
+    "DELETE",
+    "CREATE",
+    "DROP",
+    "ALTER",
+    "TABLE",
+    "INDEX",
+    "VIEW",
+    "PRAGMA",
+    "EXPLAIN",
+    "DISTINCT",
+    "COUNT",
+    "SUM",
+    "AVG",
+    "MIN",
+    "MAX",
+    "CASE",
+    "WHEN",
+    "THEN",
+    "ELSE",
+    "END",
+    "CAST",
+    "UNION",
+    "INTERSECT",
+    "EXCEPT",
+    "EXISTS",
+    "ALL",
+    "ANY",
+    "SOME",
   ];
-  
+
   return keywords.includes(word.toUpperCase());
 }
 
 /**
  * Analyze multiple queries and aggregate column usage frequency
  */
-export function analyzeQueryPatterns(queries: { query: string; table?: string }[]): ColumnUsageFrequency {
+export function analyzeQueryPatterns(
+  queries: { query: string; table?: string }[],
+): ColumnUsageFrequency {
   const frequency: ColumnUsageFrequency = {};
 
   for (const { query } of queries) {
     try {
       const parsed = parseQuery(query);
-      
+
       // For each table mentioned in the query
       for (const table of parsed.tables) {
         frequency[table] ??= {};
@@ -248,7 +328,13 @@ export function analyzeQueryPatterns(queries: { query: string; table?: string }[
         for (const col of parsed.whereColumns) {
           const { table: colTable, column } = parseColumnReference(col, table);
           if (colTable === table) {
-            frequency[table][column] ??= { whereCount: 0, joinCount: 0, orderByCount: 0, groupByCount: 0, totalCount: 0 };
+            frequency[table][column] ??= {
+              whereCount: 0,
+              joinCount: 0,
+              orderByCount: 0,
+              groupByCount: 0,
+              totalCount: 0,
+            };
             frequency[table][column].whereCount++;
             frequency[table][column].totalCount++;
           }
@@ -258,7 +344,13 @@ export function analyzeQueryPatterns(queries: { query: string; table?: string }[
         for (const col of parsed.joinColumns) {
           const { table: colTable, column } = parseColumnReference(col, table);
           if (colTable === table) {
-            frequency[table][column] ??= { whereCount: 0, joinCount: 0, orderByCount: 0, groupByCount: 0, totalCount: 0 };
+            frequency[table][column] ??= {
+              whereCount: 0,
+              joinCount: 0,
+              orderByCount: 0,
+              groupByCount: 0,
+              totalCount: 0,
+            };
             frequency[table][column].joinCount++;
             frequency[table][column].totalCount++;
           }
@@ -268,7 +360,13 @@ export function analyzeQueryPatterns(queries: { query: string; table?: string }[
         for (const col of parsed.orderByColumns) {
           const { table: colTable, column } = parseColumnReference(col, table);
           if (colTable === table) {
-            frequency[table][column] ??= { whereCount: 0, joinCount: 0, orderByCount: 0, groupByCount: 0, totalCount: 0 };
+            frequency[table][column] ??= {
+              whereCount: 0,
+              joinCount: 0,
+              orderByCount: 0,
+              groupByCount: 0,
+              totalCount: 0,
+            };
             frequency[table][column].orderByCount++;
             frequency[table][column].totalCount++;
           }
@@ -278,7 +376,13 @@ export function analyzeQueryPatterns(queries: { query: string; table?: string }[
         for (const col of parsed.groupByColumns) {
           const { table: colTable, column } = parseColumnReference(col, table);
           if (colTable === table) {
-            frequency[table][column] ??= { whereCount: 0, joinCount: 0, orderByCount: 0, groupByCount: 0, totalCount: 0 };
+            frequency[table][column] ??= {
+              whereCount: 0,
+              joinCount: 0,
+              orderByCount: 0,
+              groupByCount: 0,
+              totalCount: 0,
+            };
             frequency[table][column].groupByCount++;
             frequency[table][column].totalCount++;
           }
@@ -286,11 +390,16 @@ export function analyzeQueryPatterns(queries: { query: string; table?: string }[
       }
     } catch (error) {
       // Skip queries that fail to parse
-      logWarning(`Failed to parse query: ${error instanceof Error ? error.message : String(error)}`, {
-        module: 'query_parser',
-        operation: 'analyze_patterns',
-        metadata: { error: error instanceof Error ? error.message : String(error) }
-      });
+      logWarning(
+        `Failed to parse query: ${error instanceof Error ? error.message : String(error)}`,
+        {
+          module: "query_parser",
+          operation: "analyze_patterns",
+          metadata: {
+            error: error instanceof Error ? error.message : String(error),
+          },
+        },
+      );
     }
   }
 
@@ -300,13 +409,15 @@ export function analyzeQueryPatterns(queries: { query: string; table?: string }[
 /**
  * Parse column reference to extract table and column name
  */
-function parseColumnReference(colRef: string, defaultTable: string): { table: string; column: string } {
-  if (colRef.includes('.')) {
-    const parts = colRef.split('.');
+function parseColumnReference(
+  colRef: string,
+  defaultTable: string,
+): { table: string; column: string } {
+  if (colRef.includes(".")) {
+    const parts = colRef.split(".");
     const table = parts[0] ?? defaultTable;
     const column = parts[1] ?? colRef;
     return { table, column };
   }
   return { table: defaultTable, column: colRef };
 }
-

@@ -1,25 +1,58 @@
 /**
  * WebhookManager Component
- * 
+ *
  * Provides a UI for managing webhook configurations.
  * Supports creating, editing, deleting, and testing webhooks.
  */
 
-import { useState, useEffect, useCallback } from 'react';
-import { Button } from './ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
-import { Input } from './ui/input';
-import { Label } from './ui/label';
-import { Checkbox } from './ui/checkbox';
-import { webhookApi } from '../services/webhookApi';
-import type { Webhook, WebhookEventType, WebhookInput } from '../types/webhook';
-import { ALL_WEBHOOK_EVENTS, WEBHOOK_EVENT_LABELS, WEBHOOK_EVENT_DESCRIPTIONS } from '../types/webhook';
-import { ErrorMessage } from '@/components/ui/error-message';
+import { useState, useEffect, useCallback } from "react";
+import { Button } from "./ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "./ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "./ui/dialog";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import { Checkbox } from "./ui/checkbox";
+import { webhookApi } from "../services/webhookApi";
+import type { Webhook, WebhookEventType, WebhookInput } from "../types/webhook";
+import {
+  ALL_WEBHOOK_EVENTS,
+  WEBHOOK_EVENT_LABELS,
+  WEBHOOK_EVENT_DESCRIPTIONS,
+} from "../types/webhook";
+import { ErrorMessage } from "@/components/ui/error-message";
 
 // Icons as inline SVGs for accessibility
-const RefreshIcon = ({ className }: { className?: string }): React.JSX.Element => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+const RefreshIcon = ({
+  className,
+}: {
+  className?: string;
+}): React.JSX.Element => (
+  <svg
+    className={className}
+    xmlns="http://www.w3.org/2000/svg"
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
     <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
     <path d="M3 3v5h5" />
     <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
@@ -28,21 +61,61 @@ const RefreshIcon = ({ className }: { className?: string }): React.JSX.Element =
 );
 
 const PlusIcon = ({ className }: { className?: string }): React.JSX.Element => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+  <svg
+    className={className}
+    xmlns="http://www.w3.org/2000/svg"
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
     <path d="M12 5v14" />
     <path d="M5 12h14" />
   </svg>
 );
 
 const EditIcon = ({ className }: { className?: string }): React.JSX.Element => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+  <svg
+    className={className}
+    xmlns="http://www.w3.org/2000/svg"
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
     <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
     <path d="m15 5 4 4" />
   </svg>
 );
 
-const TrashIcon = ({ className }: { className?: string }): React.JSX.Element => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+const TrashIcon = ({
+  className,
+}: {
+  className?: string;
+}): React.JSX.Element => (
+  <svg
+    className={className}
+    xmlns="http://www.w3.org/2000/svg"
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
     <path d="M3 6h18" />
     <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
     <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
@@ -50,48 +123,148 @@ const TrashIcon = ({ className }: { className?: string }): React.JSX.Element => 
 );
 
 const PlayIcon = ({ className }: { className?: string }): React.JSX.Element => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+  <svg
+    className={className}
+    xmlns="http://www.w3.org/2000/svg"
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
     <polygon points="6 3 20 12 6 21 6 3" />
   </svg>
 );
 
 const BellIcon = ({ className }: { className?: string }): React.JSX.Element => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+  <svg
+    className={className}
+    xmlns="http://www.w3.org/2000/svg"
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
     <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
     <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
   </svg>
 );
 
-const ShieldIcon = ({ className }: { className?: string }): React.JSX.Element => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+const ShieldIcon = ({
+  className,
+}: {
+  className?: string;
+}): React.JSX.Element => (
+  <svg
+    className={className}
+    xmlns="http://www.w3.org/2000/svg"
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
     <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
   </svg>
 );
 
 const LinkIcon = ({ className }: { className?: string }): React.JSX.Element => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+  <svg
+    className={className}
+    xmlns="http://www.w3.org/2000/svg"
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
     <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
     <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
   </svg>
 );
 
-const CheckCircleIcon = ({ className }: { className?: string }): React.JSX.Element => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+const CheckCircleIcon = ({
+  className,
+}: {
+  className?: string;
+}): React.JSX.Element => (
+  <svg
+    className={className}
+    xmlns="http://www.w3.org/2000/svg"
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
     <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
     <polyline points="22 4 12 14.01 9 11.01" />
   </svg>
 );
 
-const XCircleIcon = ({ className }: { className?: string }): React.JSX.Element => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+const XCircleIcon = ({
+  className,
+}: {
+  className?: string;
+}): React.JSX.Element => (
+  <svg
+    className={className}
+    xmlns="http://www.w3.org/2000/svg"
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
     <circle cx="12" cy="12" r="10" />
     <path d="m15 9-6 6" />
     <path d="m9 9 6 6" />
   </svg>
 );
 
-const LoaderIcon = ({ className }: { className?: string }): React.JSX.Element => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+const LoaderIcon = ({
+  className,
+}: {
+  className?: string;
+}): React.JSX.Element => (
+  <svg
+    className={className}
+    xmlns="http://www.w3.org/2000/svg"
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
     <path d="M21 12a9 9 0 1 1-6.219-8.56" />
   </svg>
 );
@@ -99,19 +272,22 @@ const LoaderIcon = ({ className }: { className?: string }): React.JSX.Element =>
 export function WebhookManager(): React.ReactElement {
   const [webhooks, setWebhooks] = useState<Webhook[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string>('');
+  const [error, setError] = useState<string>("");
 
   // Dialog states
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [editingWebhook, setEditingWebhook] = useState<Webhook | null>(null);
   const [deletingWebhook, setDeletingWebhook] = useState<Webhook | null>(null);
   const [testingWebhook, setTestingWebhook] = useState<string | null>(null);
-  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [testResult, setTestResult] = useState<{
+    success: boolean;
+    message: string;
+  } | null>(null);
 
   // Form states
-  const [formName, setFormName] = useState('');
-  const [formUrl, setFormUrl] = useState('');
-  const [formSecret, setFormSecret] = useState('');
+  const [formName, setFormName] = useState("");
+  const [formUrl, setFormUrl] = useState("");
+  const [formSecret, setFormSecret] = useState("");
   const [formEvents, setFormEvents] = useState<WebhookEventType[]>([]);
   const [formEnabled, setFormEnabled] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -119,11 +295,11 @@ export function WebhookManager(): React.ReactElement {
   const loadWebhooks = useCallback(async (): Promise<void> => {
     try {
       setLoading(true);
-      setError('');
+      setError("");
       const data = await webhookApi.list();
       setWebhooks(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load webhooks');
+      setError(err instanceof Error ? err.message : "Failed to load webhooks");
     } finally {
       setLoading(false);
     }
@@ -134,9 +310,9 @@ export function WebhookManager(): React.ReactElement {
   }, [loadWebhooks]);
 
   const resetForm = (): void => {
-    setFormName('');
-    setFormUrl('');
-    setFormSecret('');
+    setFormName("");
+    setFormUrl("");
+    setFormSecret("");
     setFormEvents([]);
     setFormEnabled(true);
   };
@@ -149,7 +325,7 @@ export function WebhookManager(): React.ReactElement {
   const openEditDialog = (webhook: Webhook): void => {
     setFormName(webhook.name);
     setFormUrl(webhook.url);
-    setFormSecret(webhook.secret ?? '');
+    setFormSecret(webhook.secret ?? "");
     try {
       setFormEvents(JSON.parse(webhook.events) as WebhookEventType[]);
     } catch {
@@ -178,14 +354,19 @@ export function WebhookManager(): React.ReactElement {
       resetForm();
       await loadWebhooks();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create webhook');
+      setError(err instanceof Error ? err.message : "Failed to create webhook");
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleUpdateWebhook = async (): Promise<void> => {
-    if (!editingWebhook || !formName.trim() || !formUrl.trim() || formEvents.length === 0) {
+    if (
+      !editingWebhook ||
+      !formName.trim() ||
+      !formUrl.trim() ||
+      formEvents.length === 0
+    ) {
       return;
     }
 
@@ -203,7 +384,7 @@ export function WebhookManager(): React.ReactElement {
       resetForm();
       await loadWebhooks();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update webhook');
+      setError(err instanceof Error ? err.message : "Failed to update webhook");
     } finally {
       setSubmitting(false);
     }
@@ -218,7 +399,7 @@ export function WebhookManager(): React.ReactElement {
       setDeletingWebhook(null);
       await loadWebhooks();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete webhook');
+      setError(err instanceof Error ? err.message : "Failed to delete webhook");
     } finally {
       setSubmitting(false);
     }
@@ -233,7 +414,7 @@ export function WebhookManager(): React.ReactElement {
     } catch (err) {
       setTestResult({
         success: false,
-        message: err instanceof Error ? err.message : 'Test failed',
+        message: err instanceof Error ? err.message : "Test failed",
       });
     } finally {
       setTestingWebhook(null);
@@ -245,15 +426,13 @@ export function WebhookManager(): React.ReactElement {
       await webhookApi.update(webhook.id, { enabled: webhook.enabled !== 1 });
       await loadWebhooks();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to toggle webhook');
+      setError(err instanceof Error ? err.message : "Failed to toggle webhook");
     }
   };
 
   const toggleEvent = (event: WebhookEventType): void => {
     setFormEvents((prev) =>
-      prev.includes(event)
-        ? prev.filter((e) => e !== event)
-        : [...prev, event]
+      prev.includes(event) ? prev.filter((e) => e !== event) : [...prev, event],
     );
   };
 
@@ -266,12 +445,12 @@ export function WebhookManager(): React.ReactElement {
   };
 
   const formatDate = (dateString: string): string => {
-    return new Date(dateString).toLocaleString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
+    return new Date(dateString).toLocaleString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
@@ -292,7 +471,9 @@ export function WebhookManager(): React.ReactElement {
             disabled={loading}
             aria-label="Refresh webhooks"
           >
-            <RefreshIcon className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshIcon
+              className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`}
+            />
             Refresh
           </Button>
           <Button onClick={openCreateDialog} aria-label="Add new webhook">
@@ -306,14 +487,15 @@ export function WebhookManager(): React.ReactElement {
       {error && (
         <div className="mb-6">
           <ErrorMessage error={error} showTitle />
-          {error.includes('migration') && (
+          {error.includes("migration") && (
             <div className="mt-2 p-2 bg-muted/50 rounded text-xs font-mono">
-              npx wrangler d1 execute d1-manager-metadata --remote --file=worker/migrations/004_add_webhooks.sql
+              npx wrangler d1 execute d1-manager-metadata --remote
+              --file=worker/migrations/004_add_webhooks.sql
             </div>
           )}
           <button
             type="button"
-            onClick={() => setError('')}
+            onClick={() => setError("")}
             className="mt-2 underline text-sm text-destructive"
             aria-label="Dismiss error"
           >
@@ -327,8 +509,8 @@ export function WebhookManager(): React.ReactElement {
         <div
           className={`mb-6 px-4 py-3 rounded-lg flex items-center gap-2 ${
             testResult.success
-              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-              : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+              ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+              : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
           }`}
           role="status"
           aria-live="polite"
@@ -352,7 +534,11 @@ export function WebhookManager(): React.ReactElement {
 
       {/* Loading State */}
       {loading && (
-        <div className="flex items-center justify-center py-12" role="status" aria-label="Loading webhooks">
+        <div
+          className="flex items-center justify-center py-12"
+          role="status"
+          aria-label="Loading webhooks"
+        >
           <LoaderIcon className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
       )}
@@ -378,22 +564,26 @@ export function WebhookManager(): React.ReactElement {
           {webhooks.map((webhook) => {
             const events = parseEvents(webhook.events);
             return (
-              <Card 
-                key={webhook.id} 
-                className={webhook.enabled === 0 ? 'opacity-60' : ''}
+              <Card
+                key={webhook.id}
+                className={webhook.enabled === 0 ? "opacity-60" : ""}
                 role="listitem"
               >
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <BellIcon className={`h-5 w-5 ${webhook.enabled === 1 ? 'text-primary' : 'text-muted-foreground'}`} />
+                      <BellIcon
+                        className={`h-5 w-5 ${webhook.enabled === 1 ? "text-primary" : "text-muted-foreground"}`}
+                      />
                       <div>
                         <CardTitle className="text-base flex items-center gap-2">
                           {webhook.name}
                           {webhook.secret && (
                             <span title="HMAC signature enabled">
                               <ShieldIcon className="h-4 w-4 text-green-500" />
-                              <span className="sr-only">HMAC signature enabled</span>
+                              <span className="sr-only">
+                                HMAC signature enabled
+                              </span>
                             </span>
                           )}
                         </CardTitle>
@@ -409,11 +599,11 @@ export function WebhookManager(): React.ReactElement {
                       <span
                         className={`text-xs px-2 py-1 rounded-full ${
                           webhook.enabled === 1
-                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                            : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
+                            ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                            : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200"
                         }`}
                       >
-                        {webhook.enabled === 1 ? 'Enabled' : 'Disabled'}
+                        {webhook.enabled === 1 ? "Enabled" : "Disabled"}
                       </span>
                     </div>
                   </div>
@@ -453,9 +643,9 @@ export function WebhookManager(): React.ReactElement {
                         size="sm"
                         variant="outline"
                         onClick={() => void handleToggleEnabled(webhook)}
-                        aria-label={`${webhook.enabled === 1 ? 'Disable' : 'Enable'} ${webhook.name}`}
+                        aria-label={`${webhook.enabled === 1 ? "Disable" : "Enable"} ${webhook.name}`}
                       >
-                        {webhook.enabled === 1 ? 'Disable' : 'Enable'}
+                        {webhook.enabled === 1 ? "Disable" : "Enable"}
                       </Button>
                       <Button
                         size="sm"
@@ -498,7 +688,7 @@ export function WebhookManager(): React.ReactElement {
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>
-              {editingWebhook ? 'Edit Webhook' : 'Add Webhook'}
+              {editingWebhook ? "Edit Webhook" : "Add Webhook"}
             </DialogTitle>
             <DialogDescription>
               Configure a webhook endpoint to receive event notifications
@@ -515,7 +705,10 @@ export function WebhookManager(): React.ReactElement {
                 onChange={(e) => setFormName(e.target.value)}
                 aria-describedby="webhook-name-description"
               />
-              <p id="webhook-name-description" className="text-xs text-muted-foreground">
+              <p
+                id="webhook-name-description"
+                className="text-xs text-muted-foreground"
+              >
                 A descriptive name for this webhook
               </p>
             </div>
@@ -530,7 +723,10 @@ export function WebhookManager(): React.ReactElement {
                 onChange={(e) => setFormUrl(e.target.value)}
                 aria-describedby="webhook-url-description"
               />
-              <p id="webhook-url-description" className="text-xs text-muted-foreground">
+              <p
+                id="webhook-url-description"
+                className="text-xs text-muted-foreground"
+              >
                 The endpoint that will receive webhook POST requests
               </p>
             </div>
@@ -545,13 +741,21 @@ export function WebhookManager(): React.ReactElement {
                 onChange={(e) => setFormSecret(e.target.value)}
                 aria-describedby="webhook-secret-description"
               />
-              <p id="webhook-secret-description" className="text-xs text-muted-foreground">
-                If set, requests will include an X-Webhook-Signature header for verification
+              <p
+                id="webhook-secret-description"
+                className="text-xs text-muted-foreground"
+              >
+                If set, requests will include an X-Webhook-Signature header for
+                verification
               </p>
             </div>
             <fieldset className="space-y-2">
               <legend className="text-sm font-medium">Events</legend>
-              <div className="grid grid-cols-2 gap-2" role="group" aria-label="Select webhook events">
+              <div
+                className="grid grid-cols-2 gap-2"
+                role="group"
+                aria-label="Select webhook events"
+              >
                 {ALL_WEBHOOK_EVENTS.map((event) => (
                   <div key={event} className="flex items-center space-x-2">
                     <Checkbox
@@ -593,23 +797,38 @@ export function WebhookManager(): React.ReactElement {
               Cancel
             </Button>
             <Button
-              onClick={() => void (editingWebhook ? handleUpdateWebhook() : handleCreateWebhook())}
-              disabled={submitting || !formName.trim() || !formUrl.trim() || formEvents.length === 0}
+              onClick={() =>
+                void (editingWebhook
+                  ? handleUpdateWebhook()
+                  : handleCreateWebhook())
+              }
+              disabled={
+                submitting ||
+                !formName.trim() ||
+                !formUrl.trim() ||
+                formEvents.length === 0
+              }
             >
-              {submitting && <LoaderIcon className="h-4 w-4 mr-2 animate-spin" />}
-              {editingWebhook ? 'Update' : 'Create'}
+              {submitting && (
+                <LoaderIcon className="h-4 w-4 mr-2 animate-spin" />
+              )}
+              {editingWebhook ? "Update" : "Create"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={deletingWebhook !== null} onOpenChange={() => setDeletingWebhook(null)}>
+      <Dialog
+        open={deletingWebhook !== null}
+        onOpenChange={() => setDeletingWebhook(null)}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete Webhook</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete &quot;{deletingWebhook?.name}&quot;? This action cannot be undone.
+              Are you sure you want to delete &quot;{deletingWebhook?.name}
+              &quot;? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -621,7 +840,9 @@ export function WebhookManager(): React.ReactElement {
               onClick={() => void handleDeleteWebhook()}
               disabled={submitting}
             >
-              {submitting && <LoaderIcon className="h-4 w-4 mr-2 animate-spin" />}
+              {submitting && (
+                <LoaderIcon className="h-4 w-4 mr-2 animate-spin" />
+              )}
               Delete
             </Button>
           </DialogFooter>
@@ -630,4 +851,3 @@ export function WebhookManager(): React.ReactElement {
     </div>
   );
 }
-

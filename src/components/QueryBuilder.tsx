@@ -1,9 +1,21 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Plus, Trash2, Play, Save, History, Loader2, RotateCcw, Pencil, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import {
+  Plus,
+  Trash2,
+  Play,
+  Save,
+  History,
+  Loader2,
+  RotateCcw,
+  Pencil,
+  ArrowRight,
+  AlertCircle,
+  CheckCircle2,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -11,26 +23,29 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { 
-  listTables, 
-  getTableSchema, 
-  executeQuery, 
+} from "@/components/ui/dialog";
+import {
+  listTables,
+  getTableSchema,
+  executeQuery,
   getSavedQueries,
   createSavedQuery,
   deleteSavedQuery,
-  type TableInfo, 
+  type TableInfo,
   type ColumnInfo,
-  type SavedQuery as APISavedQuery
-} from '@/services/api';
-import { SqlEditor } from '@/components/SqlEditor';
-import { validateSql } from '@/lib/sqlValidator';
-import { handleSqlKeydown } from '@/lib/sqlAutocomplete';
-import { useSchemaContext } from '@/hooks/useSchemaContext';
-import { parseContext, filterSuggestions } from '@/lib/sqlContextParser';
-import { ALL_SQL_KEYWORDS } from '@/lib/sqlKeywords';
-import { getCaretCoordinates } from '@/lib/caretPosition';
-import { AutocompletePopup, type Suggestion } from '@/components/AutocompletePopup';
+  type SavedQuery as APISavedQuery,
+} from "@/services/api";
+import { SqlEditor } from "@/components/SqlEditor";
+import { validateSql } from "@/lib/sqlValidator";
+import { handleSqlKeydown } from "@/lib/sqlAutocomplete";
+import { useSchemaContext } from "@/hooks/useSchemaContext";
+import { parseContext, filterSuggestions } from "@/lib/sqlContextParser";
+import { ALL_SQL_KEYWORDS } from "@/lib/sqlKeywords";
+import { getCaretCoordinates } from "@/lib/caretPosition";
+import {
+  AutocompletePopup,
+  type Suggestion,
+} from "@/components/AutocompletePopup";
 
 interface QueryBuilderProps {
   databaseId: string;
@@ -47,58 +62,62 @@ interface QueryCondition {
 }
 
 const OPERATORS = [
-  { value: '=', label: 'Equals (=)' },
-  { value: '!=', label: 'Not Equals (!=)' },
-  { value: '>', label: 'Greater Than (>)' },
-  { value: '<', label: 'Less Than (<)' },
-  { value: '>=', label: 'Greater or Equal (>=)' },
-  { value: '<=', label: 'Less or Equal (<=)' },
-  { value: 'LIKE', label: 'Like (LIKE)' },
-  { value: 'IN', label: 'In (IN)' },
-  { value: 'IS NULL', label: 'Is Null' },
-  { value: 'IS NOT NULL', label: 'Is Not Null' },
+  { value: "=", label: "Equals (=)" },
+  { value: "!=", label: "Not Equals (!=)" },
+  { value: ">", label: "Greater Than (>)" },
+  { value: "<", label: "Less Than (<)" },
+  { value: ">=", label: "Greater or Equal (>=)" },
+  { value: "<=", label: "Less or Equal (<=)" },
+  { value: "LIKE", label: "Like (LIKE)" },
+  { value: "IN", label: "In (IN)" },
+  { value: "IS NULL", label: "Is Null" },
+  { value: "IS NOT NULL", label: "Is Not Null" },
 ];
 
-export function QueryBuilder({ databaseId, databaseName, onSendToEditor }: QueryBuilderProps): React.JSX.Element {
+export function QueryBuilder({
+  databaseId,
+  databaseName,
+  onSendToEditor,
+}: QueryBuilderProps): React.JSX.Element {
   const [tables, setTables] = useState<TableInfo[]>([]);
-  const [selectedTable, setSelectedTable] = useState<string>('');
+  const [selectedTable, setSelectedTable] = useState<string>("");
   const [columns, setColumns] = useState<ColumnInfo[]>([]);
-  const [selectedColumns, setSelectedColumns] = useState<string[]>(['*']);
+  const [selectedColumns, setSelectedColumns] = useState<string[]>(["*"]);
   const [conditions, setConditions] = useState<QueryCondition[]>([]);
-  const [orderBy, setOrderBy] = useState<string>('');
-  const [orderDirection, setOrderDirection] = useState<'ASC' | 'DESC'>('ASC');
-  const [limit, setLimit] = useState<string>('100');
-  const [generatedSQL, setGeneratedSQL] = useState<string>('');
+  const [orderBy, setOrderBy] = useState<string>("");
+  const [orderDirection, setOrderDirection] = useState<"ASC" | "DESC">("ASC");
+  const [limit, setLimit] = useState<string>("100");
+  const [generatedSQL, setGeneratedSQL] = useState<string>("");
   const [results, setResults] = useState<Record<string, unknown>[]>([]);
   const [resultColumns, setResultColumns] = useState<string[]>([]);
   const [executing, setExecuting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
-  const [queryName, setQueryName] = useState('');
-  const [queryDescription, setQueryDescription] = useState('');
+  const [queryName, setQueryName] = useState("");
+  const [queryDescription, setQueryDescription] = useState("");
   const [savedQueries, setSavedQueries] = useState<APISavedQuery[]>([]);
   const [showSavedQueries, setShowSavedQueries] = useState(false);
   const [savingQuery, setSavingQuery] = useState(false);
   const [loadingQueries, setLoadingQueries] = useState(false);
-  
+
   // Track manual SQL edits
-  const [editedSQL, setEditedSQL] = useState<string>('');
+  const [editedSQL, setEditedSQL] = useState<string>("");
   const [isManuallyEdited, setIsManuallyEdited] = useState(false);
-  const lastGeneratedSQL = useRef<string>('');
-  
+  const lastGeneratedSQL = useRef<string>("");
+
   // Refs for editor
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  
+
   // Autocomplete state
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [popupPosition, setPopupPosition] = useState({ top: 0, left: 0 });
   const [showAutocomplete, setShowAutocomplete] = useState(false);
-  
+
   // Schema context for table/column suggestions
   const schema = useSchemaContext(databaseId);
-  
+
   // Real-time SQL validation
   const validation = useMemo(() => validateSql(editedSQL), [editedSQL]);
 
@@ -118,7 +137,14 @@ export function QueryBuilder({ databaseId, databaseName, onSendToEditor }: Query
   useEffect(() => {
     generateSQL();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedTable, selectedColumns, conditions, orderBy, orderDirection, limit]);
+  }, [
+    selectedTable,
+    selectedColumns,
+    conditions,
+    orderBy,
+    orderDirection,
+    limit,
+  ]);
 
   // Sync editedSQL with generatedSQL when it changes (unless manually edited)
   useEffect(() => {
@@ -135,7 +161,9 @@ export function QueryBuilder({ databaseId, databaseName, onSendToEditor }: Query
       const tableList = await listTables(databaseId);
       // Include both regular tables and virtual tables (FTS5, etc.)
       // Exclude shadow tables which are internal FTS5 implementation tables
-      setTables(tableList.filter(t => t.type === 'table' || t.type === 'virtual'));
+      setTables(
+        tableList.filter((t) => t.type === "table" || t.type === "virtual"),
+      );
     } catch {
       // Silently ignore failures
     }
@@ -145,7 +173,7 @@ export function QueryBuilder({ databaseId, databaseName, onSendToEditor }: Query
     try {
       const schema = await getTableSchema(databaseId, selectedTable);
       setColumns(schema);
-      setSelectedColumns(['*']);
+      setSelectedColumns(["*"]);
       setConditions([]);
     } catch {
       // Silently ignore failures
@@ -158,7 +186,7 @@ export function QueryBuilder({ databaseId, databaseName, onSendToEditor }: Query
       // First try to load from API
       const queries = await getSavedQueries(databaseId);
       setSavedQueries(queries);
-      
+
       // Check if we have localStorage data to migrate
       const localStorageKey = `d1-saved-queries-${databaseId}`;
       const stored = localStorage.getItem(localStorageKey);
@@ -170,20 +198,20 @@ export function QueryBuilder({ databaseId, databaseName, onSendToEditor }: Query
             query: string;
             createdAt: string;
           }[];
-          
+
           // Migrate any localStorage queries that don't exist in the database
-          const existingNames = new Set(queries.map(q => q.name));
+          const existingNames = new Set(queries.map((q) => q.name));
           for (const localQuery of localQueries) {
             if (!existingNames.has(localQuery.name)) {
               await createSavedQuery(
                 localQuery.name,
                 localQuery.query,
-                'Migrated from local storage',
-                databaseId
+                "Migrated from local storage",
+                databaseId,
               );
             }
           }
-          
+
           // Reload queries after migration and clear localStorage
           const updatedQueries = await getSavedQueries(databaseId);
           setSavedQueries(updatedQueries);
@@ -193,7 +221,7 @@ export function QueryBuilder({ databaseId, databaseName, onSendToEditor }: Query
         }
       }
     } catch {
-      setError('Failed to load saved queries');
+      setError("Failed to load saved queries");
     } finally {
       setLoadingQueries(false);
     }
@@ -201,29 +229,29 @@ export function QueryBuilder({ databaseId, databaseName, onSendToEditor }: Query
 
   const generateSQL = (): void => {
     if (!selectedTable) {
-      setGeneratedSQL('');
+      setGeneratedSQL("");
       return;
     }
 
-    let sql = 'SELECT ';
-    sql += selectedColumns.join(', ');
+    let sql = "SELECT ";
+    sql += selectedColumns.join(", ");
     sql += ` FROM ${selectedTable}`;
 
     if (conditions.length > 0) {
       const whereClauses = conditions
-        .filter(c => c.column && c.operator)
-        .map(c => {
-          if (c.operator === 'IS NULL' || c.operator === 'IS NOT NULL') {
+        .filter((c) => c.column && c.operator)
+        .map((c) => {
+          if (c.operator === "IS NULL" || c.operator === "IS NOT NULL") {
             return `${c.column} ${c.operator}`;
           }
-          if (c.operator === 'IN') {
+          if (c.operator === "IN") {
             return `${c.column} IN (${c.value})`;
           }
           return `${c.column} ${c.operator} '${c.value.replace(/'/g, "''")}'`;
         });
 
       if (whereClauses.length > 0) {
-        sql += ' WHERE ' + whereClauses.join(' AND ');
+        sql += " WHERE " + whereClauses.join(" AND ");
       }
     }
 
@@ -235,34 +263,41 @@ export function QueryBuilder({ databaseId, databaseName, onSendToEditor }: Query
       sql += ` LIMIT ${limit}`;
     }
 
-    sql += ';';
+    sql += ";";
     setGeneratedSQL(sql);
   };
 
   const addCondition = (): void => {
     setConditions([
       ...conditions,
-      { id: String(Date.now()), column: '', operator: '=', value: '' }
+      { id: String(Date.now()), column: "", operator: "=", value: "" },
     ]);
   };
 
   const removeCondition = (id: string): void => {
-    setConditions(conditions.filter(c => c.id !== id));
+    setConditions(conditions.filter((c) => c.id !== id));
   };
 
-  const updateCondition = (id: string, field: keyof QueryCondition, value: string): void => {
-    setConditions(conditions.map(c =>
-      c.id === id ? { ...c, [field]: value } : c
-    ));
+  const updateCondition = (
+    id: string,
+    field: keyof QueryCondition,
+    value: string,
+  ): void => {
+    setConditions(
+      conditions.map((c) => (c.id === id ? { ...c, [field]: value } : c)),
+    );
   };
 
-  const handleSQLChange = useCallback((newSQL: string) => {
-    setEditedSQL(newSQL);
-    // Mark as manually edited if it differs from generated SQL
-    if (newSQL !== generatedSQL) {
-      setIsManuallyEdited(true);
-    }
-  }, [generatedSQL]);
+  const handleSQLChange = useCallback(
+    (newSQL: string) => {
+      setEditedSQL(newSQL);
+      // Mark as manually edited if it differs from generated SQL
+      if (newSQL !== generatedSQL) {
+        setIsManuallyEdited(true);
+      }
+    },
+    [generatedSQL],
+  );
 
   const resetToGeneratedSQL = (): void => {
     setEditedSQL(generatedSQL);
@@ -272,184 +307,219 @@ export function QueryBuilder({ databaseId, databaseName, onSendToEditor }: Query
 
   // Get the current SQL to execute/save (edited version takes precedence)
   const currentSQL = editedSQL || generatedSQL;
-  
+
   // Update suggestions based on current context
-  const updateSuggestions = useCallback(async (text: string, cursorPos: number) => {
-    const context = parseContext(text, cursorPos);
-    
-    if (!context.currentWord && context.type === 'keyword') {
-      setSuggestions([]);
-      setShowAutocomplete(false);
-      return;
-    }
-    
-    let items: Suggestion[] = [];
-    
-    if (context.type === 'keyword') {
-      items = ALL_SQL_KEYWORDS
-        .filter(kw => kw.toUpperCase().startsWith(context.currentWord.toUpperCase()))
-        .slice(0, 20)
-        .map(kw => ({ text: kw, type: 'keyword' as const }));
-    } else if (context.type === 'table') {
-      items = filterSuggestions(schema.tables, context.currentWord)
-        .slice(0, 20)
-        .map(t => ({ text: t, type: 'table' as const }));
-    } else if (context.type === 'column') {
-      let columns: string[] = [];
-      
-      if (context.dotTable) {
-        // Specific table after dot notation
-        columns = await schema.fetchColumnsForTable(context.dotTable);
-      } else if (context.tableNames.length > 0) {
-        // Columns from tables in query
-        columns = await schema.getColumnsForTables(context.tableNames);
-      }
-      
-      items = filterSuggestions(columns, context.currentWord)
-        .slice(0, 20)
-        .map(c => ({ text: c, type: 'column' as const }));
-      
-      // Also add table names if no dot notation
-      if (!context.dotTable && context.currentWord.length > 0) {
-        const tableMatches = filterSuggestions(schema.tables, context.currentWord, 3);
-        const tableSuggestions = tableMatches.map(t => ({ text: t, type: 'table' as const }));
-        items = [...items, ...tableSuggestions].slice(0, 10);
-      }
-    }
-    
-    // Show popup if we have suggestions and user has typed something or used dot notation
-    const shouldShow = items.length > 0 && 
-      (context.currentWord.length > 0 || context.dotTable !== null);
-    
-    setSuggestions(items);
-    setSelectedIndex(0);
-    setShowAutocomplete(shouldShow);
-  }, [schema]);
-  
-  // Handle accepting a suggestion
-  const acceptSuggestion = useCallback((suggestion: Suggestion) => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-    
-    const cursorPos = textarea.selectionStart;
-    const text = editedSQL;
-    const context = parseContext(text, cursorPos);
-    
-    const beforeWord = text.slice(0, cursorPos - context.currentWord.length);
-    const afterCursor = text.slice(cursorPos);
-    
-    const newText = beforeWord + suggestion.text + afterCursor;
-    handleSQLChange(newText);
-    
-    setShowAutocomplete(false);
-    
-    const newCursorPos = beforeWord.length + suggestion.text.length;
-    setTimeout(() => {
-      textarea.focus();
-      textarea.setSelectionRange(newCursorPos, newCursorPos);
-    }, 0);
-  }, [editedSQL, handleSQLChange]);
-  
-  // Handle keydown for autocomplete navigation
-  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // Handle autocomplete navigation when popup is visible
-    if (showAutocomplete && suggestions.length > 0) {
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        setSelectedIndex(prev => (prev + 1) % suggestions.length);
-        return;
-      }
-      if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        setSelectedIndex(prev => (prev - 1 + suggestions.length) % suggestions.length);
-        return;
-      }
-      if (e.key === 'Tab' || e.key === 'Enter') {
-        if (suggestions[selectedIndex]) {
-          e.preventDefault();
-          acceptSuggestion(suggestions[selectedIndex]);
-          return;
-        }
-      }
-      if (e.key === 'Escape') {
-        e.preventDefault();
+  const updateSuggestions = useCallback(
+    async (text: string, cursorPos: number) => {
+      const context = parseContext(text, cursorPos);
+
+      if (!context.currentWord && context.type === "keyword") {
+        setSuggestions([]);
         setShowAutocomplete(false);
         return;
       }
-    }
-    
-    // Handle SQL autocomplete features (auto-pairing, indentation, etc.)
-    const textarea = e.currentTarget;
-    const result = handleSqlKeydown(
-      e.key,
-      textarea.value,
-      textarea.selectionStart,
-      textarea.selectionEnd,
-      e.shiftKey
-    );
-    
-    if (result.handled && result.newValue !== undefined) {
-      e.preventDefault();
-      handleSQLChange(result.newValue);
-      if (result.newCursorPos !== undefined) {
-        const cursorPos = result.newCursorPos;
+
+      let items: Suggestion[] = [];
+
+      if (context.type === "keyword") {
+        items = ALL_SQL_KEYWORDS.filter((kw) =>
+          kw.toUpperCase().startsWith(context.currentWord.toUpperCase()),
+        )
+          .slice(0, 20)
+          .map((kw) => ({ text: kw, type: "keyword" as const }));
+      } else if (context.type === "table") {
+        items = filterSuggestions(schema.tables, context.currentWord)
+          .slice(0, 20)
+          .map((t) => ({ text: t, type: "table" as const }));
+      } else if (context.type === "column") {
+        let columns: string[] = [];
+
+        if (context.dotTable) {
+          // Specific table after dot notation
+          columns = await schema.fetchColumnsForTable(context.dotTable);
+        } else if (context.tableNames.length > 0) {
+          // Columns from tables in query
+          columns = await schema.getColumnsForTables(context.tableNames);
+        }
+
+        items = filterSuggestions(columns, context.currentWord)
+          .slice(0, 20)
+          .map((c) => ({ text: c, type: "column" as const }));
+
+        // Also add table names if no dot notation
+        if (!context.dotTable && context.currentWord.length > 0) {
+          const tableMatches = filterSuggestions(
+            schema.tables,
+            context.currentWord,
+            3,
+          );
+          const tableSuggestions = tableMatches.map((t) => ({
+            text: t,
+            type: "table" as const,
+          }));
+          items = [...items, ...tableSuggestions].slice(0, 10);
+        }
+      }
+
+      // Show popup if we have suggestions and user has typed something or used dot notation
+      const shouldShow =
+        items.length > 0 &&
+        (context.currentWord.length > 0 || context.dotTable !== null);
+
+      setSuggestions(items);
+      setSelectedIndex(0);
+      setShowAutocomplete(shouldShow);
+    },
+    [schema],
+  );
+
+  // Handle accepting a suggestion
+  const acceptSuggestion = useCallback(
+    (suggestion: Suggestion) => {
+      const textarea = textareaRef.current;
+      if (!textarea) return;
+
+      const cursorPos = textarea.selectionStart;
+      const text = editedSQL;
+      const context = parseContext(text, cursorPos);
+
+      const beforeWord = text.slice(0, cursorPos - context.currentWord.length);
+      const afterCursor = text.slice(cursorPos);
+
+      const newText = beforeWord + suggestion.text + afterCursor;
+      handleSQLChange(newText);
+
+      setShowAutocomplete(false);
+
+      const newCursorPos = beforeWord.length + suggestion.text.length;
+      setTimeout(() => {
+        textarea.focus();
+        textarea.setSelectionRange(newCursorPos, newCursorPos);
+      }, 0);
+    },
+    [editedSQL, handleSQLChange],
+  );
+
+  // Handle keydown for autocomplete navigation
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      // Handle autocomplete navigation when popup is visible
+      if (showAutocomplete && suggestions.length > 0) {
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          setSelectedIndex((prev) => (prev + 1) % suggestions.length);
+          return;
+        }
+        if (e.key === "ArrowUp") {
+          e.preventDefault();
+          setSelectedIndex(
+            (prev) => (prev - 1 + suggestions.length) % suggestions.length,
+          );
+          return;
+        }
+        if (e.key === "Tab" || e.key === "Enter") {
+          if (suggestions[selectedIndex]) {
+            e.preventDefault();
+            acceptSuggestion(suggestions[selectedIndex]);
+            return;
+          }
+        }
+        if (e.key === "Escape") {
+          e.preventDefault();
+          setShowAutocomplete(false);
+          return;
+        }
+      }
+
+      // Handle SQL autocomplete features (auto-pairing, indentation, etc.)
+      const textarea = e.currentTarget;
+      const result = handleSqlKeydown(
+        e.key,
+        textarea.value,
+        textarea.selectionStart,
+        textarea.selectionEnd,
+        e.shiftKey,
+      );
+
+      if (result.handled && result.newValue !== undefined) {
+        e.preventDefault();
+        handleSQLChange(result.newValue);
+        if (result.newCursorPos !== undefined) {
+          const cursorPos = result.newCursorPos;
+          setTimeout(() => {
+            textarea.setSelectionRange(cursorPos, cursorPos);
+          }, 0);
+        }
+      }
+    },
+    [
+      showAutocomplete,
+      suggestions,
+      selectedIndex,
+      acceptSuggestion,
+      handleSQLChange,
+    ],
+  );
+
+  // Handle text change with autocomplete update
+  const handleEditorChange = useCallback(
+    (newValue: string) => {
+      handleSQLChange(newValue);
+
+      const textarea = textareaRef.current;
+      if (textarea) {
         setTimeout(() => {
-          textarea.setSelectionRange(cursorPos, cursorPos);
+          void updateSuggestions(newValue, textarea.selectionStart);
+
+          // Update popup position
+          if (containerRef.current) {
+            const coords = getCaretCoordinates(
+              textarea,
+              textarea.selectionStart,
+            );
+            const containerRect = containerRef.current.getBoundingClientRect();
+            const textareaRect = textarea.getBoundingClientRect();
+
+            setPopupPosition({
+              top: textareaRect.top - containerRect.top + coords.top + 20,
+              left: textareaRect.left - containerRect.left + coords.left,
+            });
+          }
         }, 0);
       }
-    }
-  }, [showAutocomplete, suggestions, selectedIndex, acceptSuggestion, handleSQLChange]);
-  
-  // Handle text change with autocomplete update
-  const handleEditorChange = useCallback((newValue: string) => {
-    handleSQLChange(newValue);
-    
-    const textarea = textareaRef.current;
-    if (textarea) {
-      setTimeout(() => {
-        void updateSuggestions(newValue, textarea.selectionStart);
-        
-        // Update popup position
-        if (containerRef.current) {
-          const coords = getCaretCoordinates(textarea, textarea.selectionStart);
-          const containerRect = containerRef.current.getBoundingClientRect();
-          const textareaRect = textarea.getBoundingClientRect();
-          
-          setPopupPosition({
-            top: textareaRect.top - containerRect.top + coords.top + 20,
-            left: textareaRect.left - containerRect.left + coords.left,
-          });
-        }
-      }, 0);
-    }
-  }, [updateSuggestions, handleSQLChange]);
-  
+    },
+    [updateSuggestions, handleSQLChange],
+  );
+
   // Handle selection change (for autocomplete positioning)
   const handleSelect = useCallback(() => {
     const textarea = textareaRef.current;
     if (textarea && containerRef.current) {
       void updateSuggestions(editedSQL, textarea.selectionStart);
-      
+
       const coords = getCaretCoordinates(textarea, textarea.selectionStart);
       const containerRect = containerRef.current.getBoundingClientRect();
       const textareaRect = textarea.getBoundingClientRect();
-      
+
       setPopupPosition({
         top: textareaRect.top - containerRect.top + coords.top + 20,
         left: textareaRect.left - containerRect.left + coords.left,
       });
     }
   }, [editedSQL, updateSuggestions]);
-  
+
   // Close autocomplete when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent): void => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node)
+      ) {
         setShowAutocomplete(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const executeGeneratedQuery = async (): Promise<void> => {
@@ -474,7 +544,7 @@ export function QueryBuilder({ databaseId, databaseName, onSendToEditor }: Query
         setResultColumns([]);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Query execution failed');
+      setError(err instanceof Error ? err.message : "Query execution failed");
     } finally {
       setExecuting(false);
     }
@@ -490,17 +560,17 @@ export function QueryBuilder({ databaseId, databaseName, onSendToEditor }: Query
         queryName.trim(),
         currentSQL,
         queryDescription.trim() || undefined,
-        databaseId
+        databaseId,
       );
-      
+
       // Reload saved queries
       await loadSavedQueries();
-      
-      setQueryName('');
-      setQueryDescription('');
+
+      setQueryName("");
+      setQueryDescription("");
       setShowSaveDialog(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save query');
+      setError(err instanceof Error ? err.message : "Failed to save query");
     } finally {
       setSavingQuery(false);
     }
@@ -518,14 +588,14 @@ export function QueryBuilder({ databaseId, databaseName, onSendToEditor }: Query
       // Reload saved queries
       await loadSavedQueries();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete query');
+      setError(err instanceof Error ? err.message : "Failed to delete query");
     }
   };
 
   const formatValue = (value: unknown): string => {
-    if (value === null) return 'NULL';
-    if (value === undefined) return '';
-    if (typeof value === 'object') return JSON.stringify(value);
+    if (value === null) return "NULL";
+    if (value === undefined) return "";
+    if (typeof value === "object") return JSON.stringify(value);
     return String(value as string | number | boolean);
   };
 
@@ -566,8 +636,10 @@ export function QueryBuilder({ databaseId, databaseName, onSendToEditor }: Query
               onChange={(e) => setSelectedTable(e.target.value)}
             >
               <option value="">Choose a table...</option>
-              {tables.map(table => (
-                <option key={table.name} value={table.name}>{table.name}</option>
+              {tables.map((table) => (
+                <option key={table.name} value={table.name}>
+                  {table.name}
+                </option>
               ))}
             </select>
           </div>
@@ -576,38 +648,47 @@ export function QueryBuilder({ databaseId, databaseName, onSendToEditor }: Query
             <>
               {/* Column Selection */}
               <fieldset className="space-y-2">
-                <legend className="text-sm font-medium leading-none">Select Columns</legend>
+                <legend className="text-sm font-medium leading-none">
+                  Select Columns
+                </legend>
                 <div className="flex flex-wrap gap-2">
                   <label className="flex items-center gap-2">
                     <input
                       type="checkbox"
                       id="select-all-columns"
                       name="select-all-columns"
-                      checked={selectedColumns.includes('*')}
+                      checked={selectedColumns.includes("*")}
                       onChange={(e) => {
                         if (e.target.checked) {
-                          setSelectedColumns(['*']);
+                          setSelectedColumns(["*"]);
                         }
                       }}
                     />
                     <span className="text-sm">All columns (*)</span>
                   </label>
-                  {columns.map(col => (
+                  {columns.map((col) => (
                     <label key={col.name} className="flex items-center gap-2">
                       <input
                         type="checkbox"
                         id={`select-col-${col.name}`}
                         name={`select-col-${col.name}`}
-                        checked={selectedColumns.includes(col.name) && !selectedColumns.includes('*')}
+                        checked={
+                          selectedColumns.includes(col.name) &&
+                          !selectedColumns.includes("*")
+                        }
                         onChange={(e) => {
                           if (e.target.checked) {
-                            const filtered = selectedColumns.filter(c => c !== '*');
+                            const filtered = selectedColumns.filter(
+                              (c) => c !== "*",
+                            );
                             setSelectedColumns([...filtered, col.name]);
                           } else {
-                            setSelectedColumns(selectedColumns.filter(c => c !== col.name));
+                            setSelectedColumns(
+                              selectedColumns.filter((c) => c !== col.name),
+                            );
                           }
                         }}
-                        disabled={selectedColumns.includes('*')}
+                        disabled={selectedColumns.includes("*")}
                       />
                       <span className="text-sm">{col.name}</span>
                     </label>
@@ -618,7 +699,9 @@ export function QueryBuilder({ databaseId, databaseName, onSendToEditor }: Query
               {/* WHERE Conditions */}
               <fieldset className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <legend className="text-sm font-medium leading-none">WHERE Conditions</legend>
+                  <legend className="text-sm font-medium leading-none">
+                    WHERE Conditions
+                  </legend>
                   <Button variant="outline" size="sm" onClick={addCondition}>
                     <Plus className="h-4 w-4 mr-2" />
                     Add Condition
@@ -628,47 +711,89 @@ export function QueryBuilder({ databaseId, databaseName, onSendToEditor }: Query
                 {conditions.length > 0 && (
                   <div className="space-y-2">
                     {conditions.map((condition, index) => (
-                      <div key={condition.id} className="flex gap-2 items-start">
+                      <div
+                        key={condition.id}
+                        className="flex gap-2 items-start"
+                      >
                         {index > 0 && (
                           <div className="text-sm font-semibold text-muted-foreground pt-2">
                             AND
                           </div>
                         )}
-                        <label htmlFor={`condition-col-${condition.id}`} className="sr-only">Column</label>
+                        <label
+                          htmlFor={`condition-col-${condition.id}`}
+                          className="sr-only"
+                        >
+                          Column
+                        </label>
                         <select
                           id={`condition-col-${condition.id}`}
                           name={`condition-col-${condition.id}`}
                           className="flex-1 h-10 px-3 rounded-md border border-input bg-background"
                           value={condition.column}
-                          onChange={(e) => updateCondition(condition.id, 'column', e.target.value)}
+                          onChange={(e) =>
+                            updateCondition(
+                              condition.id,
+                              "column",
+                              e.target.value,
+                            )
+                          }
                         >
                           <option value="">Column...</option>
-                          {columns.map(col => (
-                            <option key={col.name} value={col.name}>{col.name}</option>
+                          {columns.map((col) => (
+                            <option key={col.name} value={col.name}>
+                              {col.name}
+                            </option>
                           ))}
                         </select>
-                        <label htmlFor={`condition-op-${condition.id}`} className="sr-only">Operator</label>
+                        <label
+                          htmlFor={`condition-op-${condition.id}`}
+                          className="sr-only"
+                        >
+                          Operator
+                        </label>
                         <select
                           id={`condition-op-${condition.id}`}
                           name={`condition-op-${condition.id}`}
                           className="w-40 h-10 px-3 rounded-md border border-input bg-background"
                           value={condition.operator}
-                          onChange={(e) => updateCondition(condition.id, 'operator', e.target.value)}
+                          onChange={(e) =>
+                            updateCondition(
+                              condition.id,
+                              "operator",
+                              e.target.value,
+                            )
+                          }
                         >
-                          {OPERATORS.map(op => (
-                            <option key={op.value} value={op.value}>{op.label}</option>
+                          {OPERATORS.map((op) => (
+                            <option key={op.value} value={op.value}>
+                              {op.label}
+                            </option>
                           ))}
                         </select>
-                        {!['IS NULL', 'IS NOT NULL'].includes(condition.operator) && (
+                        {!["IS NULL", "IS NOT NULL"].includes(
+                          condition.operator,
+                        ) && (
                           <>
-                            <label htmlFor={`condition-val-${condition.id}`} className="sr-only">Value</label>
+                            <label
+                              htmlFor={`condition-val-${condition.id}`}
+                              className="sr-only"
+                            >
+                              Value
+                            </label>
                             <Input
                               id={`condition-val-${condition.id}`}
                               name={`condition-val-${condition.id}`}
                               className="flex-1"
                               placeholder="Value..."
                               value={condition.value}
-                              onChange={(e) => updateCondition(condition.id, 'value', e.target.value)}
+                              onChange={(e) =>
+                                updateCondition(
+                                  condition.id,
+                                  "value",
+                                  e.target.value,
+                                )
+                              }
                               autoComplete="off"
                             />
                           </>
@@ -698,8 +823,10 @@ export function QueryBuilder({ databaseId, databaseName, onSendToEditor }: Query
                     onChange={(e) => setOrderBy(e.target.value)}
                   >
                     <option value="">None</option>
-                    {columns.map(col => (
-                      <option key={col.name} value={col.name}>{col.name}</option>
+                    {columns.map((col) => (
+                      <option key={col.name} value={col.name}>
+                        {col.name}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -711,7 +838,9 @@ export function QueryBuilder({ databaseId, databaseName, onSendToEditor }: Query
                     name="order-direction-select"
                     className="w-full h-10 px-3 rounded-md border border-input bg-background"
                     value={orderDirection}
-                    onChange={(e) => setOrderDirection(e.target.value as 'ASC' | 'DESC')}
+                    onChange={(e) =>
+                      setOrderDirection(e.target.value as "ASC" | "DESC")
+                    }
                     disabled={!orderBy}
                   >
                     <option value="ASC">Ascending</option>
@@ -744,7 +873,7 @@ export function QueryBuilder({ databaseId, databaseName, onSendToEditor }: Query
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <CardTitle className="text-base">
-                  {isManuallyEdited ? 'Custom SQL' : 'Generated SQL'}
+                  {isManuallyEdited ? "Custom SQL" : "Generated SQL"}
                 </CardTitle>
                 {isManuallyEdited && (
                   <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
@@ -753,9 +882,13 @@ export function QueryBuilder({ databaseId, databaseName, onSendToEditor }: Query
                   </span>
                 )}
                 {editedSQL.trim() && (
-                  <span className={`text-xs flex items-center gap-1 ${
-                    validation.isValid ? 'text-green-600 dark:text-green-400' : 'text-destructive'
-                  }`}>
+                  <span
+                    className={`text-xs flex items-center gap-1 ${
+                      validation.isValid
+                        ? "text-green-600 dark:text-green-400"
+                        : "text-destructive"
+                    }`}
+                  >
                     {validation.isValid ? (
                       <>
                         <CheckCircle2 className="h-3 w-3" />
@@ -791,9 +924,9 @@ export function QueryBuilder({ databaseId, databaseName, onSendToEditor }: Query
                   Save Query
                 </Button>
                 {onSendToEditor && (
-                  <Button 
+                  <Button
                     variant="outline"
-                    size="sm" 
+                    size="sm"
                     onClick={() => onSendToEditor(editedSQL || generatedSQL)}
                     disabled={!editedSQL && !generatedSQL}
                   >
@@ -801,7 +934,11 @@ export function QueryBuilder({ databaseId, databaseName, onSendToEditor }: Query
                     Send to Editor
                   </Button>
                 )}
-                <Button size="sm" onClick={() => void executeGeneratedQuery()} disabled={executing}>
+                <Button
+                  size="sm"
+                  onClick={() => void executeGeneratedQuery()}
+                  disabled={executing}
+                >
                   {executing ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -832,10 +969,12 @@ export function QueryBuilder({ databaseId, databaseName, onSendToEditor }: Query
                 textareaRef={textareaRef}
                 ariaLabel="SQL Query Editor"
                 ariaAutoComplete="list"
-                ariaControls={showAutocomplete ? 'builder-autocomplete-popup' : undefined}
+                ariaControls={
+                  showAutocomplete ? "builder-autocomplete-popup" : undefined
+                }
                 ariaExpanded={showAutocomplete}
               />
-              
+
               <AutocompletePopup
                 suggestions={suggestions}
                 selectedIndex={selectedIndex}
@@ -845,9 +984,9 @@ export function QueryBuilder({ databaseId, databaseName, onSendToEditor }: Query
               />
             </div>
             <p className="text-xs text-muted-foreground">
-              {isManuallyEdited 
-                ? 'You can edit the SQL directly. Click Reset to restore the auto-generated query.'
-                : 'Tip: You can edit the SQL directly to customize your query.'}
+              {isManuallyEdited
+                ? "You can edit the SQL directly. Click Reset to restore the auto-generated query."
+                : "Tip: You can edit the SQL directly to customize your query."}
             </p>
           </CardContent>
         </Card>
@@ -867,7 +1006,7 @@ export function QueryBuilder({ databaseId, databaseName, onSendToEditor }: Query
         <Card>
           <CardHeader>
             <CardTitle className="text-base">
-              Results ({results.length} {results.length === 1 ? 'row' : 'rows'})
+              Results ({results.length} {results.length === 1 ? "row" : "rows"})
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -893,7 +1032,13 @@ export function QueryBuilder({ databaseId, databaseName, onSendToEditor }: Query
                           key={cellIndex}
                           className="px-4 py-2 text-sm whitespace-nowrap"
                         >
-                          <span className={row[col] === null ? 'italic text-muted-foreground' : ''}>
+                          <span
+                            className={
+                              row[col] === null
+                                ? "italic text-muted-foreground"
+                                : ""
+                            }
+                          >
                             {formatValue(row[col])}
                           </span>
                         </td>
@@ -912,7 +1057,9 @@ export function QueryBuilder({ databaseId, databaseName, onSendToEditor }: Query
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Save Query</DialogTitle>
-            <DialogDescription>Give your query a name to save it for later use.</DialogDescription>
+            <DialogDescription>
+              Give your query a name to save it for later use.
+            </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="space-y-2">
@@ -939,17 +1086,24 @@ export function QueryBuilder({ databaseId, databaseName, onSendToEditor }: Query
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowSaveDialog(false)} disabled={savingQuery}>
+            <Button
+              variant="outline"
+              onClick={() => setShowSaveDialog(false)}
+              disabled={savingQuery}
+            >
               Cancel
             </Button>
-            <Button onClick={() => void saveQuery()} disabled={!queryName.trim() || !currentSQL || savingQuery}>
+            <Button
+              onClick={() => void saveQuery()}
+              disabled={!queryName.trim() || !currentSQL || savingQuery}
+            >
               {savingQuery ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Saving...
                 </>
               ) : (
-                'Save'
+                "Save"
               )}
             </Button>
           </DialogFooter>
@@ -962,26 +1116,33 @@ export function QueryBuilder({ databaseId, databaseName, onSendToEditor }: Query
           <DialogHeader>
             <DialogTitle>Saved Queries</DialogTitle>
             <DialogDescription>
-              {savedQueries.length} saved {savedQueries.length === 1 ? 'query' : 'queries'}
+              {savedQueries.length} saved{" "}
+              {savedQueries.length === 1 ? "query" : "queries"}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2 max-h-96 overflow-y-auto">
             {loadingQueries ? (
               <div className="text-center py-8">
                 <Loader2 className="w-8 h-8 animate-spin mx-auto text-muted-foreground" />
-                <p className="text-sm text-muted-foreground mt-2">Loading saved queries...</p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Loading saved queries...
+                </p>
               </div>
             ) : savedQueries.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">No saved queries yet</p>
+              <p className="text-center text-muted-foreground py-8">
+                No saved queries yet
+              </p>
             ) : (
-              savedQueries.map(query => (
+              savedQueries.map((query) => (
                 <Card key={query.id} className="bg-muted/50">
                   <CardContent className="pt-4">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <h4 className="font-semibold">{query.name}</h4>
                         {query.description && (
-                          <p className="text-sm text-muted-foreground mt-1">{query.description}</p>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {query.description}
+                          </p>
                         )}
                         <pre className="text-xs font-mono mt-2 p-2 bg-background rounded overflow-x-auto">
                           {query.query}
@@ -1017,4 +1178,3 @@ export function QueryBuilder({ databaseId, databaseName, onSendToEditor }: Query
     </div>
   );
 }
-

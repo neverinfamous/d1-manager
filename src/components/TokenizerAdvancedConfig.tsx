@@ -1,10 +1,10 @@
-import { useState } from 'react';
-import { ChevronDown, ChevronUp, HelpCircle } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
-import type { TokenizerConfig } from '@/services/fts5-types';
+import { useState } from "react";
+import { ChevronDown, ChevronUp, HelpCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import type { TokenizerConfig } from "@/services/fts5-types";
 
 interface TokenizerAdvancedConfigProps {
   value: TokenizerConfig;
@@ -12,10 +12,17 @@ interface TokenizerAdvancedConfigProps {
   disabled?: boolean;
 }
 
-export function TokenizerAdvancedConfig({ value, onChange, disabled }: TokenizerAdvancedConfigProps): React.JSX.Element | null {
+export function TokenizerAdvancedConfig({
+  value,
+  onChange,
+  disabled,
+}: TokenizerAdvancedConfigProps): React.JSX.Element | null {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const handleParameterChange = (key: string, paramValue: string | number): void => {
+  const handleParameterChange = (
+    key: string,
+    paramValue: string | number,
+  ): void => {
     onChange({
       ...value,
       parameters: {
@@ -26,19 +33,19 @@ export function TokenizerAdvancedConfig({ value, onChange, disabled }: Tokenizer
   };
 
   const handleRemoveDiacriticsChange = (checked: boolean): void => {
-    handleParameterChange('remove_diacritics', checked ? 1 : 0);
+    handleParameterChange("remove_diacritics", checked ? 1 : 0);
   };
 
   const handleCaseSensitiveChange = (checked: boolean): void => {
-    handleParameterChange('case_sensitive', checked ? 1 : 0);
+    handleParameterChange("case_sensitive", checked ? 1 : 0);
   };
 
-  const isUnicode61 = value.type === 'unicode61' || value.type === 'porter';
-  const isTrigram = value.type === 'trigram';
-  
+  const isUnicode61 = value.type === "unicode61" || value.type === "porter";
+  const isTrigram = value.type === "trigram";
+
   // Don't show the section at all if the tokenizer has no configurable parameters
   const hasConfigurableOptions = isUnicode61 || isTrigram;
-  
+
   if (!hasConfigurableOptions) {
     return null;
   }
@@ -53,7 +60,11 @@ export function TokenizerAdvancedConfig({ value, onChange, disabled }: Tokenizer
         disabled={disabled}
       >
         <span className="font-medium">Advanced Tokenizer Configuration</span>
-        {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        {isExpanded ? (
+          <ChevronUp className="h-4 w-4" />
+        ) : (
+          <ChevronDown className="h-4 w-4" />
+        )}
       </Button>
 
       {isExpanded && (
@@ -68,13 +79,17 @@ export function TokenizerAdvancedConfig({ value, onChange, disabled }: Tokenizer
                     onCheckedChange={handleRemoveDiacriticsChange}
                     disabled={disabled}
                   />
-                  <Label htmlFor="remove-diacritics" className="font-normal cursor-pointer">
+                  <Label
+                    htmlFor="remove-diacritics"
+                    className="font-normal cursor-pointer"
+                  >
                     Remove diacritics
                   </Label>
                   <div className="relative group">
                     <HelpCircle className="h-4 w-4 text-muted-foreground" />
                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-2 bg-popover text-popover-foreground text-xs rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity z-10">
-                      Treat characters with diacritics (é, ñ, ü) as equivalent to their base forms (e, n, u)
+                      Treat characters with diacritics (é, ñ, ü) as equivalent
+                      to their base forms (e, n, u)
                     </div>
                   </div>
                 </div>
@@ -88,8 +103,10 @@ export function TokenizerAdvancedConfig({ value, onChange, disabled }: Tokenizer
                 <Input
                   id="separator-chars"
                   placeholder="e.g., _-."
-                  value={value.parameters?.separators || ''}
-                  onChange={(e) => handleParameterChange('separators', e.target.value)}
+                  value={value.parameters?.separators || ""}
+                  onChange={(e) =>
+                    handleParameterChange("separators", e.target.value)
+                  }
                   disabled={disabled}
                 />
                 <p className="text-xs text-muted-foreground">
@@ -102,12 +119,15 @@ export function TokenizerAdvancedConfig({ value, onChange, disabled }: Tokenizer
                 <Input
                   id="token-chars"
                   placeholder="e.g., @#"
-                  value={value.parameters?.tokenchars || ''}
-                  onChange={(e) => handleParameterChange('tokenchars', e.target.value)}
+                  value={value.parameters?.tokenchars || ""}
+                  onChange={(e) =>
+                    handleParameterChange("tokenchars", e.target.value)
+                  }
                   disabled={disabled}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Additional characters to include in tokens (e.g., @ for emails)
+                  Additional characters to include in tokens (e.g., @ for
+                  emails)
                 </p>
               </div>
 
@@ -116,8 +136,10 @@ export function TokenizerAdvancedConfig({ value, onChange, disabled }: Tokenizer
                 <Input
                   id="categories"
                   placeholder="e.g., L* N* Co"
-                  value={value.parameters?.categories || ''}
-                  onChange={(e) => handleParameterChange('categories', e.target.value)}
+                  value={value.parameters?.categories || ""}
+                  onChange={(e) =>
+                    handleParameterChange("categories", e.target.value)
+                  }
                   disabled={disabled}
                 />
                 <p className="text-xs text-muted-foreground">
@@ -136,7 +158,10 @@ export function TokenizerAdvancedConfig({ value, onChange, disabled }: Tokenizer
                   onCheckedChange={handleCaseSensitiveChange}
                   disabled={disabled}
                 />
-                <Label htmlFor="case-sensitive" className="font-normal cursor-pointer">
+                <Label
+                  htmlFor="case-sensitive"
+                  className="font-normal cursor-pointer"
+                >
                   Case sensitive
                 </Label>
                 <div className="relative group">
@@ -156,4 +181,3 @@ export function TokenizerAdvancedConfig({ value, onChange, disabled }: Tokenizer
     </div>
   );
 }
-

@@ -1,12 +1,22 @@
-import { useState, useCallback } from 'react';
-import { Globe, Sparkles, Copy, Check, ChevronUp, ChevronDown } from 'lucide-react';
-import { Checkbox } from '@/components/ui/checkbox';
-import { DatabaseColorPicker } from './DatabaseColorPicker';
-import { DatabaseActionButtons, type DatabaseActionHandlers } from './DatabaseActionButtons';
-import type { D1Database, DatabaseColor } from '../services/api';
+import { useState, useCallback } from "react";
+import {
+  Globe,
+  Sparkles,
+  Copy,
+  Check,
+  ChevronUp,
+  ChevronDown,
+} from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { DatabaseColorPicker } from "./DatabaseColorPicker";
+import {
+  DatabaseActionButtons,
+  type DatabaseActionHandlers,
+} from "./DatabaseActionButtons";
+import type { D1Database, DatabaseColor } from "../services/api";
 
-type SortField = 'name' | 'created_at' | 'file_size' | 'num_tables';
-type SortDirection = 'asc' | 'desc';
+type SortField = "name" | "created_at" | "file_size" | "num_tables";
+type SortDirection = "asc" | "desc";
 
 // Sort icon component - defined outside to avoid recreation during render
 function SortIcon({
@@ -19,7 +29,7 @@ function SortIcon({
   sortDirection: SortDirection;
 }): React.JSX.Element | null {
   if (sortField !== field) return null;
-  return sortDirection === 'asc' ? (
+  return sortDirection === "asc" ? (
     <ChevronUp className="h-4 w-4 inline-block ml-1" />
   ) : (
     <ChevronDown className="h-4 w-4 inline-block ml-1" />
@@ -33,7 +43,7 @@ function SortableHeader({
   sortDirection,
   onSort,
   children,
-  className = '',
+  className = "",
 }: {
   field: SortField;
   sortField: SortField;
@@ -47,11 +57,21 @@ function SortableHeader({
       scope="col"
       className={`px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer hover:bg-muted/50 select-none ${className}`}
       onClick={() => onSort(field)}
-      aria-sort={sortField === field ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
+      aria-sort={
+        sortField === field
+          ? sortDirection === "asc"
+            ? "ascending"
+            : "descending"
+          : "none"
+      }
     >
       <span className="flex items-center">
         {children}
-        <SortIcon field={field} sortField={sortField} sortDirection={sortDirection} />
+        <SortIcon
+          field={field}
+          sortField={sortField}
+          sortDirection={sortDirection}
+        />
       </span>
     </th>
   );
@@ -82,20 +102,20 @@ export function DatabaseListView({
   copiedDbId,
   onCopyId,
 }: DatabaseListViewProps): React.JSX.Element {
-  const [sortField, setSortField] = useState<SortField>('name');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [sortField, setSortField] = useState<SortField>("name");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
 
   const formatDate = (dateString: string): string => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
     });
   };
 
   const formatSize = (bytes?: number): string => {
-    if (!bytes) return '—';
-    const units = ['B', 'KB', 'MB', 'GB'];
+    if (!bytes) return "—";
+    const units = ["B", "KB", "MB", "GB"];
     let size = bytes;
     let unitIndex = 0;
     while (size >= 1024 && unitIndex < units.length - 1) {
@@ -105,35 +125,40 @@ export function DatabaseListView({
     return `${size.toFixed(unitIndex > 0 ? 1 : 0)} ${units[unitIndex]}`;
   };
 
-  const handleSort = useCallback((field: SortField): void => {
-    if (sortField === field) {
-      setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
-    } else {
-      setSortField(field);
-      setSortDirection('asc');
-    }
-  }, [sortField]);
+  const handleSort = useCallback(
+    (field: SortField): void => {
+      if (sortField === field) {
+        setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+      } else {
+        setSortField(field);
+        setSortDirection("asc");
+      }
+    },
+    [sortField],
+  );
 
   const sortedDatabases = [...databases].sort((a, b) => {
     let comparison = 0;
     switch (sortField) {
-      case 'name':
+      case "name":
         comparison = a.name.localeCompare(b.name);
         break;
-      case 'created_at':
-        comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      case "created_at":
+        comparison =
+          new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
         break;
-      case 'file_size':
+      case "file_size":
         comparison = (a.file_size ?? 0) - (b.file_size ?? 0);
         break;
-      case 'num_tables':
+      case "num_tables":
         comparison = (a.num_tables ?? 0) - (b.num_tables ?? 0);
         break;
     }
-    return sortDirection === 'asc' ? comparison : -comparison;
+    return sortDirection === "asc" ? comparison : -comparison;
   });
 
-  const allSelected = databases.length > 0 && selectedDatabases.length === databases.length;
+  const allSelected =
+    databases.length > 0 && selectedDatabases.length === databases.length;
 
   return (
     <div className="overflow-x-auto border rounded-lg bg-card">
@@ -150,7 +175,11 @@ export function DatabaseListView({
                     onClearSelection();
                   }
                 }}
-                aria-label={allSelected ? 'Deselect all databases' : 'Select all databases'}
+                aria-label={
+                  allSelected
+                    ? "Deselect all databases"
+                    : "Select all databases"
+                }
               />
             </th>
             <th scope="col" className="px-3 py-3 w-3">
@@ -164,10 +193,16 @@ export function DatabaseListView({
             >
               Name
             </SortableHeader>
-            <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            <th
+              scope="col"
+              className="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
+            >
               ID
             </th>
-            <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            <th
+              scope="col"
+              className="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
+            >
               Status
             </th>
             <SortableHeader
@@ -194,7 +229,10 @@ export function DatabaseListView({
             >
               Created
             </SortableHeader>
-            <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            <th
+              scope="col"
+              className="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
+            >
               Actions
             </th>
           </tr>
@@ -206,7 +244,7 @@ export function DatabaseListView({
             return (
               <tr
                 key={db.uuid}
-                className={`hover:bg-muted/50 transition-colors ${isSelected ? 'bg-primary/5' : ''}`}
+                className={`hover:bg-muted/50 transition-colors ${isSelected ? "bg-primary/5" : ""}`}
               >
                 {/* Checkbox */}
                 <td className="px-3 py-2">
@@ -261,7 +299,7 @@ export function DatabaseListView({
                         FTS5
                       </span>
                     )}
-                    {db.read_replication?.mode === 'auto' && (
+                    {db.read_replication?.mode === "auto" && (
                       <span className="text-xs px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 flex items-center gap-0.5">
                         <Globe className="h-2.5 w-2.5" />
                         Replicated
@@ -278,7 +316,7 @@ export function DatabaseListView({
 
                 {/* Tables */}
                 <td className="px-3 py-2 text-muted-foreground">
-                  {db.num_tables ?? '—'}
+                  {db.num_tables ?? "—"}
                 </td>
 
                 {/* Created */}

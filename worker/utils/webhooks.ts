@@ -1,12 +1,18 @@
 /**
  * Webhook Utilities
- * 
+ *
  * Handles sending webhook notifications to configured endpoints.
  * Supports HMAC-SHA256 signatures for secure payload verification.
  */
 
-import type { Env, Webhook, WebhookEventType, WebhookPayload, WebhookResult } from '../types';
-import { logInfo, logWarning } from './error-logger';
+import type {
+  Env,
+  Webhook,
+  WebhookEventType,
+  WebhookPayload,
+  WebhookResult,
+} from "../types";
+import { logInfo, logWarning } from "./error-logger";
 
 /**
  * Generate current ISO timestamp
@@ -18,18 +24,25 @@ function nowISO(): string {
 /**
  * Generate HMAC-SHA256 signature for webhook payload
  */
-async function generateSignature(payload: string, secret: string): Promise<string> {
+async function generateSignature(
+  payload: string,
+  secret: string,
+): Promise<string> {
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey(
-    'raw',
+    "raw",
     encoder.encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
+    { name: "HMAC", hash: "SHA-256" },
     false,
-    ['sign']
+    ["sign"],
   );
-  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(payload));
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    encoder.encode(payload),
+  );
   const hashArray = Array.from(new Uint8Array(signature));
-  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 /**
@@ -38,7 +51,7 @@ async function generateSignature(payload: string, secret: string): Promise<strin
 export async function sendWebhook(
   webhook: Webhook,
   event: WebhookEventType,
-  data: Record<string, unknown>
+  data: Record<string, unknown>,
 ): Promise<WebhookResult> {
   const payload: WebhookPayload = {
     event,
@@ -48,20 +61,20 @@ export async function sendWebhook(
 
   const body = JSON.stringify(payload);
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    'User-Agent': 'D1-Manager-Webhook/1.0',
-    'X-Webhook-Event': event,
+    "Content-Type": "application/json",
+    "User-Agent": "D1-Manager-Webhook/1.0",
+    "X-Webhook-Event": event,
   };
 
   // Add HMAC signature if secret is configured
   if (webhook.secret) {
     const signature = await generateSignature(body, webhook.secret);
-    headers['X-Webhook-Signature'] = `sha256=${signature}`;
+    headers["X-Webhook-Signature"] = `sha256=${signature}`;
   }
 
   try {
     const response = await fetch(webhook.url, {
-      method: 'POST',
+      method: "POST",
       headers,
       body,
     });
@@ -69,7 +82,7 @@ export async function sendWebhook(
     if (response.ok) {
       return { success: true, statusCode: response.status };
     } else {
-      const errorText = await response.text().catch(() => 'Unknown error');
+      const errorText = await response.text().catch(() => "Unknown error");
       return {
         success: false,
         statusCode: response.status,
@@ -79,7 +92,7 @@ export async function sendWebhook(
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: error instanceof Error ? error.message : "Unknown error",
     };
   }
 }
@@ -89,12 +102,12 @@ export async function sendWebhook(
  */
 export async function getWebhooksForEvent(
   db: D1Database,
-  event: WebhookEventType
+  event: WebhookEventType,
 ): Promise<Webhook[]> {
   try {
-    const result = await db.prepare(
-      'SELECT * FROM webhooks WHERE enabled = 1'
-    ).all<Webhook>();
+    const result = await db
+      .prepare("SELECT * FROM webhooks WHERE enabled = 1")
+      .all<Webhook>();
 
     // Filter webhooks that are subscribed to this event
     return result.results.filter((webhook) => {
@@ -106,11 +119,17 @@ export async function getWebhooksForEvent(
       }
     });
   } catch (error) {
-    logWarning(`Failed to get webhooks: ${error instanceof Error ? error.message : String(error)}`, {
-      module: 'webhooks',
-      operation: 'get_webhooks',
-      metadata: { event, error: error instanceof Error ? error.message : String(error) }
-    });
+    logWarning(
+      `Failed to get webhooks: ${error instanceof Error ? error.message : String(error)}`,
+      {
+        module: "webhooks",
+        operation: "get_webhooks",
+        metadata: {
+          event,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      },
+    );
     return [];
   }
 }
@@ -123,13 +142,13 @@ export async function triggerWebhooks(
   env: Env,
   event: WebhookEventType,
   data: Record<string, unknown>,
-  isLocalDev: boolean
+  isLocalDev: boolean,
 ): Promise<void> {
   if (isLocalDev) {
     logInfo(`Mock trigger: ${event}`, {
-      module: 'webhooks',
-      operation: 'trigger',
-      metadata: { event, data }
+      module: "webhooks",
+      operation: "trigger",
+      metadata: { event, data },
     });
     return;
   }
@@ -141,40 +160,64 @@ export async function triggerWebhooks(
       return;
     }
 
-    logInfo(`Triggering ${String(webhooks.length)} webhook(s) for event: ${event}`, {
-      module: 'webhooks',
-      operation: 'trigger',
-      metadata: { event, webhookCount: webhooks.length }
-    });
+    logInfo(
+      `Triggering ${String(webhooks.length)} webhook(s) for event: ${event}`,
+      {
+        module: "webhooks",
+        operation: "trigger",
+        metadata: { event, webhookCount: webhooks.length },
+      },
+    );
 
     // Send webhooks in parallel, don't await completion
     const promises = webhooks.map(async (webhook) => {
       try {
         const result = await sendWebhook(webhook, event, data);
         if (!result.success) {
-          logWarning(`Failed to send to ${webhook.name}: ${result.error ?? 'Unknown error'}`, {
-            module: 'webhooks',
-            operation: 'send',
-            metadata: { webhookName: webhook.name, event, error: result.error, statusCode: result.statusCode }
-          });
+          logWarning(
+            `Failed to send to ${webhook.name}: ${result.error ?? "Unknown error"}`,
+            {
+              module: "webhooks",
+              operation: "send",
+              metadata: {
+                webhookName: webhook.name,
+                event,
+                error: result.error,
+                statusCode: result.statusCode,
+              },
+            },
+          );
         }
       } catch (error) {
-        logWarning(`Error sending to ${webhook.name}: ${error instanceof Error ? error.message : String(error)}`, {
-          module: 'webhooks',
-          operation: 'send',
-          metadata: { webhookName: webhook.name, event, error: error instanceof Error ? error.message : String(error) }
-        });
+        logWarning(
+          `Error sending to ${webhook.name}: ${error instanceof Error ? error.message : String(error)}`,
+          {
+            module: "webhooks",
+            operation: "send",
+            metadata: {
+              webhookName: webhook.name,
+              event,
+              error: error instanceof Error ? error.message : String(error),
+            },
+          },
+        );
       }
     });
 
     // Fire and forget - use waitUntil pattern in production
     void Promise.all(promises);
   } catch (error) {
-    logWarning(`Trigger error: ${error instanceof Error ? error.message : String(error)}`, {
-      module: 'webhooks',
-      operation: 'trigger',
-      metadata: { event, error: error instanceof Error ? error.message : String(error) }
-    });
+    logWarning(
+      `Trigger error: ${error instanceof Error ? error.message : String(error)}`,
+      {
+        module: "webhooks",
+        operation: "trigger",
+        metadata: {
+          event,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      },
+    );
   }
 }
 
@@ -188,7 +231,7 @@ export async function triggerWebhooks(
 export function createDatabaseCreatePayload(
   databaseId: string,
   databaseName: string,
-  userEmail: string | null
+  userEmail: string | null,
 ): Record<string, unknown> {
   return {
     database_id: databaseId,
@@ -203,7 +246,7 @@ export function createDatabaseCreatePayload(
 export function createDatabaseDeletePayload(
   databaseId: string,
   databaseName: string,
-  userEmail: string | null
+  userEmail: string | null,
 ): Record<string, unknown> {
   return {
     database_id: databaseId,
@@ -223,7 +266,7 @@ export function createTableCreatePayload(
   databaseId: string,
   databaseName: string,
   tableName: string,
-  userEmail: string | null
+  userEmail: string | null,
 ): Record<string, unknown> {
   return {
     database_id: databaseId,
@@ -240,7 +283,7 @@ export function createTableDeletePayload(
   databaseId: string,
   databaseName: string,
   tableName: string,
-  userEmail: string | null
+  userEmail: string | null,
 ): Record<string, unknown> {
   return {
     database_id: databaseId,
@@ -258,7 +301,7 @@ export function createTableUpdatePayload(
   databaseName: string,
   tableName: string,
   changeType: string,
-  userEmail: string | null
+  userEmail: string | null,
 ): Record<string, unknown> {
   return {
     database_id: databaseId,
@@ -281,7 +324,7 @@ export function createBackupCompletePayload(
   databaseName: string,
   backupPath: string,
   sizeBytes: number,
-  userEmail: string | null
+  userEmail: string | null,
 ): Record<string, unknown> {
   return {
     database_id: databaseId,
@@ -300,7 +343,7 @@ export function createRestoreCompletePayload(
   databaseName: string,
   backupPath: string,
   tablesRestored: number,
-  userEmail: string | null
+  userEmail: string | null,
 ): Record<string, unknown> {
   return {
     database_id: databaseId,
@@ -322,7 +365,7 @@ export function createImportCompletePayload(
   databaseId: string,
   databaseName: string,
   numQueries: number | undefined,
-  userEmail: string | null
+  userEmail: string | null,
 ): Record<string, unknown> {
   return {
     database_id: databaseId,
@@ -340,7 +383,7 @@ export function createExportCompletePayload(
   databaseName: string,
   sizeBytes: number,
   format: string,
-  userEmail: string | null
+  userEmail: string | null,
 ): Record<string, unknown> {
   return {
     database_id: databaseId,
@@ -361,10 +404,10 @@ export function createExportCompletePayload(
 export function createSchemaChangePayload(
   databaseId: string,
   databaseName: string,
-  ddlType: 'CREATE' | 'ALTER' | 'DROP',
-  objectType: 'TABLE' | 'INDEX' | 'VIEW' | 'TRIGGER',
+  ddlType: "CREATE" | "ALTER" | "DROP",
+  objectType: "TABLE" | "INDEX" | "VIEW" | "TRIGGER",
   objectName: string,
-  userEmail: string | null
+  userEmail: string | null,
 ): Record<string, unknown> {
   return {
     database_id: databaseId,
@@ -388,7 +431,7 @@ export function createBulkDeleteCompletePayload(
   databaseName: string,
   tableName: string,
   rowsDeleted: number,
-  userEmail: string | null
+  userEmail: string | null,
 ): Record<string, unknown> {
   return {
     database_id: databaseId,
@@ -411,7 +454,7 @@ export function createJobFailedPayload(
   jobType: string,
   error: string,
   databaseId: string | null,
-  userEmail: string | null
+  userEmail: string | null,
 ): Record<string, unknown> {
   return {
     job_id: jobId,
@@ -430,7 +473,7 @@ export function createBatchCompletePayload(
   total: number,
   success: number,
   failed: number,
-  userEmail: string | null
+  userEmail: string | null,
 ): Record<string, unknown> {
   return {
     job_type: jobType,
@@ -453,7 +496,7 @@ export function createDatabaseExportPayload(
   databaseId: string,
   databaseName: string,
   sizeBytes: number,
-  userEmail: string | null
+  userEmail: string | null,
 ): Record<string, unknown> {
   return {
     database_id: databaseId,
@@ -471,7 +514,7 @@ export function createDatabaseImportPayload(
   databaseId: string,
   databaseName: string,
   numQueries: number | undefined,
-  userEmail: string | null
+  userEmail: string | null,
 ): Record<string, unknown> {
   return {
     database_id: databaseId,
@@ -480,4 +523,3 @@ export function createDatabaseImportPayload(
     user_email: userEmail,
   };
 }
-

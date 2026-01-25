@@ -1,32 +1,32 @@
 /**
  * Scheduled Backup Processor
- * 
+ *
  * Handles the execution of scheduled backups when triggered by cron.
  * Queries the scheduled_backups table for due backups and triggers
  * the backup process via BackupDO.
  */
 
-import type { Env, ScheduledBackup, ScheduledBackupSchedule } from '../types';
-import { logInfo, logError, logWarning } from './error-logger';
-import { calculateNextRunAt } from './scheduled-backups';
-import { generateJobId, createJob, completeJob } from '../routes/jobs';
-import { OperationType } from './job-tracking';
+import type { Env, ScheduledBackup, ScheduledBackupSchedule } from "../types";
+import { logInfo, logError, logWarning } from "./error-logger";
+import { calculateNextRunAt } from "./scheduled-backups";
+import { generateJobId, createJob, completeJob } from "../routes/jobs";
+import { OperationType } from "./job-tracking";
 
 /**
  * Process all due scheduled backups
  */
 export async function processScheduledBackups(env: Env): Promise<void> {
   const isLocalDev = !env.BACKUP_BUCKET || !env.BACKUP_DO;
-  
-  logInfo('Starting scheduled backup processing', {
-    module: 'scheduled_backup_processor',
-    operation: 'start'
+
+  logInfo("Starting scheduled backup processing", {
+    module: "scheduled_backup_processor",
+    operation: "start",
   });
 
   if (isLocalDev) {
-    logInfo('Skipping scheduled backups - R2 not configured', {
-      module: 'scheduled_backup_processor',
-      operation: 'skip'
+    logInfo("Skipping scheduled backups - R2 not configured", {
+      module: "scheduled_backup_processor",
+      operation: "skip",
     });
     return;
   }
@@ -36,38 +36,50 @@ export async function processScheduledBackups(env: Env): Promise<void> {
     const now = new Date().toISOString();
 
     // Query for due schedules
-    const dueSchedules = await db.prepare(`
+    const dueSchedules = await db
+      .prepare(
+        `
       SELECT * FROM scheduled_backups 
       WHERE enabled = 1 
         AND next_run_at IS NOT NULL 
         AND next_run_at <= ?
       ORDER BY next_run_at ASC
-    `).bind(now).all<ScheduledBackup>();
+    `,
+      )
+      .bind(now)
+      .all<ScheduledBackup>();
 
     if (dueSchedules.results.length === 0) {
-      logInfo('No scheduled backups due', {
-        module: 'scheduled_backup_processor',
-        operation: 'check'
+      logInfo("No scheduled backups due", {
+        module: "scheduled_backup_processor",
+        operation: "check",
       });
       return;
     }
 
-    logInfo(`Found ${String(dueSchedules.results.length)} scheduled backup(s) due`, {
-      module: 'scheduled_backup_processor',
-      operation: 'check',
-      metadata: { count: dueSchedules.results.length }
-    });
+    logInfo(
+      `Found ${String(dueSchedules.results.length)} scheduled backup(s) due`,
+      {
+        module: "scheduled_backup_processor",
+        operation: "check",
+        metadata: { count: dueSchedules.results.length },
+      },
+    );
 
     // Process each due schedule
     for (const schedule of dueSchedules.results) {
       await processSchedule(schedule, env, isLocalDev);
     }
-
   } catch (error) {
-    void logError(env, error instanceof Error ? error : String(error), {
-      module: 'scheduled_backup_processor',
-      operation: 'process'
-    }, isLocalDev);
+    void logError(
+      env,
+      error instanceof Error ? error : String(error),
+      {
+        module: "scheduled_backup_processor",
+        operation: "process",
+      },
+      isLocalDev,
+    );
   }
 }
 
@@ -77,17 +89,24 @@ export async function processScheduledBackups(env: Env): Promise<void> {
 async function processSchedule(
   schedule: ScheduledBackup,
   env: Env,
-  isLocalDev: boolean
+  isLocalDev: boolean,
 ): Promise<void> {
   const db = env.METADATA;
-  const { database_id, database_name, schedule: scheduleType, hour, day_of_week, day_of_month } = schedule;
+  const {
+    database_id,
+    database_name,
+    schedule: scheduleType,
+    hour,
+    day_of_week,
+    day_of_month,
+  } = schedule;
 
   logInfo(`Processing scheduled backup for: ${database_name}`, {
-    module: 'scheduled_backup_processor',
-    operation: 'process_schedule',
+    module: "scheduled_backup_processor",
+    operation: "process_schedule",
     databaseId: database_id,
     databaseName: database_name,
-    metadata: { scheduleId: schedule.id }
+    metadata: { scheduleId: schedule.id },
   });
 
   // Create job for tracking (as "Scheduled Backup" / scheduled_backup operation type)
@@ -99,38 +118,43 @@ async function processSchedule(
       databaseId: database_id,
       operationType: OperationType.SCHEDULED_BACKUP,
       totalItems: 100,
-      userEmail: 'system',
+      userEmail: "system",
       metadata: {
         databaseName: database_name,
         schedule: scheduleType,
-        scheduledTime: schedule.next_run_at
-      }
+        scheduledTime: schedule.next_run_at,
+      },
     });
   } catch (err) {
-    logWarning(`Failed to create job for scheduled backup: ${err instanceof Error ? err.message : String(err)}`, {
-      module: 'scheduled_backup_processor',
-      operation: 'create_job',
-      databaseId: database_id
-    });
+    logWarning(
+      `Failed to create job for scheduled backup: ${err instanceof Error ? err.message : String(err)}`,
+      {
+        module: "scheduled_backup_processor",
+        operation: "create_job",
+        databaseId: database_id,
+      },
+    );
     // Continue even if job creation fails
   }
 
   try {
     // Start backup via BackupDO
     if (env.BACKUP_DO) {
-      const doId = env.BACKUP_DO.idFromName(jobId ?? `scheduled-${database_id}-${Date.now()}`);
+      const doId = env.BACKUP_DO.idFromName(
+        jobId ?? `scheduled-${database_id}-${Date.now()}`,
+      );
       const stub = env.BACKUP_DO.get(doId);
 
-      const doRequest = new Request('https://do/process/database-backup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const doRequest = new Request("https://do/process/database-backup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           jobId,
           databaseId: database_id,
           databaseName: database_name,
-          source: 'scheduled',
-          userEmail: 'system'
-        })
+          source: "scheduled",
+          userEmail: "system",
+        }),
       });
 
       // Wait for the DO to complete (or at least start processing)
@@ -138,14 +162,16 @@ async function processSchedule(
 
       if (!doResponse.ok) {
         const responseText = await doResponse.text();
-        throw new Error(`Backup DO failed: ${doResponse.status} - ${responseText}`);
+        throw new Error(
+          `Backup DO failed: ${doResponse.status} - ${responseText}`,
+        );
       }
 
       logInfo(`Scheduled backup started for: ${database_name}`, {
-        module: 'scheduled_backup_processor',
-        operation: 'backup_started',
+        module: "scheduled_backup_processor",
+        operation: "backup_started",
         databaseId: database_id,
-        metadata: { jobId }
+        metadata: { jobId },
       });
     }
 
@@ -154,11 +180,13 @@ async function processSchedule(
       scheduleType as ScheduledBackupSchedule,
       hour,
       day_of_week,
-      day_of_month
+      day_of_month,
     );
 
     // Update schedule with last run info and next run time
-    await db.prepare(`
+    await db
+      .prepare(
+        `
       UPDATE scheduled_backups SET
         last_run_at = ?,
         next_run_at = ?,
@@ -166,42 +194,49 @@ async function processSchedule(
         last_status = 'success',
         updated_at = ?
       WHERE id = ?
-    `).bind(
-      new Date().toISOString(),
-      nextRunAt,
-      jobId ?? null,
-      new Date().toISOString(),
-      schedule.id
-    ).run();
+    `,
+      )
+      .bind(
+        new Date().toISOString(),
+        nextRunAt,
+        jobId ?? null,
+        new Date().toISOString(),
+        schedule.id,
+      )
+      .run();
 
     logInfo(`Scheduled backup completed for: ${database_name}`, {
-      module: 'scheduled_backup_processor',
-      operation: 'completed',
+      module: "scheduled_backup_processor",
+      operation: "completed",
       databaseId: database_id,
-      metadata: { jobId, nextRunAt }
+      metadata: { jobId, nextRunAt },
     });
-
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
 
-    void logError(env, error instanceof Error ? error : String(error), {
-      module: 'scheduled_backup_processor',
-      operation: 'backup_failed',
-      databaseId: database_id,
-      databaseName: database_name,
-      metadata: { scheduleId: schedule.id }
-    }, isLocalDev);
+    void logError(
+      env,
+      error instanceof Error ? error : String(error),
+      {
+        module: "scheduled_backup_processor",
+        operation: "backup_failed",
+        databaseId: database_id,
+        databaseName: database_name,
+        metadata: { scheduleId: schedule.id },
+      },
+      isLocalDev,
+    );
 
     // Mark job as failed
     if (jobId) {
       try {
         await completeJob(db, {
           jobId,
-          status: 'failed',
+          status: "failed",
           processedItems: 0,
           errorCount: 1,
-          userEmail: 'system',
-          errorMessage
+          userEmail: "system",
+          errorMessage,
         });
       } catch {
         // Ignore errors in failure reporting
@@ -213,12 +248,14 @@ async function processSchedule(
       scheduleType as ScheduledBackupSchedule,
       hour,
       day_of_week,
-      day_of_month
+      day_of_month,
     );
 
     // Update schedule with failure status
     try {
-      await db.prepare(`
+      await db
+        .prepare(
+          `
         UPDATE scheduled_backups SET
           last_run_at = ?,
           next_run_at = ?,
@@ -226,16 +263,18 @@ async function processSchedule(
           last_status = 'failed',
           updated_at = ?
         WHERE id = ?
-      `).bind(
-        new Date().toISOString(),
-        nextRunAt,
-        jobId ?? null,
-        new Date().toISOString(),
-        schedule.id
-      ).run();
+      `,
+        )
+        .bind(
+          new Date().toISOString(),
+          nextRunAt,
+          jobId ?? null,
+          new Date().toISOString(),
+          schedule.id,
+        )
+        .run();
     } catch {
       // Ignore errors in status update
     }
   }
 }
-

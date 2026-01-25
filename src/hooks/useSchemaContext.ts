@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { listTables, getTableSchema, type ColumnInfo } from '@/services/api';
+import { useState, useEffect, useCallback, useRef } from "react";
+import { listTables, getTableSchema, type ColumnInfo } from "@/services/api";
 
 /**
  * Schema context for SQL autocomplete
@@ -29,7 +29,7 @@ export function useSchemaContext(databaseId: string): SchemaContext {
   const [columns, setColumns] = useState<Map<string, string[]>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Track in-flight column fetch requests to avoid duplicates
   const pendingFetches = useRef<Map<string, Promise<string[]>>>(new Map());
 
@@ -40,20 +40,24 @@ export function useSchemaContext(databaseId: string): SchemaContext {
     const fetchTables = async (): Promise<void> => {
       setLoading(true);
       setError(null);
-      
+
       try {
         const tableList = await listTables(databaseId);
         if (!cancelled) {
           // Filter to only include regular tables and views, exclude shadow tables
           const tableNames = tableList
-            .filter(t => t.type === 'table' || t.type === 'view')
-            .map(t => t.name)
-            .filter(name => !name.startsWith('sqlite_') && !name.startsWith('_cf_'));
+            .filter((t) => t.type === "table" || t.type === "view")
+            .map((t) => t.name)
+            .filter(
+              (name) => !name.startsWith("sqlite_") && !name.startsWith("_cf_"),
+            );
           setTables(tableNames);
         }
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Failed to load tables');
+          setError(
+            err instanceof Error ? err.message : "Failed to load tables",
+          );
         }
       } finally {
         if (!cancelled) {
@@ -70,59 +74,68 @@ export function useSchemaContext(databaseId: string): SchemaContext {
   }, [databaseId]);
 
   // Fetch columns for a specific table
-  const fetchColumnsForTable = useCallback(async (tableName: string): Promise<string[]> => {
-    // Return cached columns if available
-    const cached = columns.get(tableName);
-    if (cached) {
-      return cached;
-    }
-
-    // Check if there's already a pending fetch for this table
-    const pending = pendingFetches.current.get(tableName);
-    if (pending) {
-      return pending;
-    }
-
-    // Create new fetch promise
-    const fetchPromise = (async () => {
-      try {
-        const schema: ColumnInfo[] = await getTableSchema(databaseId, tableName);
-        const columnNames = schema.map(col => col.name);
-        
-        // Update the columns map
-        setColumns(prev => {
-          const next = new Map(prev);
-          next.set(tableName, columnNames);
-          return next;
-        });
-        
-        return columnNames;
-      } catch {
-        return [];
-      } finally {
-        // Clean up pending fetch
-        pendingFetches.current.delete(tableName);
+  const fetchColumnsForTable = useCallback(
+    async (tableName: string): Promise<string[]> => {
+      // Return cached columns if available
+      const cached = columns.get(tableName);
+      if (cached) {
+        return cached;
       }
-    })();
 
-    pendingFetches.current.set(tableName, fetchPromise);
-    return fetchPromise;
-  }, [databaseId, columns]);
+      // Check if there's already a pending fetch for this table
+      const pending = pendingFetches.current.get(tableName);
+      if (pending) {
+        return pending;
+      }
+
+      // Create new fetch promise
+      const fetchPromise = (async () => {
+        try {
+          const schema: ColumnInfo[] = await getTableSchema(
+            databaseId,
+            tableName,
+          );
+          const columnNames = schema.map((col) => col.name);
+
+          // Update the columns map
+          setColumns((prev) => {
+            const next = new Map(prev);
+            next.set(tableName, columnNames);
+            return next;
+          });
+
+          return columnNames;
+        } catch {
+          return [];
+        } finally {
+          // Clean up pending fetch
+          pendingFetches.current.delete(tableName);
+        }
+      })();
+
+      pendingFetches.current.set(tableName, fetchPromise);
+      return fetchPromise;
+    },
+    [databaseId, columns],
+  );
 
   // Get columns for multiple tables (used when query references multiple tables)
-  const getColumnsForTables = useCallback(async (tableNames: string[]): Promise<string[]> => {
-    const allColumns: string[] = [];
-    
-    await Promise.all(
-      tableNames.map(async (tableName) => {
-        const cols = await fetchColumnsForTable(tableName);
-        allColumns.push(...cols);
-      })
-    );
-    
-    // Return unique column names
-    return [...new Set(allColumns)];
-  }, [fetchColumnsForTable]);
+  const getColumnsForTables = useCallback(
+    async (tableNames: string[]): Promise<string[]> => {
+      const allColumns: string[] = [];
+
+      await Promise.all(
+        tableNames.map(async (tableName) => {
+          const cols = await fetchColumnsForTable(tableName);
+          allColumns.push(...cols);
+        }),
+      );
+
+      // Return unique column names
+      return [...new Set(allColumns)];
+    },
+    [fetchColumnsForTable],
+  );
 
   return {
     tables,
@@ -133,4 +146,3 @@ export function useSchemaContext(databaseId: string): SchemaContext {
     getColumnsForTables,
   };
 }
-

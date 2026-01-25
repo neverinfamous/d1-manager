@@ -3,8 +3,8 @@ name: Dependabot auto-merge
 on:
   pull_request:
     paths:
-      - 'package*.json'
-      - '.github/workflows/dependabot-auto-merge.yml'
+      - "package*.json"
+      - ".github/workflows/dependabot-auto-merge.yml"
 
 permissions:
   pull-requests: write
@@ -40,4 +40,3 @@ jobs:
               repo: context.repo.repo,
               body: '⚠️ This is a major version update. Please review carefully before merging.'
             })
-

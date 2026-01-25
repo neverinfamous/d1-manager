@@ -2,22 +2,22 @@
 // Custom extensions only below
 
 export interface Env {
-  ASSETS?: Fetcher
-  METADATA: D1Database
-  BACKUP_BUCKET?: R2Bucket
-  BACKUP_DO?: DurableObjectNamespace
-  AI?: Ai  // Workers AI binding for AI Search (AutoRAG)
-  CF_EMAIL: string
-  API_KEY: string
-  ACCOUNT_ID: string
-  TEAM_DOMAIN: string
-  POLICY_AUD: string
+  ASSETS?: Fetcher;
+  METADATA: D1Database;
+  BACKUP_BUCKET?: R2Bucket;
+  BACKUP_DO?: DurableObjectNamespace;
+  AI?: Ai; // Workers AI binding for AI Search (AutoRAG)
+  CF_EMAIL: string;
+  API_KEY: string;
+  ACCOUNT_ID: string;
+  TEAM_DOMAIN: string;
+  POLICY_AUD: string;
 }
 
 // CORS headers type
-export type CorsHeaders = Record<string, string>
+export type CorsHeaders = Record<string, string>;
 
-export const CF_API = 'https://api.cloudflare.com/client/v4';
+export const CF_API = "https://api.cloudflare.com/client/v4";
 
 // D1 Database types from Cloudflare REST API
 export interface D1DatabaseInfo {
@@ -28,12 +28,12 @@ export interface D1DatabaseInfo {
   file_size?: number;
   num_tables?: number;
   read_replication?: {
-    mode: 'auto' | 'disabled';
+    mode: "auto" | "disabled";
   };
 }
 
 // Read Replication types
-export type ReadReplicationMode = 'auto' | 'disabled';
+export type ReadReplicationMode = "auto" | "disabled";
 
 export interface ReadReplicationConfig {
   mode: ReadReplicationMode;
@@ -48,7 +48,7 @@ export interface QueryServingInfo {
 // Table schema types
 export interface TableInfo {
   name: string;
-  type: 'table' | 'view' | 'shadow' | 'virtual';
+  type: "table" | "view" | "shadow" | "virtual";
   ncol: number;
   wr: number;
   strict: number;
@@ -97,7 +97,7 @@ export interface SavedQuery {
 export interface UndoHistoryEntry {
   id: number;
   database_id: string;
-  operation_type: 'DROP_TABLE' | 'DROP_COLUMN' | 'DELETE_ROW';
+  operation_type: "DROP_TABLE" | "DROP_COLUMN" | "DELETE_ROW";
   target_table: string;
   target_column?: string;
   description: string;
@@ -107,7 +107,7 @@ export interface UndoHistoryEntry {
 }
 
 export interface UndoSnapshot {
-  operation_type: 'DROP_TABLE' | 'DROP_COLUMN' | 'DELETE_ROW';
+  operation_type: "DROP_TABLE" | "DROP_COLUMN" | "DELETE_ROW";
   tableSchema?: {
     createStatement: string;
     indexes: string[];
@@ -130,14 +130,14 @@ export interface UndoSnapshot {
 // Constraint validation types
 export interface ConstraintViolation {
   id: string;
-  type: 'foreign_key' | 'not_null' | 'unique';
-  severity: 'critical' | 'warning' | 'info';
+  type: "foreign_key" | "not_null" | "unique";
+  severity: "critical" | "warning" | "info";
   table: string;
   column?: string;
   affectedRows: number;
   details: string;
   fixable: boolean;
-  fixStrategies?: ('delete' | 'set_null' | 'manual')[];
+  fixStrategies?: ("delete" | "set_null" | "manual")[];
   metadata?: {
     parentTable?: string;
     parentColumn?: string;
@@ -170,9 +170,9 @@ export interface FixResult {
 export interface IndexRecommendation {
   tableName: string;
   columnName: string;
-  indexType: 'single' | 'composite';
+  indexType: "single" | "composite";
   compositeColumns?: string[];
-  priority: 'high' | 'medium' | 'low';
+  priority: "high" | "medium" | "low";
   rationale: string;
   estimatedImpact: string;
   suggestedSQL: string;
@@ -207,29 +207,28 @@ export interface IndexAnalysisResult {
  */
 export type WebhookEventType =
   // Database lifecycle
-  | 'database_create'
-  | 'database_delete'
+  | "database_create"
+  | "database_delete"
   // Table DDL operations
-  | 'table_create'
-  | 'table_delete'
-  | 'table_update'
+  | "table_create"
+  | "table_delete"
+  | "table_update"
   // R2 snapshot lifecycle
-  | 'backup_complete'
-  | 'restore_complete'
+  | "backup_complete"
+  | "restore_complete"
   // Data transfer operations
-  | 'import_complete'
-  | 'export_complete'
+  | "import_complete"
+  | "export_complete"
   // DDL query execution
-  | 'schema_change'
+  | "schema_change"
   // Bulk operations
-  | 'bulk_delete_complete'
+  | "bulk_delete_complete"
   // Job lifecycle
-  | 'job_failed'
-  | 'batch_complete'
+  | "job_failed"
+  | "batch_complete"
   // Backward-compatible aliases (legacy)
-  | 'database_export'
-  | 'database_import';
-
+  | "database_export"
+  | "database_import";
 
 /**
  * Webhook record from D1 metadata database
@@ -270,14 +269,14 @@ export interface WebhookResult {
 /**
  * Error severity levels
  */
-export type ErrorSeverity = 'error' | 'warning' | 'info';
+export type ErrorSeverity = "error" | "warning" | "info";
 
 /**
  * Context for structured error logging
  */
 export interface ErrorContext {
-  module: string;          // e.g., 'databases', 'tables', 'queries'
-  operation: string;       // e.g., 'create', 'delete', 'export'
+  module: string; // e.g., 'databases', 'tables', 'queries'
+  operation: string; // e.g., 'create', 'delete', 'export'
   databaseId?: string;
   databaseName?: string;
   userId?: string;
@@ -290,7 +289,7 @@ export interface ErrorContext {
 export interface StructuredError {
   timestamp: string;
   level: ErrorSeverity;
-  code: string;            // e.g., 'DB_CREATE_FAILED', 'EXPORT_TIMEOUT'
+  code: string; // e.g., 'DB_CREATE_FAILED', 'EXPORT_TIMEOUT'
   message: string;
   context: ErrorContext;
   stack?: string | undefined;
@@ -304,14 +303,14 @@ export interface StructuredError {
  * Source of the backup - tracks what operation triggered the backup
  */
 export type R2BackupSource =
-  | 'manual'           // User-initiated from database card
-  | 'rename_database'  // Before database rename operation
-  | 'strict_mode'      // Before enabling STRICT mode on table
-  | 'fts5_convert'     // Before converting FTS5 to regular table
-  | 'column_modify'    // Before modifying column type/constraints
-  | 'table_export'     // Single table export to R2
-  | 'table_backup'     // Table backup from operations like Modify Column
-  | 'scheduled';       // Automated scheduled backup
+  | "manual" // User-initiated from database card
+  | "rename_database" // Before database rename operation
+  | "strict_mode" // Before enabling STRICT mode on table
+  | "fts5_convert" // Before converting FTS5 to regular table
+  | "column_modify" // Before modifying column type/constraints
+  | "table_export" // Single table export to R2
+  | "table_backup" // Table backup from operations like Modify Column
+  | "scheduled"; // Automated scheduled backup
 
 /**
  * Metadata stored with R2 backup objects
@@ -323,8 +322,8 @@ export interface R2BackupMetadata {
   timestamp: number;
   size: number;
   bookmark?: string | undefined;
-  tableName?: string | undefined;      // For table-specific backups
-  tableFormat?: 'sql' | 'csv' | 'json' | undefined;  // For table exports
+  tableName?: string | undefined; // For table-specific backups
+  tableFormat?: "sql" | "csv" | "json" | undefined; // For table exports
   userEmail?: string | undefined;
 }
 
@@ -340,8 +339,8 @@ export interface R2BackupListItem {
   size: number;
   uploaded: string;
   tableName?: string | undefined;
-  tableFormat?: 'sql' | 'csv' | 'json' | undefined;
-  backupType: 'database' | 'table';
+  tableFormat?: "sql" | "csv" | "json" | undefined;
+  backupType: "database" | "table";
 }
 
 /**
@@ -349,7 +348,7 @@ export interface R2BackupListItem {
  */
 export interface BackupJobProgress {
   jobId: string;
-  status: 'queued' | 'running' | 'completed' | 'failed';
+  status: "queued" | "running" | "completed" | "failed";
   progress: {
     percentage: number;
     step: string;
@@ -378,7 +377,7 @@ export interface R2TableBackupParams {
   databaseId: string;
   databaseName: string;
   tableName: string;
-  format: 'sql' | 'csv' | 'json';
+  format: "sql" | "csv" | "json";
   source: R2BackupSource;
   userEmail?: string;
 }
@@ -397,7 +396,7 @@ export interface R2RestoreParams {
  */
 export interface BackupJobResponse {
   job_id: string;
-  status: 'queued';
+  status: "queued";
 }
 
 // ============================================
@@ -460,7 +459,7 @@ export interface LegacyInstallationInfo {
 /**
  * Time range for metrics queries
  */
-export type MetricsTimeRange = '24h' | '7d' | '30d';
+export type MetricsTimeRange = "24h" | "7d" | "30d";
 
 /**
  * Raw metrics data point from GraphQL API
@@ -563,7 +562,7 @@ export interface GraphQLResponse<T> {
 /**
  * Scheduled backup frequency options
  */
-export type ScheduledBackupSchedule = 'daily' | 'weekly' | 'monthly';
+export type ScheduledBackupSchedule = "daily" | "weekly" | "monthly";
 
 /**
  * Scheduled backup configuration record from D1 metadata database
@@ -573,14 +572,14 @@ export interface ScheduledBackup {
   database_id: string;
   database_name: string;
   schedule: ScheduledBackupSchedule;
-  day_of_week: number | null;     // 0-6 for weekly (0=Sunday)
-  day_of_month: number | null;    // 1-28 for monthly
-  hour: number;                    // 0-23 UTC
-  enabled: number;                 // 0 or 1
+  day_of_week: number | null; // 0-6 for weekly (0=Sunday)
+  day_of_month: number | null; // 1-28 for monthly
+  hour: number; // 0-23 UTC
+  enabled: number; // 0 or 1
   last_run_at: string | null;
   next_run_at: string | null;
   last_job_id: string | null;
-  last_status: 'success' | 'failed' | null;
+  last_status: "success" | "failed" | null;
   created_at: string;
   updated_at: string;
   created_by: string | null;
@@ -668,9 +667,9 @@ export interface AISearchInstance {
   description?: string;
   created_at?: string;
   modified_at?: string;
-  status?: 'active' | 'indexing' | 'paused' | 'error';
+  status?: "active" | "indexing" | "paused" | "error";
   data_source?: {
-    type: 'r2' | 'website';
+    type: "r2" | "website";
     bucket_name?: string;
     domain?: string;
   };
@@ -708,7 +707,7 @@ export interface AISearchCompatibility {
  */
 export interface AISearchExportStatus {
   databaseId: string;
-  status: 'pending' | 'running' | 'completed' | 'failed';
+  status: "pending" | "running" | "completed" | "failed";
   progress?: {
     tablesProcessed: number;
     totalTables: number;
@@ -756,7 +755,7 @@ export interface AISearchResult {
  * AI Search response
  */
 export interface AISearchResponse {
-  response?: string;  // AI-generated response (for ai-search endpoint)
+  response?: string; // AI-generated response (for ai-search endpoint)
   data: AISearchResult[];
   has_more: boolean;
   next_page: string | null;
@@ -781,4 +780,3 @@ export interface CreateAISearchBody {
   embeddingModel?: string;
   generationModel?: string;
 }
-

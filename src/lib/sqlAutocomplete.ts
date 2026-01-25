@@ -5,10 +5,10 @@
 
 /** Matching pairs for auto-completion */
 const PAIRS: Record<string, string> = {
-  '(': ')',
-  '{': '}',
-  '[': ']',
-  '<': '>',
+  "(": ")",
+  "{": "}",
+  "[": "]",
+  "<": ">",
   "'": "'",
   '"': '"',
 };
@@ -35,17 +35,17 @@ export interface AutocompleteResult {
  * Get the current line's indentation
  */
 function getLineIndent(text: string, cursorPos: number): string {
-  const lineStart = text.lastIndexOf('\n', cursorPos - 1) + 1;
+  const lineStart = text.lastIndexOf("\n", cursorPos - 1) + 1;
   const lineText = text.slice(lineStart, cursorPos);
   const match = /^(\s*)/.exec(lineText);
-  return match?.[1] ?? '';
+  return match?.[1] ?? "";
 }
 
 /**
  * Get the current line's text (before cursor)
  */
 function getCurrentLineText(text: string, cursorPos: number): string {
-  const lineStart = text.lastIndexOf('\n', cursorPos - 1) + 1;
+  const lineStart = text.lastIndexOf("\n", cursorPos - 1) + 1;
   return text.slice(lineStart, cursorPos).trim().toUpperCase();
 }
 
@@ -57,10 +57,10 @@ function isInsideEmptyPair(text: string, cursorPos: number): boolean {
   const before = text[cursorPos - 1];
   const after = text[cursorPos];
   return (
-    (before === '(' && after === ')') ||
-    (before === '{' && after === '}') ||
-    (before === '[' && after === ']') ||
-    (before === '<' && after === '>') ||
+    (before === "(" && after === ")") ||
+    (before === "{" && after === "}") ||
+    (before === "[" && after === "]") ||
+    (before === "<" && after === ">") ||
     (before === "'" && after === "'") ||
     (before === '"' && after === '"')
   );
@@ -69,7 +69,11 @@ function isInsideEmptyPair(text: string, cursorPos: number): boolean {
 /**
  * Check if the next character is a closing character we should skip
  */
-function shouldSkipCloser(text: string, cursorPos: number, char: string): boolean {
+function shouldSkipCloser(
+  text: string,
+  cursorPos: number,
+  char: string,
+): boolean {
   if (cursorPos >= text.length) return false;
   return text[cursorPos] === char && CLOSERS.has(char);
 }
@@ -77,10 +81,14 @@ function shouldSkipCloser(text: string, cursorPos: number, char: string): boolea
 /**
  * Check if we're inside a string literal (for quote handling)
  */
-function isInsideString(text: string, cursorPos: number, quoteChar: string): boolean {
+function isInsideString(
+  text: string,
+  cursorPos: number,
+  quoteChar: string,
+): boolean {
   let count = 0;
   for (let i = 0; i < cursorPos; i++) {
-    if (text[i] === quoteChar && (i === 0 || text[i - 1] !== '\\')) {
+    if (text[i] === quoteChar && (i === 0 || text[i - 1] !== "\\")) {
       count++;
     }
   }
@@ -95,7 +103,7 @@ export function handleSqlKeydown(
   text: string,
   selectionStart: number,
   selectionEnd: number,
-  shiftKey: boolean
+  shiftKey: boolean,
 ): AutocompleteResult {
   const hasSelection = selectionStart !== selectionEnd;
 
@@ -143,23 +151,25 @@ export function handleSqlKeydown(
   }
 
   // Handle Enter key - smart indentation
-  if (key === 'Enter' && !hasSelection) {
+  if (key === "Enter" && !hasSelection) {
     const currentIndent = getLineIndent(text, selectionStart);
-    const charBefore = selectionStart > 0 ? text[selectionStart - 1] : '';
-    const charAfter = selectionStart < text.length ? text[selectionStart] : '';
+    const charBefore = selectionStart > 0 ? text[selectionStart - 1] : "";
+    const charAfter = selectionStart < text.length ? text[selectionStart] : "";
     const lineText = getCurrentLineText(text, selectionStart);
 
     // Inside empty brackets - add extra indentation and closing on new line
-    if ((charBefore === '(' && charAfter === ')') ||
-        (charBefore === '{' && charAfter === '}') ||
-        (charBefore === '[' && charAfter === ']') ||
-        (charBefore === '<' && charAfter === '>')) {
-      const newIndent = currentIndent + '  ';
+    if (
+      (charBefore === "(" && charAfter === ")") ||
+      (charBefore === "{" && charAfter === "}") ||
+      (charBefore === "[" && charAfter === "]") ||
+      (charBefore === "<" && charAfter === ">")
+    ) {
+      const newIndent = currentIndent + "  ";
       const newValue =
         text.slice(0, selectionStart) +
-        '\n' +
+        "\n" +
         newIndent +
-        '\n' +
+        "\n" +
         currentIndent +
         text.slice(selectionStart);
 
@@ -171,10 +181,18 @@ export function handleSqlKeydown(
     }
 
     // After opening bracket - increase indent
-    if (charBefore === '(' || charBefore === '{' || charBefore === '[' || charBefore === '<') {
-      const newIndent = currentIndent + '  ';
+    if (
+      charBefore === "(" ||
+      charBefore === "{" ||
+      charBefore === "[" ||
+      charBefore === "<"
+    ) {
+      const newIndent = currentIndent + "  ";
       const newValue =
-        text.slice(0, selectionStart) + '\n' + newIndent + text.slice(selectionStart);
+        text.slice(0, selectionStart) +
+        "\n" +
+        newIndent +
+        text.slice(selectionStart);
 
       return {
         handled: true,
@@ -184,13 +202,33 @@ export function handleSqlKeydown(
     }
 
     // After SQL keywords that typically precede new clauses - increase indent
-    const keywordsForIndent = ['SELECT', 'FROM', 'WHERE', 'AND', 'OR', 'JOIN', 'LEFT', 'RIGHT', 'INNER', 'OUTER', 'ON', 'SET', 'VALUES', 'ORDER', 'GROUP', 'HAVING'];
-    const shouldIndent = keywordsForIndent.some(kw => lineText.endsWith(kw));
-    
+    const keywordsForIndent = [
+      "SELECT",
+      "FROM",
+      "WHERE",
+      "AND",
+      "OR",
+      "JOIN",
+      "LEFT",
+      "RIGHT",
+      "INNER",
+      "OUTER",
+      "ON",
+      "SET",
+      "VALUES",
+      "ORDER",
+      "GROUP",
+      "HAVING",
+    ];
+    const shouldIndent = keywordsForIndent.some((kw) => lineText.endsWith(kw));
+
     if (shouldIndent) {
-      const newIndent = currentIndent + '  ';
+      const newIndent = currentIndent + "  ";
       const newValue =
-        text.slice(0, selectionStart) + '\n' + newIndent + text.slice(selectionStart);
+        text.slice(0, selectionStart) +
+        "\n" +
+        newIndent +
+        text.slice(selectionStart);
 
       return {
         handled: true,
@@ -201,7 +239,10 @@ export function handleSqlKeydown(
 
     // Normal enter - maintain indentation
     const newValue =
-      text.slice(0, selectionStart) + '\n' + currentIndent + text.slice(selectionStart);
+      text.slice(0, selectionStart) +
+      "\n" +
+      currentIndent +
+      text.slice(selectionStart);
 
     return {
       handled: true,
@@ -211,7 +252,7 @@ export function handleSqlKeydown(
   }
 
   // Handle Backspace - delete matching pairs
-  if (key === 'Backspace' && !hasSelection && selectionStart > 0) {
+  if (key === "Backspace" && !hasSelection && selectionStart > 0) {
     if (isInsideEmptyPair(text, selectionStart)) {
       const newValue =
         text.slice(0, selectionStart - 1) + text.slice(selectionStart + 1);
@@ -225,29 +266,30 @@ export function handleSqlKeydown(
   }
 
   // Handle Tab - insert 2 spaces instead of losing focus
-  if (key === 'Tab' && !shiftKey) {
+  if (key === "Tab" && !shiftKey) {
     if (hasSelection) {
       // Indent selected lines
       const beforeSelection = text.slice(0, selectionStart);
       const afterSelection = text.slice(selectionEnd);
-      
+
       // Find the start of the first selected line
-      const lineStart = beforeSelection.lastIndexOf('\n') + 1;
+      const lineStart = beforeSelection.lastIndexOf("\n") + 1;
       const prefix = text.slice(0, lineStart);
       const selectedWithLineStart = text.slice(lineStart, selectionEnd);
-      
+
       // Add indent to each line
-      const indented = selectedWithLineStart.replace(/^/gm, '  ');
+      const indented = selectedWithLineStart.replace(/^/gm, "  ");
       const newValue = prefix + indented + afterSelection;
-      
+
       return {
         handled: true,
         newValue,
-        newCursorPos: selectionEnd + (indented.length - selectedWithLineStart.length),
+        newCursorPos:
+          selectionEnd + (indented.length - selectedWithLineStart.length),
       };
     } else {
       const newValue =
-        text.slice(0, selectionStart) + '  ' + text.slice(selectionEnd);
+        text.slice(0, selectionStart) + "  " + text.slice(selectionEnd);
 
       return {
         handled: true,
@@ -258,13 +300,16 @@ export function handleSqlKeydown(
   }
 
   // Handle Shift+Tab - unindent (single line)
-  if (key === 'Tab' && shiftKey && !hasSelection) {
-    const lineStart = text.lastIndexOf('\n', selectionStart - 1) + 1;
+  if (key === "Tab" && shiftKey && !hasSelection) {
+    const lineStart = text.lastIndexOf("\n", selectionStart - 1) + 1;
     const lineText = text.slice(lineStart, selectionStart);
-    
+
     // Check if line starts with spaces we can remove
-    if (lineText.startsWith('  ')) {
-      const newValue = text.slice(0, lineStart) + lineText.slice(2) + text.slice(selectionStart);
+    if (lineText.startsWith("  ")) {
+      const newValue =
+        text.slice(0, lineStart) +
+        lineText.slice(2) +
+        text.slice(selectionStart);
       return {
         handled: true,
         newValue,
@@ -274,22 +319,22 @@ export function handleSqlKeydown(
   }
 
   // Handle Shift+Tab with selection - unindent multiple lines
-  if (key === 'Tab' && shiftKey && hasSelection) {
+  if (key === "Tab" && shiftKey && hasSelection) {
     const beforeSelection = text.slice(0, selectionStart);
     const afterSelection = text.slice(selectionEnd);
-    
+
     // Find the start of the first selected line
-    const lineStart = beforeSelection.lastIndexOf('\n') + 1;
+    const lineStart = beforeSelection.lastIndexOf("\n") + 1;
     const prefix = text.slice(0, lineStart);
     const selectedWithLineStart = text.slice(lineStart, selectionEnd);
-    
+
     // Remove up to 2 spaces from the start of each line
-    const unindented = selectedWithLineStart.replace(/^( {1,2})/gm, '');
+    const unindented = selectedWithLineStart.replace(/^( {1,2})/gm, "");
     const removedChars = selectedWithLineStart.length - unindented.length;
-    
+
     if (removedChars > 0) {
       const newValue = prefix + unindented + afterSelection;
-      
+
       return {
         handled: true,
         newValue,
@@ -300,4 +345,3 @@ export function handleSqlKeydown(
 
   return { handled: false };
 }
-

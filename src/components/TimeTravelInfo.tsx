@@ -1,6 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState, useEffect, useCallback } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   getCurrentBookmark,
   getBookmarkHistory,
@@ -8,8 +14,8 @@ import {
   deleteBookmarkEntry,
   generateRestoreCommand,
   type BookmarkInfo,
-  type BookmarkHistoryEntry
-} from '../services/api';
+  type BookmarkHistoryEntry,
+} from "../services/api";
 import {
   Clock,
   Copy,
@@ -22,17 +28,22 @@ import {
   ChevronDown,
   ChevronUp,
   Bookmark,
-  Info
-} from 'lucide-react';
-import { ErrorMessage } from '@/components/ui/error-message';
+  Info,
+} from "lucide-react";
+import { ErrorMessage } from "@/components/ui/error-message";
 
 interface TimeTravelInfoProps {
   databaseId: string;
   databaseName: string;
 }
 
-export function TimeTravelInfo({ databaseId, databaseName }: TimeTravelInfoProps): React.JSX.Element {
-  const [currentBookmark, setCurrentBookmark] = useState<BookmarkInfo | null>(null);
+export function TimeTravelInfo({
+  databaseId,
+  databaseName,
+}: TimeTravelInfoProps): React.JSX.Element {
+  const [currentBookmark, setCurrentBookmark] = useState<BookmarkInfo | null>(
+    null,
+  );
   const [history, setHistory] = useState<BookmarkHistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -41,25 +52,32 @@ export function TimeTravelInfo({ databaseId, databaseName }: TimeTravelInfoProps
   const [historyExpanded, setHistoryExpanded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  const loadData = useCallback(async (skipCache?: boolean) => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      // Use cache on initial load for instant tab switching
-      const [bookmarkResult, historyResult] = await Promise.all([
-        getCurrentBookmark(databaseId, skipCache),
-        getBookmarkHistory(databaseId, 10, skipCache)
-      ]);
-      
-      setCurrentBookmark(bookmarkResult);
-      setHistory(historyResult);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load Time Travel data');
-    } finally {
-      setLoading(false);
-    }
-  }, [databaseId]);
+  const loadData = useCallback(
+    async (skipCache?: boolean) => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        // Use cache on initial load for instant tab switching
+        const [bookmarkResult, historyResult] = await Promise.all([
+          getCurrentBookmark(databaseId, skipCache),
+          getBookmarkHistory(databaseId, 10, skipCache),
+        ]);
+
+        setCurrentBookmark(bookmarkResult);
+        setHistory(historyResult);
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Failed to load Time Travel data",
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    [databaseId],
+  );
 
   useEffect(() => {
     void loadData();
@@ -87,10 +105,12 @@ export function TimeTravelInfo({ databaseId, databaseName }: TimeTravelInfoProps
   const handleCapture = async (): Promise<void> => {
     try {
       setCapturing(true);
-      await captureBookmark(databaseId, 'Manual checkpoint');
+      await captureBookmark(databaseId, "Manual checkpoint");
       await loadData();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to capture bookmark');
+      setError(
+        err instanceof Error ? err.message : "Failed to capture bookmark",
+      );
     } finally {
       setCapturing(false);
     }
@@ -99,9 +119,11 @@ export function TimeTravelInfo({ databaseId, databaseName }: TimeTravelInfoProps
   const handleDeleteBookmark = async (bookmarkId: number): Promise<void> => {
     try {
       await deleteBookmarkEntry(databaseId, bookmarkId);
-      setHistory(prev => prev.filter(h => h.id !== bookmarkId));
+      setHistory((prev) => prev.filter((h) => h.id !== bookmarkId));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete bookmark');
+      setError(
+        err instanceof Error ? err.message : "Failed to delete bookmark",
+      );
     }
   };
 
@@ -113,7 +135,7 @@ export function TimeTravelInfo({ databaseId, databaseName }: TimeTravelInfoProps
     const diffHours = Math.floor(diffMins / 60);
     const diffDays = Math.floor(diffHours / 24);
 
-    if (diffMins < 1) return 'just now';
+    if (diffMins < 1) return "just now";
     if (diffMins < 60) return `${String(diffMins)}m ago`;
     if (diffHours < 24) return `${String(diffHours)}h ago`;
     if (diffDays < 7) return `${String(diffDays)}d ago`;
@@ -122,18 +144,18 @@ export function TimeTravelInfo({ databaseId, databaseName }: TimeTravelInfoProps
 
   const getOperationLabel = (type: string): string => {
     switch (type) {
-      case 'manual':
-        return 'Manual Checkpoint';
-      case 'pre_drop_table':
-        return 'Pre-Drop Table';
-      case 'pre_delete_rows':
-        return 'Pre-Delete Rows';
-      case 'pre_drop_column':
-        return 'Pre-Drop Column';
-      case 'pre_import':
-        return 'Pre-Import';
-      case 'pre_rename':
-        return 'Pre-Rename';
+      case "manual":
+        return "Manual Checkpoint";
+      case "pre_drop_table":
+        return "Pre-Drop Table";
+      case "pre_delete_rows":
+        return "Pre-Delete Rows";
+      case "pre_drop_column":
+        return "Pre-Drop Column";
+      case "pre_import":
+        return "Pre-Import";
+      case "pre_rename":
+        return "Pre-Rename";
       default:
         return type;
     }
@@ -141,7 +163,7 @@ export function TimeTravelInfo({ databaseId, databaseName }: TimeTravelInfoProps
 
   const truncateBookmark = (bookmark: string, length = 40): string => {
     if (bookmark.length <= length) return bookmark;
-    return bookmark.substring(0, length) + '...';
+    return bookmark.substring(0, length) + "...";
   };
 
   if (loading) {
@@ -149,7 +171,9 @@ export function TimeTravelInfo({ databaseId, databaseName }: TimeTravelInfoProps
       <Card>
         <CardContent className="flex items-center justify-center py-12">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          <span className="ml-2 text-muted-foreground">Loading Time Travel data...</span>
+          <span className="ml-2 text-muted-foreground">
+            Loading Time Travel data...
+          </span>
         </CardContent>
       </Card>
     );
@@ -160,8 +184,16 @@ export function TimeTravelInfo({ databaseId, databaseName }: TimeTravelInfoProps
       <Card>
         <CardContent className="py-6">
           <ErrorMessage error={error} className="mb-4" />
-          <Button variant="outline" onClick={() => void handleRefresh()} disabled={refreshing}>
-            {refreshing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+          <Button
+            variant="outline"
+            onClick={() => void handleRefresh()}
+            disabled={refreshing}
+          >
+            {refreshing ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : (
+              <RefreshCw className="h-4 w-4 mr-2" />
+            )}
             Retry
           </Button>
         </CardContent>
@@ -171,7 +203,7 @@ export function TimeTravelInfo({ databaseId, databaseName }: TimeTravelInfoProps
 
   const restoreCommand = currentBookmark?.bookmark
     ? generateRestoreCommand(databaseName, currentBookmark.bookmark)
-    : '';
+    : "";
 
   return (
     <div className="space-y-4">
@@ -203,19 +235,23 @@ export function TimeTravelInfo({ databaseId, databaseName }: TimeTravelInfoProps
         <CardContent className="space-y-4">
           {/* Current Bookmark */}
           <div className="space-y-2">
-            <label className="text-sm font-medium text-muted-foreground">Current Bookmark</label>
+            <label className="text-sm font-medium text-muted-foreground">
+              Current Bookmark
+            </label>
             <div className="flex items-center gap-2">
               <code className="flex-1 px-3 py-2 bg-muted rounded-md font-mono text-xs break-all">
-                {currentBookmark?.bookmark || 'No bookmark available'}
+                {currentBookmark?.bookmark || "No bookmark available"}
               </code>
               {currentBookmark?.bookmark && (
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => void handleCopy(currentBookmark.bookmark, 'current')}
+                  onClick={() =>
+                    void handleCopy(currentBookmark.bookmark, "current")
+                  }
                   className="shrink-0"
                 >
-                  {copiedId === 'current' ? (
+                  {copiedId === "current" ? (
                     <Check className="h-4 w-4 text-green-500" />
                   ) : (
                     <Copy className="h-4 w-4" />
@@ -229,7 +265,8 @@ export function TimeTravelInfo({ databaseId, databaseName }: TimeTravelInfoProps
           <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-md">
             <Info className="h-4 w-4 text-muted-foreground shrink-0" />
             <span className="text-sm text-muted-foreground">
-              Retention: <strong>30 days</strong> (Paid plans) / <strong>7 days</strong> (Free plan)
+              Retention: <strong>30 days</strong> (Paid plans) /{" "}
+              <strong>7 days</strong> (Free plan)
             </span>
           </div>
 
@@ -247,10 +284,10 @@ export function TimeTravelInfo({ databaseId, databaseName }: TimeTravelInfoProps
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => void handleCopy(restoreCommand, 'restore')}
+                  onClick={() => void handleCopy(restoreCommand, "restore")}
                   className="shrink-0"
                 >
-                  {copiedId === 'restore' ? (
+                  {copiedId === "restore" ? (
                     <Check className="h-4 w-4 text-green-500" />
                   ) : (
                     <Copy className="h-4 w-4" />
@@ -258,7 +295,8 @@ export function TimeTravelInfo({ databaseId, databaseName }: TimeTravelInfoProps
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                Run this command in your terminal with Wrangler CLI to restore the database to this point.
+                Run this command in your terminal with Wrangler CLI to restore
+                the database to this point.
               </p>
             </div>
           )}
@@ -285,12 +323,17 @@ export function TimeTravelInfo({ databaseId, databaseName }: TimeTravelInfoProps
 
       {/* Bookmark History Card */}
       <Card>
-        <CardHeader className="pb-2 cursor-pointer" onClick={() => setHistoryExpanded(!historyExpanded)}>
+        <CardHeader
+          className="pb-2 cursor-pointer"
+          onClick={() => setHistoryExpanded(!historyExpanded)}
+        >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <History className="h-5 w-5 text-muted-foreground" />
               <CardTitle className="text-lg">Checkpoint History</CardTitle>
-              <span className="text-sm text-muted-foreground">({history.length})</span>
+              <span className="text-sm text-muted-foreground">
+                ({history.length})
+              </span>
             </div>
             <Button variant="ghost" size="sm">
               {historyExpanded ? (
@@ -304,12 +347,13 @@ export function TimeTravelInfo({ databaseId, databaseName }: TimeTravelInfoProps
             Checkpoints captured before destructive operations
           </CardDescription>
         </CardHeader>
-        
+
         {historyExpanded && (
           <CardContent>
             {history.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">
-                No checkpoint history yet. Checkpoints are automatically created before destructive operations.
+                No checkpoint history yet. Checkpoints are automatically created
+                before destructive operations.
               </p>
             ) : (
               <div className="space-y-3">
@@ -338,10 +382,15 @@ export function TimeTravelInfo({ databaseId, databaseName }: TimeTravelInfoProps
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => void handleCopy(
-                            generateRestoreCommand(databaseName, entry.bookmark),
-                            `history-${String(entry.id)}`
-                          )}
+                          onClick={() =>
+                            void handleCopy(
+                              generateRestoreCommand(
+                                databaseName,
+                                entry.bookmark,
+                              ),
+                              `history-${String(entry.id)}`,
+                            )
+                          }
                           title="Copy restore command"
                         >
                           {copiedId === `history-${String(entry.id)}` ? (
@@ -379,10 +428,12 @@ export function TimeTravelInfo({ databaseId, databaseName }: TimeTravelInfoProps
             <Info className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
             <div className="text-sm text-muted-foreground space-y-2">
               <p>
-                <strong>D1 Time Travel</strong> allows you to restore your database to any point within the retention period.
+                <strong>D1 Time Travel</strong> allows you to restore your
+                database to any point within the retention period.
               </p>
               <p>
-                Restore operations require the <strong>Wrangler CLI</strong>. The D1 REST API does not support restore operations.
+                Restore operations require the <strong>Wrangler CLI</strong>.
+                The D1 REST API does not support restore operations.
               </p>
               <p>
                 <a
@@ -401,4 +452,3 @@ export function TimeTravelInfo({ databaseId, databaseName }: TimeTravelInfoProps
     </div>
   );
 }
-

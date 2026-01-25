@@ -8,44 +8,47 @@ import type {
   GraphQLResponse,
   D1AnalyticsResult,
   D1DatabaseInfo,
-  QueryInsight
-} from '../types';
-import { CF_API } from '../types';
-import { logInfo, logWarning, logError } from '../utils/error-logger';
+  QueryInsight,
+} from "../types";
+import { CF_API } from "../types";
+import { logInfo, logWarning, logError } from "../utils/error-logger";
 
-const GRAPHQL_API = 'https://api.cloudflare.com/client/v4/graphql';
+const GRAPHQL_API = "https://api.cloudflare.com/client/v4/graphql";
 
 /**
  * Helper to create response headers with CORS
  */
 function jsonHeaders(corsHeaders: HeadersInit): Headers {
   const headers = new Headers(corsHeaders);
-  headers.set('Content-Type', 'application/json');
+  headers.set("Content-Type", "application/json");
   return headers;
 }
 
 /**
  * Calculate date range based on time range string
  */
-function getDateRange(timeRange: MetricsTimeRange): { start: string; end: string } {
+function getDateRange(timeRange: MetricsTimeRange): {
+  start: string;
+  end: string;
+} {
   const end = new Date();
   const start = new Date();
 
   switch (timeRange) {
-    case '24h':
+    case "24h":
       start.setHours(start.getHours() - 24);
       break;
-    case '7d':
+    case "7d":
       start.setDate(start.getDate() - 7);
       break;
-    case '30d':
+    case "30d":
       start.setDate(start.getDate() - 30);
       break;
   }
 
   return {
-    start: start.toISOString().split('T')[0] ?? '',
-    end: end.toISOString().split('T')[0] ?? ''
+    start: start.toISOString().split("T")[0] ?? "",
+    end: end.toISOString().split("T")[0] ?? "",
   };
 }
 
@@ -57,9 +60,9 @@ function buildAnalyticsQuery(
   accountId: string,
   start: string,
   end: string,
-  databaseId?: string
+  databaseId?: string,
 ): string {
-  const dbFilter = databaseId ? `, databaseId: "${databaseId}"` : '';
+  const dbFilter = databaseId ? `, databaseId: "${databaseId}"` : "";
 
   return `
     query D1Metrics {
@@ -135,14 +138,14 @@ function buildAnalyticsQuery(
  */
 async function fetchDatabaseNames(
   env: Env,
-  cfHeaders: Record<string, string>
+  cfHeaders: Record<string, string>,
 ): Promise<Map<string, string>> {
   const nameMap = new Map<string, string>();
 
   try {
     const response = await fetch(
       `${CF_API}/accounts/${env.ACCOUNT_ID}/d1/database`,
-      { headers: cfHeaders }
+      { headers: cfHeaders },
     );
 
     if (response.ok) {
@@ -154,10 +157,10 @@ async function fetchDatabaseNames(
       }
     }
   } catch (err) {
-    logWarning('Failed to fetch database names for metrics', {
-      module: 'metrics',
-      operation: 'fetch_names',
-      metadata: { error: err instanceof Error ? err.message : String(err) }
+    logWarning("Failed to fetch database names for metrics", {
+      module: "metrics",
+      operation: "fetch_names",
+      metadata: { error: err instanceof Error ? err.message : String(err) },
     });
   }
 
@@ -170,53 +173,68 @@ async function fetchDatabaseNames(
 async function executeGraphQLQuery(
   env: Env,
   query: string,
-  isLocalDev: boolean
+  isLocalDev: boolean,
 ): Promise<D1AnalyticsResult | null> {
   const cfHeaders = {
-    'Authorization': `Bearer ${env.API_KEY}`,
-    'Content-Type': 'application/json'
+    Authorization: `Bearer ${env.API_KEY}`,
+    "Content-Type": "application/json",
   };
 
   try {
-    logInfo('Executing GraphQL analytics query', {
-      module: 'metrics',
-      operation: 'graphql_query'
+    logInfo("Executing GraphQL analytics query", {
+      module: "metrics",
+      operation: "graphql_query",
     });
 
     const response = await fetch(GRAPHQL_API, {
-      method: 'POST',
+      method: "POST",
       headers: cfHeaders,
-      body: JSON.stringify({ query })
+      body: JSON.stringify({ query }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      void logError(env, `GraphQL API error: ${errorText}`, {
-        module: 'metrics',
-        operation: 'graphql_query',
-        metadata: { status: response.status }
-      }, isLocalDev);
+      void logError(
+        env,
+        `GraphQL API error: ${errorText}`,
+        {
+          module: "metrics",
+          operation: "graphql_query",
+          metadata: { status: response.status },
+        },
+        isLocalDev,
+      );
       return null;
     }
 
     const result: GraphQLResponse<D1AnalyticsResult> = await response.json();
 
     if (result.errors && result.errors.length > 0) {
-      const errorMessages = result.errors.map(e => e.message).join(', ');
-      void logError(env, `GraphQL errors: ${errorMessages}`, {
-        module: 'metrics',
-        operation: 'graphql_query',
-        metadata: { errors: result.errors }
-      }, isLocalDev);
+      const errorMessages = result.errors.map((e) => e.message).join(", ");
+      void logError(
+        env,
+        `GraphQL errors: ${errorMessages}`,
+        {
+          module: "metrics",
+          operation: "graphql_query",
+          metadata: { errors: result.errors },
+        },
+        isLocalDev,
+      );
       return null;
     }
 
     return result.data ?? null;
   } catch (err) {
-    void logError(env, err instanceof Error ? err : String(err), {
-      module: 'metrics',
-      operation: 'graphql_query'
-    }, isLocalDev);
+    void logError(
+      env,
+      err instanceof Error ? err : String(err),
+      {
+        module: "metrics",
+        operation: "graphql_query",
+      },
+      isLocalDev,
+    );
     return null;
   }
 }
@@ -229,7 +247,7 @@ function processMetricsData(
   timeRange: MetricsTimeRange,
   startDate: string,
   endDate: string,
-  databaseNames: Map<string, string>
+  databaseNames: Map<string, string>,
 ): MetricsResponse {
   const accounts = data.viewer.accounts;
   const account = accounts[0];
@@ -245,12 +263,12 @@ function processMetricsData(
         totalRowsRead: 0,
         totalRowsWritten: 0,
         totalStorageBytes: 0,
-        databaseCount: 0
+        databaseCount: 0,
       },
       byDatabase: [],
       timeSeries: [],
       storageSeries: [],
-      queryInsights: []
+      queryInsights: [],
     };
   }
 
@@ -259,7 +277,7 @@ function processMetricsData(
   const queryGroups = account.d1QueriesAdaptiveGroups ?? [];
 
   // Build time series data
-  const timeSeries: MetricsDataPoint[] = analyticsGroups.map(group => ({
+  const timeSeries: MetricsDataPoint[] = analyticsGroups.map((group) => ({
     date: group.dimensions.date,
     databaseId: group.dimensions.databaseId,
     readQueries: group.sum.readQueries,
@@ -268,28 +286,28 @@ function processMetricsData(
     rowsWritten: group.sum.rowsWritten,
     queryBatchTimeMsP50: group.quantiles?.queryBatchTimeMsP50,
     queryBatchTimeMsP90: group.quantiles?.queryBatchTimeMsP90,
-    queryBatchResponseBytes: group.sum.queryBatchResponseBytes
+    queryBatchResponseBytes: group.sum.queryBatchResponseBytes,
   }));
 
   // Build storage series data
-  const storageSeries: StorageDataPoint[] = storageGroups.map(group => ({
+  const storageSeries: StorageDataPoint[] = storageGroups.map((group) => ({
     date: group.dimensions.date,
     databaseId: group.dimensions.databaseId,
-    databaseSizeBytes: group.max.databaseSizeBytes
+    databaseSizeBytes: group.max.databaseSizeBytes,
   }));
 
   // Build Query Insights for slow query analysis
   // Note: d1QueriesAdaptiveGroups only provides 'query' dimension, no databaseId per query
-  const queryInsights: QueryInsight[] = queryGroups.map(group => ({
+  const queryInsights: QueryInsight[] = queryGroups.map((group) => ({
     queryHash: group.dimensions.query.slice(0, 16), // Generate hash from query prefix
     queryString: group.dimensions.query,
-    databaseId: '', // Not available per-query from this endpoint
+    databaseId: "", // Not available per-query from this endpoint
     databaseName: undefined,
     totalTimeMs: group.sum.queryDurationMs,
     avgTimeMs: group.avg?.queryDurationMs ?? 0,
     executionCount: group.count,
     rowsRead: group.sum.rowsRead,
-    rowsWritten: group.sum.rowsWritten
+    rowsWritten: group.sum.rowsWritten,
   }));
 
   // Aggregate by database
@@ -312,12 +330,15 @@ function processMetricsData(
         totalReadQueries: group.sum.readQueries,
         totalWriteQueries: group.sum.writeQueries,
         totalRowsRead: group.sum.rowsRead,
-        totalRowsWritten: group.sum.rowsWritten
+        totalRowsWritten: group.sum.rowsWritten,
       });
     }
 
     // Collect latency samples for averaging
-    if (group.quantiles?.queryBatchTimeMsP90 !== undefined && group.quantiles.queryBatchTimeMsP90 !== null) {
+    if (
+      group.quantiles?.queryBatchTimeMsP90 !== undefined &&
+      group.quantiles.queryBatchTimeMsP90 !== null
+    ) {
       const samples = latencySamples.get(dbId) ?? [];
       samples.push(group.quantiles.queryBatchTimeMsP90);
       latencySamples.set(dbId, samples);
@@ -328,7 +349,8 @@ function processMetricsData(
   for (const [dbId, samples] of latencySamples) {
     const dbMetrics = byDatabaseMap.get(dbId);
     if (dbMetrics && samples.length > 0) {
-      dbMetrics.p90LatencyMs = samples.reduce((a, b) => a + b, 0) / samples.length;
+      dbMetrics.p90LatencyMs =
+        samples.reduce((a, b) => a + b, 0) / samples.length;
     }
   }
 
@@ -371,9 +393,10 @@ function processMetricsData(
     }
   }
 
-  const avgLatencyMs = allLatencySamples.length > 0
-    ? allLatencySamples.reduce((a, b) => a + b, 0) / allLatencySamples.length
-    : undefined;
+  const avgLatencyMs =
+    allLatencySamples.length > 0
+      ? allLatencySamples.reduce((a, b) => a + b, 0) / allLatencySamples.length
+      : undefined;
 
   return {
     summary: {
@@ -386,12 +409,12 @@ function processMetricsData(
       totalRowsWritten,
       avgLatencyMs,
       totalStorageBytes,
-      databaseCount: byDatabase.length
+      databaseCount: byDatabase.length,
     },
     byDatabase,
     timeSeries,
     storageSeries,
-    queryInsights
+    queryInsights,
   };
 }
 
@@ -402,21 +425,21 @@ function generateMockMetrics(timeRange: MetricsTimeRange): MetricsResponse {
   const { start, end } = getDateRange(timeRange);
 
   const mockDatabases = [
-    { id: 'mock-db-1', name: 'dev-database' },
-    { id: 'mock-db-2', name: 'test-database' }
+    { id: "mock-db-1", name: "dev-database" },
+    { id: "mock-db-2", name: "test-database" },
   ];
 
   const timeSeries: MetricsDataPoint[] = [];
   const storageSeries: StorageDataPoint[] = [];
 
   // Generate sample data for each day
-  const days = timeRange === '24h' ? 1 : timeRange === '7d' ? 7 : 30;
+  const days = timeRange === "24h" ? 1 : timeRange === "7d" ? 7 : 30;
   const endDate = new Date();
 
   for (let i = 0; i < days; i++) {
     const date = new Date(endDate);
     date.setDate(date.getDate() - i);
-    const dateStr = date.toISOString().split('T')[0] ?? '';
+    const dateStr = date.toISOString().split("T")[0] ?? "";
 
     for (const db of mockDatabases) {
       timeSeries.push({
@@ -427,18 +450,18 @@ function generateMockMetrics(timeRange: MetricsTimeRange): MetricsResponse {
         rowsRead: Math.floor(Math.random() * 50000) + 5000,
         rowsWritten: Math.floor(Math.random() * 1000) + 100,
         queryBatchTimeMsP50: Math.random() * 10 + 2,
-        queryBatchTimeMsP90: Math.random() * 50 + 10
+        queryBatchTimeMsP90: Math.random() * 50 + 10,
       });
 
       storageSeries.push({
         date: dateStr,
         databaseId: db.id,
-        databaseSizeBytes: Math.floor(Math.random() * 1024 * 1024) + 100000
+        databaseSizeBytes: Math.floor(Math.random() * 1024 * 1024) + 100000,
       });
     }
   }
 
-  const byDatabase: DatabaseMetricsSummary[] = mockDatabases.map(db => ({
+  const byDatabase: DatabaseMetricsSummary[] = mockDatabases.map((db) => ({
     databaseId: db.id,
     databaseName: db.name,
     totalReadQueries: Math.floor(Math.random() * 10000) + 1000,
@@ -446,37 +469,71 @@ function generateMockMetrics(timeRange: MetricsTimeRange): MetricsResponse {
     totalRowsRead: Math.floor(Math.random() * 500000) + 50000,
     totalRowsWritten: Math.floor(Math.random() * 10000) + 1000,
     p90LatencyMs: Math.random() * 30 + 5,
-    currentSizeBytes: Math.floor(Math.random() * 10 * 1024 * 1024) + 100000
+    currentSizeBytes: Math.floor(Math.random() * 10 * 1024 * 1024) + 100000,
   }));
 
   // Generate mock Query Insights (slow query examples)
   const mockQueries = [
-    { query: 'SELECT * FROM users WHERE email LIKE ?', hash: 'a1b2c3d4' },
-    { query: 'SELECT u.*, p.* FROM users u JOIN posts p ON u.id = p.user_id', hash: 'e5f6g7h8' },
-    { query: 'UPDATE sessions SET last_active = ? WHERE user_id = ?', hash: 'i9j0k1l2' },
-    { query: 'SELECT COUNT(*) FROM events WHERE created_at > ?', hash: 'm3n4o5p6' },
-    { query: 'INSERT INTO logs (action, data, timestamp) VALUES (?, ?, ?)', hash: 'q7r8s9t0' },
-    { query: 'DELETE FROM expired_tokens WHERE expires_at < ?', hash: 'u1v2w3x4' }
+    { query: "SELECT * FROM users WHERE email LIKE ?", hash: "a1b2c3d4" },
+    {
+      query: "SELECT u.*, p.* FROM users u JOIN posts p ON u.id = p.user_id",
+      hash: "e5f6g7h8",
+    },
+    {
+      query: "UPDATE sessions SET last_active = ? WHERE user_id = ?",
+      hash: "i9j0k1l2",
+    },
+    {
+      query: "SELECT COUNT(*) FROM events WHERE created_at > ?",
+      hash: "m3n4o5p6",
+    },
+    {
+      query: "INSERT INTO logs (action, data, timestamp) VALUES (?, ?, ?)",
+      hash: "q7r8s9t0",
+    },
+    {
+      query: "DELETE FROM expired_tokens WHERE expires_at < ?",
+      hash: "u1v2w3x4",
+    },
   ];
 
-  const queryInsights: QueryInsight[] = mockQueries.map((q, i) => ({
-    queryHash: q.hash,
-    queryString: q.query,
-    databaseId: mockDatabases[i % 2]?.id ?? 'mock-db-1',
-    databaseName: mockDatabases[i % 2]?.name,
-    totalTimeMs: Math.floor(Math.random() * 5000) + 100,
-    avgTimeMs: Math.random() * 100 + 5,
-    executionCount: Math.floor(Math.random() * 1000) + 10,
-    rowsRead: Math.floor(Math.random() * 100000) + 1000,
-    rowsWritten: Math.floor(Math.random() * 1000) + 10
-  })).sort((a, b) => b.totalTimeMs - a.totalTimeMs);
+  const queryInsights: QueryInsight[] = mockQueries
+    .map((q, i) => ({
+      queryHash: q.hash,
+      queryString: q.query,
+      databaseId: mockDatabases[i % 2]?.id ?? "mock-db-1",
+      databaseName: mockDatabases[i % 2]?.name,
+      totalTimeMs: Math.floor(Math.random() * 5000) + 100,
+      avgTimeMs: Math.random() * 100 + 5,
+      executionCount: Math.floor(Math.random() * 1000) + 10,
+      rowsRead: Math.floor(Math.random() * 100000) + 1000,
+      rowsWritten: Math.floor(Math.random() * 1000) + 10,
+    }))
+    .sort((a, b) => b.totalTimeMs - a.totalTimeMs);
 
-  const totalReadQueries = byDatabase.reduce((sum, db) => sum + db.totalReadQueries, 0);
-  const totalWriteQueries = byDatabase.reduce((sum, db) => sum + db.totalWriteQueries, 0);
-  const totalRowsRead = byDatabase.reduce((sum, db) => sum + db.totalRowsRead, 0);
-  const totalRowsWritten = byDatabase.reduce((sum, db) => sum + db.totalRowsWritten, 0);
-  const totalStorageBytes = byDatabase.reduce((sum, db) => sum + (db.currentSizeBytes ?? 0), 0);
-  const avgLatencyMs = byDatabase.reduce((sum, db) => sum + (db.p90LatencyMs ?? 0), 0) / byDatabase.length;
+  const totalReadQueries = byDatabase.reduce(
+    (sum, db) => sum + db.totalReadQueries,
+    0,
+  );
+  const totalWriteQueries = byDatabase.reduce(
+    (sum, db) => sum + db.totalWriteQueries,
+    0,
+  );
+  const totalRowsRead = byDatabase.reduce(
+    (sum, db) => sum + db.totalRowsRead,
+    0,
+  );
+  const totalRowsWritten = byDatabase.reduce(
+    (sum, db) => sum + db.totalRowsWritten,
+    0,
+  );
+  const totalStorageBytes = byDatabase.reduce(
+    (sum, db) => sum + (db.currentSizeBytes ?? 0),
+    0,
+  );
+  const avgLatencyMs =
+    byDatabase.reduce((sum, db) => sum + (db.p90LatencyMs ?? 0), 0) /
+    byDatabase.length;
 
   return {
     summary: {
@@ -489,12 +546,12 @@ function generateMockMetrics(timeRange: MetricsTimeRange): MetricsResponse {
       totalRowsWritten,
       avgLatencyMs,
       totalStorageBytes,
-      databaseCount: mockDatabases.length
+      databaseCount: mockDatabases.length,
     },
     byDatabase,
     timeSeries,
     storageSeries,
-    queryInsights
+    queryInsights,
   };
 }
 
@@ -507,43 +564,53 @@ export async function handleMetricsRoutes(
   url: URL,
   corsHeaders: HeadersInit,
   isLocalDev: boolean,
-  _userEmail: string
+  _userEmail: string,
 ): Promise<Response | null> {
   // GET /api/metrics - Get D1 analytics with optional database filter
-  if (request.method === 'GET' && url.pathname === '/api/metrics') {
-    const timeRange = (url.searchParams.get('range') ?? '7d') as MetricsTimeRange;
-    const databaseId = url.searchParams.get('databaseId') ?? undefined;
+  if (request.method === "GET" && url.pathname === "/api/metrics") {
+    const timeRange = (url.searchParams.get("range") ??
+      "7d") as MetricsTimeRange;
+    const databaseId = url.searchParams.get("databaseId") ?? undefined;
 
     // Validate time range
-    if (!['24h', '7d', '30d'].includes(timeRange)) {
-      return new Response(JSON.stringify({
-        error: 'Invalid time range',
-        message: 'Time range must be one of: 24h, 7d, 30d'
-      }), {
-        status: 400,
-        headers: jsonHeaders(corsHeaders)
-      });
+    if (!["24h", "7d", "30d"].includes(timeRange)) {
+      return new Response(
+        JSON.stringify({
+          error: "Invalid time range",
+          message: "Time range must be one of: 24h, 7d, 30d",
+        }),
+        {
+          status: 400,
+          headers: jsonHeaders(corsHeaders),
+        },
+      );
     }
 
-    logInfo(`Fetching D1 metrics for range: ${timeRange}${databaseId ? ` (filtered to ${databaseId})` : ''}`, {
-      module: 'metrics',
-      operation: 'get_metrics',
-      metadata: { timeRange, databaseId }
-    });
+    logInfo(
+      `Fetching D1 metrics for range: ${timeRange}${databaseId ? ` (filtered to ${databaseId})` : ""}`,
+      {
+        module: "metrics",
+        operation: "get_metrics",
+        metadata: { timeRange, databaseId },
+      },
+    );
 
     // Return mock data for local development
     if (isLocalDev) {
-      logInfo('Using mock metrics data for local development', {
-        module: 'metrics',
-        operation: 'get_metrics'
+      logInfo("Using mock metrics data for local development", {
+        module: "metrics",
+        operation: "get_metrics",
       });
 
-      return new Response(JSON.stringify({
-        result: generateMockMetrics(timeRange),
-        success: true
-      }), {
-        headers: jsonHeaders(corsHeaders)
-      });
+      return new Response(
+        JSON.stringify({
+          result: generateMockMetrics(timeRange),
+          success: true,
+        }),
+        {
+          headers: jsonHeaders(corsHeaders),
+        },
+      );
     }
 
     const { start, end } = getDateRange(timeRange);
@@ -551,47 +618,60 @@ export async function handleMetricsRoutes(
 
     // Fetch database names and analytics in parallel
     const cfHeaders = {
-      'Authorization': `Bearer ${env.API_KEY}`,
-      'Content-Type': 'application/json'
+      Authorization: `Bearer ${env.API_KEY}`,
+      "Content-Type": "application/json",
     };
 
     const [analyticsData, databaseNames] = await Promise.all([
       executeGraphQLQuery(env, query, isLocalDev),
-      fetchDatabaseNames(env, cfHeaders)
+      fetchDatabaseNames(env, cfHeaders),
     ]);
 
     if (!analyticsData) {
-      return new Response(JSON.stringify({
-        error: 'Failed to fetch metrics',
-        message: 'Unable to retrieve analytics data from Cloudflare. This may be a permissions issue with your API token.',
-        success: false
-      }), {
-        status: 500,
-        headers: jsonHeaders(corsHeaders)
-      });
+      return new Response(
+        JSON.stringify({
+          error: "Failed to fetch metrics",
+          message:
+            "Unable to retrieve analytics data from Cloudflare. This may be a permissions issue with your API token.",
+          success: false,
+        }),
+        {
+          status: 500,
+          headers: jsonHeaders(corsHeaders),
+        },
+      );
     }
 
-    const metrics = processMetricsData(analyticsData, timeRange, start, end, databaseNames);
+    const metrics = processMetricsData(
+      analyticsData,
+      timeRange,
+      start,
+      end,
+      databaseNames,
+    );
 
-    logInfo('Successfully retrieved D1 metrics', {
-      module: 'metrics',
-      operation: 'get_metrics',
+    logInfo("Successfully retrieved D1 metrics", {
+      module: "metrics",
+      operation: "get_metrics",
       metadata: {
         databaseCount: metrics.summary.databaseCount,
-        totalQueries: metrics.summary.totalReadQueries + metrics.summary.totalWriteQueries,
-        queryInsightsCount: metrics.queryInsights?.length ?? 0
-      }
+        totalQueries:
+          metrics.summary.totalReadQueries + metrics.summary.totalWriteQueries,
+        queryInsightsCount: metrics.queryInsights?.length ?? 0,
+      },
     });
 
-    return new Response(JSON.stringify({
-      result: metrics,
-      success: true
-    }), {
-      headers: jsonHeaders(corsHeaders)
-    });
+    return new Response(
+      JSON.stringify({
+        result: metrics,
+        success: true,
+      }),
+      {
+        headers: jsonHeaders(corsHeaders),
+      },
+    );
   }
 
   // Route not handled
   return null;
 }
-

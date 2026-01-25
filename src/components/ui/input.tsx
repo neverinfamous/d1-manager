@@ -1,6 +1,6 @@
-import * as React from "react"
+import * as React from "react";
 
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils";
 
 const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
   ({ className, type, ...props }, ref) => {
@@ -13,14 +13,14 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
           "[&:-webkit-autofill]:bg-background [&:-webkit-autofill]:shadow-[0_0_0_1000px_hsl(var(--background))_inset] [&:-webkit-autofill]:[-webkit-text-fill-color:hsl(var(--foreground))]",
           "[&:-webkit-autofill:hover]:bg-background [&:-webkit-autofill:hover]:shadow-[0_0_0_1000px_hsl(var(--background))_inset]",
           "[&:-webkit-autofill:focus]:bg-background [&:-webkit-autofill:focus]:shadow-[0_0_0_1000px_hsl(var(--background))_inset]",
-          className
+          className,
         )}
         ref={ref}
         {...props}
       />
-    )
-  }
-)
-Input.displayName = "Input"
+    );
+  },
+);
+Input.displayName = "Input";
 
-export { Input }
+export { Input };

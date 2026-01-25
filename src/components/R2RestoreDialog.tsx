@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -6,19 +6,29 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { RefreshCw, Loader2, AlertTriangle, Cloud, Trash2, Download, Calendar, HardDrive, Tag } from 'lucide-react';
-import { 
-  listR2Backups, 
-  restoreFromR2, 
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  RefreshCw,
+  Loader2,
+  AlertTriangle,
+  Cloud,
+  Trash2,
+  Download,
+  Calendar,
+  HardDrive,
+  Tag,
+} from "lucide-react";
+import {
+  listR2Backups,
+  restoreFromR2,
   deleteR2Backup,
   downloadR2Backup,
   getR2BackupSourceLabel,
-  type R2BackupListItem 
-} from '@/services/api';
-import { ErrorMessage } from '@/components/ui/error-message';
+  type R2BackupListItem,
+} from "@/services/api";
+import { ErrorMessage } from "@/components/ui/error-message";
 
 interface R2RestoreDialogProps {
   open: boolean;
@@ -38,10 +48,14 @@ export function R2RestoreDialog({
   const [backups, setBackups] = useState<R2BackupListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedBackup, setSelectedBackup] = useState<R2BackupListItem | null>(null);
+  const [selectedBackup, setSelectedBackup] = useState<R2BackupListItem | null>(
+    null,
+  );
   const [isRestoring, setIsRestoring] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<R2BackupListItem | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<R2BackupListItem | null>(
+    null,
+  );
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDownloading, setIsDownloading] = useState<number | null>(null);
 
@@ -60,7 +74,7 @@ export function R2RestoreDialog({
       const result = await listR2Backups(databaseId);
       setBackups(result);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load backups');
+      setError(err instanceof Error ? err.message : "Failed to load backups");
     } finally {
       setLoading(false);
     }
@@ -68,7 +82,7 @@ export function R2RestoreDialog({
 
   const handleRestore = async (): Promise<void> => {
     if (!selectedBackup) return;
-    
+
     setIsRestoring(true);
     setError(null);
 
@@ -77,7 +91,7 @@ export function R2RestoreDialog({
       onRestoreStarted(result.job_id);
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to start restore');
+      setError(err instanceof Error ? err.message : "Failed to start restore");
     } finally {
       setIsRestoring(false);
       setShowConfirm(false);
@@ -89,11 +103,15 @@ export function R2RestoreDialog({
 
     setIsDeleting(true);
     try {
-      await deleteR2Backup(databaseId, deleteTarget.timestamp, deleteTarget.path);
-      setBackups(prev => prev.filter(b => b.path !== deleteTarget.path));
+      await deleteR2Backup(
+        databaseId,
+        deleteTarget.timestamp,
+        deleteTarget.path,
+      );
+      setBackups((prev) => prev.filter((b) => b.path !== deleteTarget.path));
       setDeleteTarget(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete backup');
+      setError(err instanceof Error ? err.message : "Failed to delete backup");
     } finally {
       setIsDeleting(false);
     }
@@ -105,7 +123,9 @@ export function R2RestoreDialog({
     try {
       await downloadR2Backup(databaseId, backup.timestamp, databaseName);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to download backup');
+      setError(
+        err instanceof Error ? err.message : "Failed to download backup",
+      );
     } finally {
       setIsDownloading(null);
     }
@@ -133,11 +153,16 @@ export function R2RestoreDialog({
 
   const getSourceColor = (source: string): string => {
     switch (source) {
-      case 'manual': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
-      case 'rename_database': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200';
-      case 'strict_mode': return 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200';
-      case 'fts5_convert': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
+      case "manual":
+        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200";
+      case "rename_database":
+        return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200";
+      case "strict_mode":
+        return "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200";
+      case "fts5_convert":
+        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
+      default:
+        return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200";
     }
   };
 
@@ -164,8 +189,9 @@ export function R2RestoreDialog({
                   Warning: Destructive Operation
                 </h4>
                 <p className="text-xs text-amber-700 dark:text-amber-300">
-                  Restoring will <strong>overwrite all existing data</strong> in the database with the backup contents.
-                  This cannot be undone. Consider creating a backup before restoring.
+                  Restoring will <strong>overwrite all existing data</strong> in
+                  the database with the backup contents. This cannot be undone.
+                  Consider creating a backup before restoring.
                 </p>
               </div>
             </div>
@@ -179,7 +205,9 @@ export function R2RestoreDialog({
           ) : backups.length === 0 ? (
             <div className="text-center py-8">
               <Cloud className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-              <p className="text-sm text-muted-foreground">No backups found for this database</p>
+              <p className="text-sm text-muted-foreground">
+                No backups found for this database
+              </p>
             </div>
           ) : (
             <ScrollArea className="h-[250px] rounded-md border">
@@ -189,18 +217,22 @@ export function R2RestoreDialog({
                     key={backup.path}
                     className={`p-3 rounded-lg border cursor-pointer transition-colors ${
                       selectedBackup?.path === backup.path
-                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                        : 'border-border hover:bg-accent'
+                        ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                        : "border-border hover:bg-accent"
                     }`}
                     onClick={() => setSelectedBackup(backup)}
-                    onKeyDown={(e) => e.key === 'Enter' && setSelectedBackup(backup)}
+                    onKeyDown={(e) =>
+                      e.key === "Enter" && setSelectedBackup(backup)
+                    }
                     role="button"
                     tabIndex={0}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="space-y-1 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className={`text-xs px-2 py-0.5 rounded-full ${getSourceColor(backup.source)}`}>
+                          <span
+                            className={`text-xs px-2 py-0.5 rounded-full ${getSourceColor(backup.source)}`}
+                          >
                             <Tag className="h-3 w-3 inline mr-1" />
                             {getR2BackupSourceLabel(backup.source)}
                           </span>
@@ -285,7 +317,10 @@ export function R2RestoreDialog({
       </DialogContent>
 
       {/* Confirm Restore Dialog */}
-      <Dialog open={showConfirm} onOpenChange={(isOpen) => !isOpen && setShowConfirm(false)}>
+      <Dialog
+        open={showConfirm}
+        onOpenChange={(isOpen) => !isOpen && setShowConfirm(false)}
+      >
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
             <DialogTitle className="text-amber-600 flex items-center gap-2">
@@ -298,8 +333,11 @@ export function R2RestoreDialog({
           </DialogHeader>
           <div className="py-4">
             <p className="text-sm text-muted-foreground">
-              Are you sure you want to restore from the backup created on{' '}
-              <strong>{selectedBackup ? formatDate(selectedBackup.timestamp) : ''}</strong>?
+              Are you sure you want to restore from the backup created on{" "}
+              <strong>
+                {selectedBackup ? formatDate(selectedBackup.timestamp) : ""}
+              </strong>
+              ?
             </p>
             <p className="text-sm text-destructive mt-2">
               This action cannot be undone.
@@ -324,7 +362,7 @@ export function R2RestoreDialog({
                   Restoring...
                 </>
               ) : (
-                'Yes, Restore'
+                "Yes, Restore"
               )}
             </Button>
           </DialogFooter>
@@ -332,7 +370,10 @@ export function R2RestoreDialog({
       </Dialog>
 
       {/* Confirm Delete Dialog */}
-      <Dialog open={!!deleteTarget} onOpenChange={(isOpen) => !isOpen && setDeleteTarget(null)}>
+      <Dialog
+        open={!!deleteTarget}
+        onOpenChange={(isOpen) => !isOpen && setDeleteTarget(null)}
+      >
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
             <DialogTitle className="text-destructive flex items-center gap-2">
@@ -345,8 +386,11 @@ export function R2RestoreDialog({
           </DialogHeader>
           <div className="py-4">
             <p className="text-sm text-muted-foreground">
-              Delete backup created on{' '}
-              <strong>{deleteTarget ? formatDate(deleteTarget.timestamp) : ''}</strong>?
+              Delete backup created on{" "}
+              <strong>
+                {deleteTarget ? formatDate(deleteTarget.timestamp) : ""}
+              </strong>
+              ?
             </p>
           </div>
           <DialogFooter>
@@ -368,7 +412,7 @@ export function R2RestoreDialog({
                   Deleting...
                 </>
               ) : (
-                'Delete'
+                "Delete"
               )}
             </Button>
           </DialogFooter>
@@ -377,4 +421,3 @@ export function R2RestoreDialog({
     </Dialog>
   );
 }
-

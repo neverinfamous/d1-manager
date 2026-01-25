@@ -1,7 +1,17 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { api, type D1Database, type ReadReplicationMode } from '../services/api';
+import { useState, useEffect, useCallback } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  api,
+  type D1Database,
+  type ReadReplicationMode,
+} from "../services/api";
 import {
   Globe,
   RefreshCw,
@@ -12,9 +22,9 @@ import {
   X,
   MapPin,
   Zap,
-  BookOpen
-} from 'lucide-react';
-import { ErrorMessage } from '@/components/ui/error-message';
+  BookOpen,
+} from "lucide-react";
+import { ErrorMessage } from "@/components/ui/error-message";
 
 interface ReadReplicationInfoProps {
   databaseId: string;
@@ -25,39 +35,51 @@ interface ReadReplicationInfoProps {
 
 // D1 Read Replica Locations
 const REPLICA_LOCATIONS = [
-  { code: 'ENAM', name: 'Eastern North America' },
-  { code: 'WNAM', name: 'Western North America' },
-  { code: 'WEUR', name: 'Western Europe' },
-  { code: 'EEUR', name: 'Eastern Europe' },
-  { code: 'APAC', name: 'Asia Pacific' },
-  { code: 'OC', name: 'Oceania' }
+  { code: "ENAM", name: "Eastern North America" },
+  { code: "WNAM", name: "Western North America" },
+  { code: "WEUR", name: "Western Europe" },
+  { code: "EEUR", name: "Eastern Europe" },
+  { code: "APAC", name: "Asia Pacific" },
+  { code: "OC", name: "Oceania" },
 ];
 
 export function ReadReplicationInfo({
   databaseId,
   initialReplicationMode,
-  onReplicationChange
+  onReplicationChange,
 }: ReadReplicationInfoProps): React.JSX.Element {
-  const [replicationMode, setReplicationMode] = useState<ReadReplicationMode | undefined>(initialReplicationMode);
+  const [replicationMode, setReplicationMode] = useState<
+    ReadReplicationMode | undefined
+  >(initialReplicationMode);
   const [loading, setLoading] = useState(!initialReplicationMode);
   const [error, setError] = useState<string | null>(null);
   const [updating, setUpdating] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  const loadData = useCallback(async (skipCache?: boolean) => {
-    try {
-      setLoading(true);
-      setError(null);
+  const loadData = useCallback(
+    async (skipCache?: boolean) => {
+      try {
+        setLoading(true);
+        setError(null);
 
-      // Use cache on initial load for instant tab switching
-      const dbInfo: D1Database = await api.getDatabaseInfo(databaseId, skipCache);
-      setReplicationMode(dbInfo.read_replication?.mode || 'disabled');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load replication info');
-    } finally {
-      setLoading(false);
-    }
-  }, [databaseId]);
+        // Use cache on initial load for instant tab switching
+        const dbInfo: D1Database = await api.getDatabaseInfo(
+          databaseId,
+          skipCache,
+        );
+        setReplicationMode(dbInfo.read_replication?.mode || "disabled");
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Failed to load replication info",
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    [databaseId],
+  );
 
   useEffect(() => {
     if (!initialReplicationMode) {
@@ -83,7 +105,8 @@ export function ReadReplicationInfo({
   const handleToggleReplication = async (): Promise<void> => {
     if (!replicationMode) return;
 
-    const newMode: ReadReplicationMode = replicationMode === 'auto' ? 'disabled' : 'auto';
+    const newMode: ReadReplicationMode =
+      replicationMode === "auto" ? "disabled" : "auto";
 
     try {
       setUpdating(true);
@@ -93,7 +116,9 @@ export function ReadReplicationInfo({
       setReplicationMode(newMode);
       onReplicationChange?.(newMode);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update replication');
+      setError(
+        err instanceof Error ? err.message : "Failed to update replication",
+      );
     } finally {
       setUpdating(false);
     }
@@ -104,7 +129,9 @@ export function ReadReplicationInfo({
       <Card>
         <CardContent className="flex items-center justify-center py-12">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          <span className="ml-2 text-muted-foreground">Loading replication info...</span>
+          <span className="ml-2 text-muted-foreground">
+            Loading replication info...
+          </span>
         </CardContent>
       </Card>
     );
@@ -115,8 +142,16 @@ export function ReadReplicationInfo({
       <Card>
         <CardContent className="py-6">
           <ErrorMessage error={error} className="mb-4" />
-          <Button variant="outline" onClick={() => void handleRefresh()} disabled={refreshing}>
-            {refreshing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+          <Button
+            variant="outline"
+            onClick={() => void handleRefresh()}
+            disabled={refreshing}
+          >
+            {refreshing ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : (
+              <RefreshCw className="h-4 w-4 mr-2" />
+            )}
             Retry
           </Button>
         </CardContent>
@@ -124,7 +159,7 @@ export function ReadReplicationInfo({
     );
   }
 
-  const isEnabled = replicationMode === 'auto';
+  const isEnabled = replicationMode === "auto";
 
   return (
     <div className="space-y-4">
@@ -168,17 +203,17 @@ export function ReadReplicationInfo({
               )}
               <div>
                 <p className="font-medium">
-                  {isEnabled ? 'Enabled' : 'Disabled'}
+                  {isEnabled ? "Enabled" : "Disabled"}
                 </p>
                 <p className="text-sm text-muted-foreground">
                   {isEnabled
-                    ? 'Reads may be served by global replicas'
-                    : 'All queries go to the primary database'}
+                    ? "Reads may be served by global replicas"
+                    : "All queries go to the primary database"}
                 </p>
               </div>
             </div>
             <Button
-              variant={isEnabled ? 'outline' : 'default'}
+              variant={isEnabled ? "outline" : "default"}
               size="sm"
               onClick={() => void handleToggleReplication()}
               disabled={updating}
@@ -186,7 +221,7 @@ export function ReadReplicationInfo({
               {updating ? (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
               ) : null}
-              {isEnabled ? 'Disable' : 'Enable'}
+              {isEnabled ? "Disable" : "Enable"}
             </Button>
           </div>
 
@@ -300,9 +335,10 @@ const bookmark = session.getBookmark();`}</code>
             <AlertCircle className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
             <div className="text-sm text-muted-foreground space-y-2">
               <p>
-                <strong>Note:</strong> D1 Manager accesses databases via REST API,
-                which does not support the Sessions API. Query results shown here
-                may not reflect the full benefits of read replication.
+                <strong>Note:</strong> D1 Manager accesses databases via REST
+                API, which does not support the Sessions API. Query results
+                shown here may not reflect the full benefits of read
+                replication.
               </p>
               <p>
                 Sessions API is only available via D1 Worker bindings in your
@@ -315,4 +351,3 @@ const bookmark = session.getBookmark();`}</code>
     </div>
   );
 }
-

@@ -1,5 +1,12 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { Search, Replace, ChevronUp, ChevronDown, X, CaseSensitive } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import {
+  Search,
+  Replace,
+  ChevronUp,
+  ChevronDown,
+  X,
+  CaseSensitive,
+} from "lucide-react";
 
 interface FindReplaceBarProps {
   /** Current value of the editor */
@@ -29,12 +36,12 @@ export function FindReplaceBar({
   onSelectMatch,
   showReplace: initialShowReplace = false,
 }: FindReplaceBarProps): React.JSX.Element {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [replaceTerm, setReplaceTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [replaceTerm, setReplaceTerm] = useState("");
   const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
   const [caseSensitive, setCaseSensitive] = useState(false);
   const [showReplace, setShowReplace] = useState(initialShowReplace);
-  
+
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Focus search input on mount
@@ -46,17 +53,17 @@ export function FindReplaceBar({
   // Calculate matches using useMemo instead of useState + useEffect
   const matches = useMemo((): Match[] => {
     if (!searchTerm) return [];
-    
+
     const searchText = caseSensitive ? value : value.toLowerCase();
     const searchFor = caseSensitive ? searchTerm : searchTerm.toLowerCase();
     const results: Match[] = [];
-    
+
     let index = 0;
     while ((index = searchText.indexOf(searchFor, index)) !== -1) {
       results.push({ start: index, end: index + searchTerm.length });
       index += 1; // Move forward to find overlapping matches
     }
-    
+
     return results;
   }, [searchTerm, value, caseSensitive]);
 
@@ -69,10 +76,10 @@ export function FindReplaceBar({
   // Navigate to next match and select it
   const goToNextMatch = useCallback(() => {
     if (matches.length === 0) return;
-    
+
     const nextIndex = (validMatchIndex + 1) % matches.length;
     setCurrentMatchIndex(nextIndex);
-    
+
     // Select the match in the editor
     const match = matches[nextIndex];
     if (match) {
@@ -83,10 +90,10 @@ export function FindReplaceBar({
   // Navigate to previous match and select it
   const goToPrevMatch = useCallback(() => {
     if (matches.length === 0) return;
-    
+
     const prevIndex = (validMatchIndex - 1 + matches.length) % matches.length;
     setCurrentMatchIndex(prevIndex);
-    
+
     // Select the match in the editor
     const match = matches[prevIndex];
     if (match) {
@@ -97,27 +104,31 @@ export function FindReplaceBar({
   // Replace current match
   const replaceCurrent = useCallback(() => {
     if (matches.length === 0) return;
-    
+
     const match = matches[validMatchIndex];
     if (!match) return;
-    
-    const newValue = value.slice(0, match.start) + replaceTerm + value.slice(match.end);
+
+    const newValue =
+      value.slice(0, match.start) + replaceTerm + value.slice(match.end);
     onChange(newValue);
   }, [matches, validMatchIndex, value, replaceTerm, onChange]);
 
   // Replace all matches
   const replaceAll = useCallback(() => {
     if (matches.length === 0 || !searchTerm) return;
-    
+
     // Replace from end to start to preserve indices
     let newValue = value;
     for (let i = matches.length - 1; i >= 0; i--) {
       const match = matches[i];
       if (match) {
-        newValue = newValue.slice(0, match.start) + replaceTerm + newValue.slice(match.end);
+        newValue =
+          newValue.slice(0, match.start) +
+          replaceTerm +
+          newValue.slice(match.end);
       }
     }
-    
+
     onChange(newValue);
     setCurrentMatchIndex(0);
   }, [matches, searchTerm, value, replaceTerm, onChange]);
@@ -126,18 +137,18 @@ export function FindReplaceBar({
   const handleInputKeyDown = (e: React.KeyboardEvent): void => {
     // Stop all keyboard events from bubbling to prevent parent autocomplete from triggering
     e.stopPropagation();
-    
-    if (e.key === 'Escape') {
+
+    if (e.key === "Escape") {
       e.preventDefault();
       onClose();
-    } else if (e.key === 'Enter') {
+    } else if (e.key === "Enter") {
       e.preventDefault();
       if (e.shiftKey) {
         goToPrevMatch();
       } else {
         goToNextMatch();
       }
-    } else if (e.key === 'F3') {
+    } else if (e.key === "F3") {
       e.preventDefault();
       if (e.shiftKey) {
         goToPrevMatch();
@@ -180,18 +191,19 @@ export function FindReplaceBar({
             data-form-type="other"
           />
           <span className="sql-find-count">
-            {matches.length > 0 
+            {matches.length > 0
               ? `${String(validMatchIndex + 1)} of ${String(matches.length)}`
-              : searchTerm ? 'No results' : ''
-            }
+              : searchTerm
+                ? "No results"
+                : ""}
           </span>
         </div>
-        
+
         <div className="sql-find-buttons">
           <button
             type="button"
             onClick={() => setCaseSensitive(!caseSensitive)}
-            className={`sql-find-btn sql-find-btn-toggle ${caseSensitive ? 'active' : ''}`}
+            className={`sql-find-btn sql-find-btn-toggle ${caseSensitive ? "active" : ""}`}
             title="Match Case (Alt+C)"
             aria-pressed={caseSensitive}
           >
@@ -218,7 +230,7 @@ export function FindReplaceBar({
           <button
             type="button"
             onClick={() => setShowReplace(!showReplace)}
-            className={`sql-find-btn sql-find-btn-toggle ${showReplace ? 'active' : ''}`}
+            className={`sql-find-btn sql-find-btn-toggle ${showReplace ? "active" : ""}`}
             title="Toggle Replace"
           >
             <Replace className="h-4 w-4" />
@@ -257,7 +269,7 @@ export function FindReplaceBar({
               data-form-type="other"
             />
           </div>
-          
+
           <div className="sql-find-buttons">
             <button
               type="button"

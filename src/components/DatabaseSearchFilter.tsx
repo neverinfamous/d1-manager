@@ -1,5 +1,5 @@
-import { Search } from 'lucide-react';
-import { Input } from '@/components/ui/input';
+import { Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
 
 interface DatabaseSearchFilterProps {
   searchQuery: string;
@@ -15,7 +15,7 @@ export function DatabaseSearchFilter({
   totalCount,
 }: DatabaseSearchFilterProps): React.JSX.Element {
   const isFiltering = searchQuery.trim().length > 0;
-  
+
   return (
     <div className="flex items-center gap-4 flex-1">
       <div className="relative flex-1 max-w-md">
@@ -34,15 +34,15 @@ export function DatabaseSearchFilter({
       <div className="text-sm text-muted-foreground">
         {isFiltering ? (
           <>
-            {filteredCount} of {totalCount} {totalCount === 1 ? 'database' : 'databases'}
+            {filteredCount} of {totalCount}{" "}
+            {totalCount === 1 ? "database" : "databases"}
           </>
         ) : (
           <>
-            {totalCount} {totalCount === 1 ? 'database' : 'databases'}
+            {totalCount} {totalCount === 1 ? "database" : "databases"}
           </>
         )}
       </div>
     </div>
   );
 }
-

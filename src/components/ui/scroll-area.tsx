@@ -13,16 +13,15 @@ const ScrollArea = React.forwardRef<HTMLDivElement, ScrollAreaProps>(
         ref={ref}
         className={cn(
           "overflow-auto scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent",
-          className
+          className,
         )}
         {...props}
       >
         {children}
       </div>
     );
-  }
+  },
 );
 ScrollArea.displayName = "ScrollArea";
 
 export { ScrollArea };
-

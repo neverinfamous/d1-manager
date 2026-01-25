@@ -1,12 +1,12 @@
 /**
  * Database Migration System
- * 
+ *
  * Provides automated schema migrations for the D1 Manager metadata database.
  * Tracks applied migrations in the schema_version table and applies pending
  * migrations when triggered by the user via the UI upgrade banner.
  */
 
-import { logInfo, logError, logWarning } from './error-logger';
+import { logInfo, logError, logWarning } from "./error-logger";
 
 // ============================================
 // Types
@@ -47,14 +47,15 @@ export interface MigrationResult {
 /**
  * All migrations in order. Each migration should be idempotent where possible
  * (using IF NOT EXISTS, etc.) to handle edge cases gracefully.
- * 
+ *
  * IMPORTANT: Never modify existing migrations. Always add new ones.
  */
 export const MIGRATIONS: Migration[] = [
   {
     version: 1,
-    name: 'initial_schema',
-    description: 'Base schema with databases, query_history, saved_queries, undo_history',
+    name: "initial_schema",
+    description:
+      "Base schema with databases, query_history, saved_queries, undo_history",
     sql: `
       -- Track managed databases
       CREATE TABLE IF NOT EXISTS databases (
@@ -110,12 +111,13 @@ export const MIGRATIONS: Migration[] = [
 
       CREATE INDEX IF NOT EXISTS idx_undo_history_database ON undo_history(database_id, executed_at DESC);
       CREATE INDEX IF NOT EXISTS idx_undo_history_user ON undo_history(user_email, executed_at DESC);
-    `
+    `,
   },
   {
     version: 2,
-    name: 'job_history',
-    description: 'Add bulk_jobs and job_audit_events tables for job history tracking',
+    name: "job_history",
+    description:
+      "Add bulk_jobs and job_audit_events tables for job history tracking",
     sql: `
       -- Bulk operation jobs (for tracking bulk operations)
       CREATE TABLE IF NOT EXISTS bulk_jobs (
@@ -166,12 +168,13 @@ export const MIGRATIONS: Migration[] = [
 
       CREATE INDEX IF NOT EXISTS idx_bookmark_history_database ON bookmark_history(database_id, captured_at DESC);
       CREATE INDEX IF NOT EXISTS idx_bookmark_history_user ON bookmark_history(user_email, captured_at DESC);
-    `
+    `,
   },
   {
     version: 3,
-    name: 'color_tags',
-    description: 'Add database_colors and table_colors tables for visual organization',
+    name: "color_tags",
+    description:
+      "Add database_colors and table_colors tables for visual organization",
     sql: `
       -- Database color tags
       CREATE TABLE IF NOT EXISTS database_colors (
@@ -195,12 +198,12 @@ export const MIGRATIONS: Migration[] = [
 
       CREATE INDEX IF NOT EXISTS idx_table_colors_database ON table_colors(database_id);
       CREATE INDEX IF NOT EXISTS idx_table_colors_updated ON table_colors(updated_at DESC);
-    `
+    `,
   },
   {
     version: 4,
-    name: 'webhooks',
-    description: 'Add webhooks table for external observability notifications',
+    name: "webhooks",
+    description: "Add webhooks table for external observability notifications",
     sql: `
       -- Webhook configurations for event notifications
       CREATE TABLE IF NOT EXISTS webhooks (
@@ -215,12 +218,13 @@ export const MIGRATIONS: Migration[] = [
       );
 
       CREATE INDEX IF NOT EXISTS idx_webhooks_enabled ON webhooks(enabled);
-    `
+    `,
   },
   {
     version: 5,
-    name: 'scheduled_backups',
-    description: 'Add scheduled_backups table for automated R2 backup schedules',
+    name: "scheduled_backups",
+    description:
+      "Add scheduled_backups table for automated R2 backup schedules",
     sql: `
       -- Scheduled backup configurations
       CREATE TABLE IF NOT EXISTS scheduled_backups (
@@ -247,8 +251,8 @@ export const MIGRATIONS: Migration[] = [
 
       CREATE INDEX IF NOT EXISTS idx_scheduled_backups_database 
         ON scheduled_backups(database_id);
-    `
-  }
+    `,
+  },
 ];
 
 // ============================================
@@ -260,13 +264,17 @@ export const MIGRATIONS: Migration[] = [
  * This is called before any migration checks.
  */
 export async function ensureSchemaVersionTable(db: D1Database): Promise<void> {
-  await db.prepare(`
+  await db
+    .prepare(
+      `
     CREATE TABLE IF NOT EXISTS schema_version (
       version INTEGER PRIMARY KEY,
       migration_name TEXT NOT NULL,
       applied_at TEXT DEFAULT (datetime('now'))
     )
-  `).run();
+  `,
+    )
+    .run();
 }
 
 /**
@@ -275,10 +283,10 @@ export async function ensureSchemaVersionTable(db: D1Database): Promise<void> {
  */
 export async function getCurrentVersion(db: D1Database): Promise<number> {
   try {
-    const result = await db.prepare(
-      'SELECT MAX(version) as version FROM schema_version'
-    ).first<{ version: number | null }>();
-    
+    const result = await db
+      .prepare("SELECT MAX(version) as version FROM schema_version")
+      .first<{ version: number | null }>();
+
     return result?.version ?? 0;
   } catch {
     // Table might not exist yet
@@ -289,12 +297,16 @@ export async function getCurrentVersion(db: D1Database): Promise<number> {
 /**
  * Gets all applied migrations from the database.
  */
-export async function getAppliedMigrations(db: D1Database): Promise<AppliedMigration[]> {
+export async function getAppliedMigrations(
+  db: D1Database,
+): Promise<AppliedMigration[]> {
   try {
-    const result = await db.prepare(
-      'SELECT version, migration_name, applied_at FROM schema_version ORDER BY version ASC'
-    ).all<AppliedMigration>();
-    
+    const result = await db
+      .prepare(
+        "SELECT version, migration_name, applied_at FROM schema_version ORDER BY version ASC",
+      )
+      .all<AppliedMigration>();
+
     return result.results;
   } catch {
     return [];
@@ -304,22 +316,26 @@ export async function getAppliedMigrations(db: D1Database): Promise<AppliedMigra
 /**
  * Gets the migration status including current version and pending migrations.
  */
-export async function getMigrationStatus(db: D1Database): Promise<MigrationStatus> {
+export async function getMigrationStatus(
+  db: D1Database,
+): Promise<MigrationStatus> {
   await ensureSchemaVersionTable(db);
-  
+
   const currentVersion = await getCurrentVersion(db);
   const appliedMigrations = await getAppliedMigrations(db);
   const lastMigration = MIGRATIONS[MIGRATIONS.length - 1];
   const latestVersion = lastMigration?.version ?? 0;
-  
-  const pendingMigrations = MIGRATIONS.filter(m => m.version > currentVersion);
-  
+
+  const pendingMigrations = MIGRATIONS.filter(
+    (m) => m.version > currentVersion,
+  );
+
   return {
     currentVersion,
     latestVersion,
     pendingMigrations,
     appliedMigrations,
-    isUpToDate: currentVersion >= latestVersion
+    isUpToDate: currentVersion >= latestVersion,
   };
 }
 
@@ -329,113 +345,125 @@ export async function getMigrationStatus(db: D1Database): Promise<MigrationStatu
  */
 export async function applyMigrations(
   db: D1Database,
-  isLocalDev = false
+  isLocalDev = false,
 ): Promise<MigrationResult> {
   const errors: string[] = [];
   let migrationsApplied = 0;
-  
+
   try {
     await ensureSchemaVersionTable(db);
     const currentVersion = await getCurrentVersion(db);
-    const pendingMigrations = MIGRATIONS.filter(m => m.version > currentVersion);
-    
+    const pendingMigrations = MIGRATIONS.filter(
+      (m) => m.version > currentVersion,
+    );
+
     if (pendingMigrations.length === 0) {
-      logInfo('No pending migrations', { module: 'migrations', operation: 'apply' });
+      logInfo("No pending migrations", {
+        module: "migrations",
+        operation: "apply",
+      });
       return {
         success: true,
         migrationsApplied: 0,
         currentVersion,
-        errors: []
+        errors: [],
       };
     }
-    
+
     logInfo(`Applying ${pendingMigrations.length} migration(s)`, {
-      module: 'migrations',
-      operation: 'apply',
-      metadata: { 
-        currentVersion, 
+      module: "migrations",
+      operation: "apply",
+      metadata: {
+        currentVersion,
         pendingCount: pendingMigrations.length,
-        migrations: pendingMigrations.map(m => m.name)
-      }
+        migrations: pendingMigrations.map((m) => m.name),
+      },
     });
-    
+
     for (const migration of pendingMigrations) {
       try {
         logInfo(`Applying migration ${migration.version}: ${migration.name}`, {
-          module: 'migrations',
-          operation: 'apply_single',
-          metadata: { version: migration.version, name: migration.name }
+          module: "migrations",
+          operation: "apply_single",
+          metadata: { version: migration.version, name: migration.name },
         });
-        
+
         // Split SQL into individual statements and execute each
         const statements = migration.sql
-          .split(';')
-          .map(s => s.trim())
-          .filter(s => s.length > 0);
-        
+          .split(";")
+          .map((s) => s.trim())
+          .filter((s) => s.length > 0);
+
         for (const statement of statements) {
           await db.prepare(statement).run();
         }
-        
+
         // Record the migration as applied
-        await db.prepare(
-          'INSERT INTO schema_version (version, migration_name) VALUES (?, ?)'
-        ).bind(migration.version, migration.name).run();
-        
+        await db
+          .prepare(
+            "INSERT INTO schema_version (version, migration_name) VALUES (?, ?)",
+          )
+          .bind(migration.version, migration.name)
+          .run();
+
         migrationsApplied++;
-        
+
         logInfo(`Migration ${migration.version} applied successfully`, {
-          module: 'migrations',
-          operation: 'apply_single',
-          metadata: { version: migration.version, name: migration.name }
+          module: "migrations",
+          operation: "apply_single",
+          metadata: { version: migration.version, name: migration.name },
         });
-        
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : String(err);
-        errors.push(`Migration ${migration.version} (${migration.name}): ${errorMessage}`);
-        
+        errors.push(
+          `Migration ${migration.version} (${migration.name}): ${errorMessage}`,
+        );
+
         void logError(
           { METADATA: db } as Parameters<typeof logError>[0],
           `Failed to apply migration ${migration.version}: ${errorMessage}`,
           {
-            module: 'migrations',
-            operation: 'apply_single',
-            metadata: { version: migration.version, name: migration.name, error: errorMessage }
+            module: "migrations",
+            operation: "apply_single",
+            metadata: {
+              version: migration.version,
+              name: migration.name,
+              error: errorMessage,
+            },
           },
-          isLocalDev
+          isLocalDev,
         );
-        
+
         // Stop on first error - don't apply further migrations
         break;
       }
     }
-    
+
     const newVersion = await getCurrentVersion(db);
-    
+
     return {
       success: errors.length === 0,
       migrationsApplied,
       currentVersion: newVersion,
-      errors
+      errors,
     };
-    
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
     errors.push(`Migration system error: ${errorMessage}`);
-    
+
     logWarning(`Migration system error: ${errorMessage}`, {
-      module: 'migrations',
-      operation: 'apply',
-      metadata: { error: errorMessage }
+      module: "migrations",
+      operation: "apply",
+      metadata: { error: errorMessage },
     });
-    
+
     const currentVersion = await getCurrentVersion(db).catch(() => 0);
-    
+
     return {
       success: false,
       migrationsApplied,
       currentVersion,
-      errors
+      errors,
     };
   }
 }
@@ -451,45 +479,59 @@ export async function detectLegacyInstallation(db: D1Database): Promise<{
 }> {
   try {
     // Check for existing tables
-    const result = await db.prepare(
-      "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name != 'schema_version'"
-    ).all<{ name: string }>();
-    
-    const existingTables = result.results.map(r => r.name);
-    
+    const result = await db
+      .prepare(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name != 'schema_version'",
+      )
+      .all<{ name: string }>();
+
+    const existingTables = result.results.map((r) => r.name);
+
     // Check if schema_version exists and has entries
     const versionCheck = await getCurrentVersion(db);
-    
+
     if (versionCheck > 0) {
       // Already tracking versions
-      return { isLegacy: false, existingTables, suggestedVersion: versionCheck };
+      return {
+        isLegacy: false,
+        existingTables,
+        suggestedVersion: versionCheck,
+      };
     }
-    
+
     // Detect which migrations have effectively been applied based on existing tables
     let suggestedVersion = 0;
-    
-    if (existingTables.includes('databases') && existingTables.includes('query_history')) {
+
+    if (
+      existingTables.includes("databases") &&
+      existingTables.includes("query_history")
+    ) {
       suggestedVersion = 1;
     }
-    if (existingTables.includes('bulk_jobs') && existingTables.includes('job_audit_events')) {
+    if (
+      existingTables.includes("bulk_jobs") &&
+      existingTables.includes("job_audit_events")
+    ) {
       suggestedVersion = 2;
     }
-    if (existingTables.includes('database_colors') && existingTables.includes('table_colors')) {
+    if (
+      existingTables.includes("database_colors") &&
+      existingTables.includes("table_colors")
+    ) {
       suggestedVersion = 3;
     }
-    if (existingTables.includes('webhooks')) {
+    if (existingTables.includes("webhooks")) {
       suggestedVersion = 4;
     }
-    if (existingTables.includes('scheduled_backups')) {
+    if (existingTables.includes("scheduled_backups")) {
       suggestedVersion = 5;
     }
-    
+
     return {
       isLegacy: suggestedVersion > 0,
       existingTables,
-      suggestedVersion
+      suggestedVersion,
     };
-    
   } catch {
     return { isLegacy: false, existingTables: [], suggestedVersion: 0 };
   }
@@ -501,29 +543,32 @@ export async function detectLegacyInstallation(db: D1Database): Promise<{
  */
 export async function markMigrationsAsApplied(
   db: D1Database,
-  upToVersion: number
+  upToVersion: number,
 ): Promise<void> {
   await ensureSchemaVersionTable(db);
-  
-  const migrationsToMark = MIGRATIONS.filter(m => m.version <= upToVersion);
-  
+
+  const migrationsToMark = MIGRATIONS.filter((m) => m.version <= upToVersion);
+
   for (const migration of migrationsToMark) {
     // Check if already marked
-    const existing = await db.prepare(
-      'SELECT version FROM schema_version WHERE version = ?'
-    ).bind(migration.version).first();
-    
+    const existing = await db
+      .prepare("SELECT version FROM schema_version WHERE version = ?")
+      .bind(migration.version)
+      .first();
+
     if (!existing) {
-      await db.prepare(
-        'INSERT INTO schema_version (version, migration_name) VALUES (?, ?)'
-      ).bind(migration.version, migration.name).run();
-      
+      await db
+        .prepare(
+          "INSERT INTO schema_version (version, migration_name) VALUES (?, ?)",
+        )
+        .bind(migration.version, migration.name)
+        .run();
+
       logInfo(`Marked migration ${migration.version} as applied (legacy)`, {
-        module: 'migrations',
-        operation: 'mark_applied',
-        metadata: { version: migration.version, name: migration.name }
+        module: "migrations",
+        operation: "mark_applied",
+        metadata: { version: migration.version, name: migration.name },
       });
     }
   }
 }
-

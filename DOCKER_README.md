@@ -1,6 +1,6 @@
 # D1 Database Manager
 
-Last Updated January 14, 2026 - Production/Stable v2.4.0
+Last Updated January 25, 2026 - Production/Stable v2.4.0
 
 [![GitHub](https://img.shields.io/badge/GitHub-neverinfamous/d1--manager-blue?logo=github)](https://github.com/neverinfamous/d1-manager)
 [![Docker Pulls](https://img.shields.io/docker/pulls/writenotenow/d1-manager)](https://hub.docker.com/r/writenotenow/d1-manager)
@@ -26,6 +26,7 @@ This Docker image provides a modern, full-featured web application for managing 
 ## 🎯 Features
 
 ### Database Management
+
 - Create, rename, clone, delete, and optimize databases
 - **Export Database** - SQL/JSON/CSV formats with portable schema + data
 - **Import Database** - SQL/JSON/CSV/ZIP with create new or update existing
@@ -35,13 +36,14 @@ This Docker image provides a modern, full-featured web application for managing 
 - **Grid/List View Toggle** - Switch between card grid and compact sortable table view
 - **Copyable Database IDs** - Click to copy database IDs with visual feedback
 - **Expanded Color Picker** - 27 colors organized by hue family for visual organization
-- **R2 Backup/Restore + Unified Hub** *(Cloudflare Workers only)* - Manual backups, undo history, and R2 snapshots in one dialog with multi-select, backup counts, and orphaned-backup visibility
-- **Scheduled R2 Backups** *(Cloudflare Workers only)* - Per-database daily/weekly/monthly schedules with cron triggers, next-run tracking, and enable/disable controls
-- **Safety Backups** *(Cloudflare Workers only)* - Delete, rename, and STRICT mode operations automatically create R2 backups before proceeding
+- **R2 Backup/Restore + Unified Hub** _(Cloudflare Workers only)_ - Manual backups, undo history, and R2 snapshots in one dialog with multi-select, backup counts, and orphaned-backup visibility
+- **Scheduled R2 Backups** _(Cloudflare Workers only)_ - Per-database daily/weekly/monthly schedules with cron triggers, next-run tracking, and enable/disable controls
+- **Safety Backups** _(Cloudflare Workers only)_ - Delete, rename, and STRICT mode operations automatically create R2 backups before proceeding
 - **Automated Migration System** - Auto-detects and applies schema upgrades with one-click "Upgrade Now" banner
 - **Database search filter & job history** - Quickly find databases and audit all operations with full date/time and duration tracking
 
 ### Table Operations
+
 - Visual schema designer with STRICT mode and generated column support
 - NEW! Clone, export (SQL/CSV/JSON), import (CSV/JSON/SQL), and bulk operations
 - Column management (add, modify, rename, delete) with UNIQUE constraint support
@@ -50,13 +52,14 @@ This Docker image provides a modern, full-featured web application for managing 
 - **Import Data** - Import CSV, JSON, or SQL into new or existing tables with duplicate handling (Fail/Replace/Skip) and auto-add missing columns
 - **STRICT Mode** - Create new tables with STRICT mode or convert existing tables with automatic type mapping and validation
 - **Generated Columns** - Create STORED or VIRTUAL computed columns with expression editor
-- **Table-level R2 Backup/Restore** *(Cloudflare Workers only)* - Backup or restore individual tables directly from table cards (Grid and List views)
+- **Table-level R2 Backup/Restore** _(Cloudflare Workers only)_ - Backup or restore individual tables directly from table cards (Grid and List views)
 - **Grid/List View Toggle** - Switch between card grid and compact sortable table view (list view is default)
 - **Row search filter + table search** - Quickly filter visible rows and find tables
 - **Table Row Counts** - See row counts on table cards (formatted with locale separators)
 - **Table color tags** - Assign colors for visual organization
 
 ### Query Console
+
 - **Tabbed interface** - Query, SQL Diff, Drizzle ORM, and Query Builder in dedicated tabs
 - **Drizzle ORM Console** - Introspect schemas, view migration status/history, generate SQL, push changes (with dry-run), and export TypeScript schema
 - **SQL Formatter** - One-click formatting with SQLite-aware sql-formatter library
@@ -68,10 +71,11 @@ This Docker image provides a modern, full-featured web application for managing 
 - CSV export
 
 ### Advanced Features
+
 - NEW! **Schema Comparison with Migration Script Generation** - Compare two databases and generate executable SQL migration scripts with risk classification, copy/download, and apply-to-target functionality
-- NEW! **AI Search Integration** *(Cloudflare Workers only)* - Semantic search over database schemas and data using Cloudflare AI Search (AutoRAG). Export databases to R2 for indexing, then query with natural language or get AI-generated SQL suggestions
-- **Unified Backup & Restore Hub** *(Cloudflare Workers only)* - Undo history and R2 backups in one dialog with bulk restore/download/delete, backup counts, source tags, and orphaned-backup visibility
-- **Scheduled R2 Backups** *(Cloudflare Workers only)* - Daily/weekly/monthly schedules with per-database controls, next-run previews, last-run status, and job history integration
+- NEW! **AI Search Integration** _(Cloudflare Workers only)_ - Semantic search over database schemas and data using Cloudflare AI Search (AutoRAG). Export databases to R2 for indexing, then query with natural language or get AI-generated SQL suggestions
+- **Unified Backup & Restore Hub** _(Cloudflare Workers only)_ - Undo history and R2 backups in one dialog with bulk restore/download/delete, backup counts, source tags, and orphaned-backup visibility
+- **Scheduled R2 Backups** _(Cloudflare Workers only)_ - Daily/weekly/monthly schedules with per-database controls, next-run previews, last-run status, and job history integration
 - **Foreign Key Visualizer & ER Diagram** - Interactive graphs with fullscreen mode, export (PNG/SVG/JSON), alphabetized dropdowns, and dual layouts (hierarchical/force-directed)
 - **Cascade Impact Simulator** - Preview DELETE cascades before execution with optimized dependency checks and multi-format export (CSV/JSON/Text/PDF)
 - **Circular Dependency Detector** - DFS-based cycle detection with severity classification and breaking suggestions
@@ -86,6 +90,7 @@ This Docker image provides a modern, full-featured web application for managing 
 - **Constraint Validator** - Validate foreign key, NOT NULL, and UNIQUE constraints across database with guided fix workflow
 
 ### Webhook Notifications
+
 - **Event-driven webhooks** - Send HTTP notifications on key database events
 - **Configurable events** - database_create, database_delete, database_export, database_import, job_failed, batch_complete
 - **HMAC signatures** - Optional secret-based request signing for security
@@ -122,12 +127,12 @@ npx wrangler d1 execute d1-manager-metadata --remote --file=worker/schema.sql
 
 ### 2. Get Cloudflare Credentials
 
-| Credential | Where to Find |
-|------------|---------------|
-| `ACCOUNT_ID` | Dashboard URL: `dash.cloudflare.com/{ACCOUNT_ID}/...` |
-| `API_KEY` | [API Tokens](https://dash.cloudflare.com/profile/api-tokens) → Create Token → **Account → D1 → Edit** |
-| `TEAM_DOMAIN` | [Zero Trust](https://one.dash.cloudflare.com/) → Settings → Custom Pages |
-| `POLICY_AUD` | Zero Trust → Access → Applications → Your App → AUD tag |
+| Credential    | Where to Find                                                                                         |
+| ------------- | ----------------------------------------------------------------------------------------------------- |
+| `ACCOUNT_ID`  | Dashboard URL: `dash.cloudflare.com/{ACCOUNT_ID}/...`                                                 |
+| `API_KEY`     | [API Tokens](https://dash.cloudflare.com/profile/api-tokens) → Create Token → **Account → D1 → Edit** |
+| `TEAM_DOMAIN` | [Zero Trust](https://one.dash.cloudflare.com/) → Settings → Custom Pages                              |
+| `POLICY_AUD`  | Zero Trust → Access → Applications → Your App → AUD tag                                               |
 
 ### 3. Run Container
 
@@ -156,6 +161,7 @@ Open **http://localhost:8787**
 **Automated Migrations (Recommended)**
 
 D1 Manager includes an automated migration system:
+
 1. Update the container to the latest version
 2. Open the app - a banner will appear if schema updates are needed
 3. Click "Upgrade Now" to apply migrations automatically
@@ -176,12 +182,12 @@ Or apply individual migrations:
 npx wrangler d1 execute d1-manager-metadata --remote --file=worker/migrations/002_add_color_tags.sql
 ```
 
-| Migration | When to Run |
-|-----------|-------------|
-| `001_add_job_history.sql` | If you don't have job history tables yet |
-| `002_add_color_tags.sql` | If you don't have color tags yet |
+| Migration                          | When to Run                                         |
+| ---------------------------------- | --------------------------------------------------- |
+| `001_add_job_history.sql`          | If you don't have job history tables yet            |
+| `002_add_color_tags.sql`           | If you don't have color tags yet                    |
 | `003_add_error_message_column.sql` | If you have job history but no error_message column |
-| `004_add_webhooks.sql` | If you don't have the webhooks table yet |
+| `004_add_webhooks.sql`             | If you don't have the webhooks table yet            |
 
 > **Note:** New installations should use the automated migration system or `schema.sql`.
 
@@ -189,14 +195,14 @@ npx wrangler d1 execute d1-manager-metadata --remote --file=worker/migrations/00
 
 **Docker deployments do not require Durable Object configuration.** The Durable Object binding (used for R2 backups in Cloudflare Workers deployments) is not applicable to Docker containers.
 
-| Feature | Docker | Cloudflare Workers |
-|---------|--------|-------------------|
-| Database management | ✅ | ✅ |
-| Query console | ✅ | ✅ |
-| Download/Import backups | ✅ | ✅ |
-| R2 cloud backups | ❌ | ✅ (requires Durable Object) |
-| Scheduled R2 backups | ❌ | ✅ (requires Durable Object + cron) |
-| Backup before delete/rename | ❌ | ✅ (requires Durable Object) |
+| Feature                     | Docker | Cloudflare Workers                  |
+| --------------------------- | ------ | ----------------------------------- |
+| Database management         | ✅     | ✅                                  |
+| Query console               | ✅     | ✅                                  |
+| Download/Import backups     | ✅     | ✅                                  |
+| R2 cloud backups            | ❌     | ✅ (requires Durable Object)        |
+| Scheduled R2 backups        | ❌     | ✅ (requires Durable Object + cron) |
+| Backup before delete/rename | ❌     | ✅ (requires Durable Object)        |
 
 If you see documentation about Durable Objects or `BACKUP_DO` bindings, those apply only to Cloudflare Workers deployments. Docker users can safely ignore those sections.
 
@@ -270,14 +276,14 @@ docker compose pull && docker compose up -d
 
 ## 📋 Environment Variables
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `ACCOUNT_ID` | ✅ | Cloudflare Account ID |
-| `API_KEY` | ✅ | API Token with D1 Edit permission |
-| `TEAM_DOMAIN` | ✅ | `https://yourteam.cloudflareaccess.com` |
-| `POLICY_AUD` | ✅ | Cloudflare Access Application AUD tag |
-| `PORT` | ❌ | Port (default: `8787`) |
-| `NODE_ENV` | ❌ | Environment (default: `production`) |
+| Variable      | Required | Description                             |
+| ------------- | -------- | --------------------------------------- |
+| `ACCOUNT_ID`  | ✅       | Cloudflare Account ID                   |
+| `API_KEY`     | ✅       | API Token with D1 Edit permission       |
+| `TEAM_DOMAIN` | ✅       | `https://yourteam.cloudflareaccess.com` |
+| `POLICY_AUD`  | ✅       | Cloudflare Access Application AUD tag   |
+| `PORT`        | ❌       | Port (default: `8787`)                  |
+| `NODE_ENV`    | ❌       | Environment (default: `production`)     |
 
 > **Note:** R2 Backup/Restore is only available when deploying to Cloudflare Workers (not Docker). Docker deployments can still use the Download/Import functionality for local backups.
 
@@ -285,25 +291,25 @@ docker compose pull && docker compose up -d
 
 ## 📊 Container Info
 
-| Property | Value |
-|----------|-------|
-| Base Image | `node:22-alpine` |
-| Size | ~150MB |
-| Architectures | `linux/amd64`, `linux/arm64` |
-| Port | `8787` |
-| User | Non-root (`app`) |
-| Health Endpoint | `/health` |
+| Property        | Value                        |
+| --------------- | ---------------------------- |
+| Base Image      | `node:22-alpine`             |
+| Size            | ~150MB                       |
+| Architectures   | `linux/amd64`, `linux/arm64` |
+| Port            | `8787`                       |
+| User            | Non-root (`app`)             |
+| Health Endpoint | `/health`                    |
 
 ---
 
 ## 🏷️ Available Tags
 
-| Tag | Description |
-|-----|-------------|
-| `latest` | Latest stable release |
-| `v2.4.0` | Specific version (recommended for production) |
-| `v2.3.0` | Previous stable release |
-| `sha-XXXXXX` | Commit SHA for reproducible builds |
+| Tag          | Description                                   |
+| ------------ | --------------------------------------------- |
+| `latest`     | Latest stable release                         |
+| `v2.4.0`     | Specific version (recommended for production) |
+| `v2.3.0`     | Previous stable release                       |
+| `sha-XXXXXX` | Commit SHA for reproducible builds            |
 
 ---
 
@@ -334,6 +340,7 @@ docker logs d1-manager
 ```
 
 Common causes:
+
 - Missing environment variables
 - Port already in use
 

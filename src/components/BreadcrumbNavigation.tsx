@@ -1,5 +1,5 @@
-import { ChevronRight, Home, ArrowLeft } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { ChevronRight, Home, ArrowLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface BreadcrumbNavigationProps {
   databaseName: string;
@@ -14,7 +14,7 @@ export function BreadcrumbNavigation({
   navigationHistory,
   onNavigateToDatabase,
   onNavigateToTable,
-  onGoBack
+  onGoBack,
 }: BreadcrumbNavigationProps): React.JSX.Element {
   // Limit to last 5 tables to prevent overflow
   const displayHistory = navigationHistory.slice(-5);
@@ -56,11 +56,11 @@ export function BreadcrumbNavigation({
             </>
           )}
           {displayHistory.map((item, index) => {
-            const actualIndex = hasMore 
-              ? navigationHistory.length - displayHistory.length + index 
+            const actualIndex = hasMore
+              ? navigationHistory.length - displayHistory.length + index
               : index;
             const isLast = index === displayHistory.length - 1;
-            
+
             return (
               <div key={actualIndex} className="flex items-center gap-2">
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
@@ -81,4 +81,3 @@ export function BreadcrumbNavigation({
     </div>
   );
 }
-

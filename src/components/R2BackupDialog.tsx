@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -6,10 +6,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Cloud, Loader2, AlertTriangle, Info } from 'lucide-react';
-import { backupToR2 } from '@/services/api';
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Cloud, Loader2, AlertTriangle, Info } from "lucide-react";
+import { backupToR2 } from "@/services/api";
 
 interface R2BackupDialogProps {
   open: boolean;
@@ -36,11 +36,11 @@ export function R2BackupDialog({
     setError(null);
 
     try {
-      const result = await backupToR2(databaseId, databaseName, 'manual');
+      const result = await backupToR2(databaseId, databaseName, "manual");
       onBackupStarted(result.job_id);
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to start backup');
+      setError(err instanceof Error ? err.message : "Failed to start backup");
     } finally {
       setIsStarting(false);
     }
@@ -94,9 +94,10 @@ export function R2BackupDialog({
                     FTS5 Tables Detected
                   </h4>
                   <p className="text-xs text-amber-700 dark:text-amber-300">
-                    This database contains FTS5 (Full-Text Search) virtual tables. 
-                    The D1 export API cannot export databases with FTS5 tables. 
-                    You must convert or remove FTS5 tables before backing up, then recreate them afterward.
+                    This database contains FTS5 (Full-Text Search) virtual
+                    tables. The D1 export API cannot export databases with FTS5
+                    tables. You must convert or remove FTS5 tables before
+                    backing up, then recreate them afterward.
                   </p>
                 </div>
               </div>
@@ -113,11 +114,7 @@ export function R2BackupDialog({
         </div>
 
         <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={handleClose}
-            disabled={isStarting}
-          >
+          <Button variant="outline" onClick={handleClose} disabled={isStarting}>
             Cancel
           </Button>
           <Button
@@ -142,4 +139,3 @@ export function R2BackupDialog({
     </Dialog>
   );
 }
-

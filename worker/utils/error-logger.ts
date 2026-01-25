@@ -1,12 +1,17 @@
 /**
  * Centralized Error Logging System
- * 
+ *
  * Provides structured error logging with consistent format across all modules.
  * Integrates with webhooks to automatically notify external systems of critical errors.
  */
 
-import type { Env, ErrorContext, ErrorSeverity, StructuredError } from '../types';
-import { triggerWebhooks, createJobFailedPayload } from './webhooks';
+import type {
+  Env,
+  ErrorContext,
+  ErrorSeverity,
+  StructuredError,
+} from "../types";
+import { triggerWebhooks, createJobFailedPayload } from "./webhooks";
 
 /**
  * Generate current ISO timestamp
@@ -19,44 +24,47 @@ function nowISO(): string {
  * Error code prefixes by module
  */
 const ERROR_CODE_PREFIXES: Record<string, string> = {
-  databases: 'DB',
-  tables: 'TBL',
-  queries: 'QRY',
-  saved_queries: 'SQ',
-  fts5: 'FTS',
-  jobs: 'JOB',
-  undo: 'UNDO',
-  indexes: 'IDX',
-  colors: 'CLR',
-  webhooks: 'WHK',
-  auth: 'AUTH',
-  time_travel: 'TT',
-  worker: 'WRK',
-  session: 'SESS',
-  db_tracking: 'DBT',
-  database_tracking: 'DBT',
-  db_protection: 'DBP',
-  database_protection: 'DBP',
-  r2_backup: 'R2B',
-  backup_do: 'BDO',
-  health: 'HLTH',
-  ai_search: 'AIS',
+  databases: "DB",
+  tables: "TBL",
+  queries: "QRY",
+  saved_queries: "SQ",
+  fts5: "FTS",
+  jobs: "JOB",
+  undo: "UNDO",
+  indexes: "IDX",
+  colors: "CLR",
+  webhooks: "WHK",
+  auth: "AUTH",
+  time_travel: "TT",
+  worker: "WRK",
+  session: "SESS",
+  db_tracking: "DBT",
+  database_tracking: "DBT",
+  db_protection: "DBP",
+  database_protection: "DBP",
+  r2_backup: "R2B",
+  backup_do: "BDO",
+  health: "HLTH",
+  ai_search: "AIS",
 };
 
 /**
  * Generate an error code from context with appropriate suffix based on severity
  */
-function generateErrorCode(context: ErrorContext, level: ErrorSeverity): string {
-  const prefix = ERROR_CODE_PREFIXES[context.module] ?? 'ERR';
-  const operation = context.operation.toUpperCase().replace(/[^A-Z0-9]/g, '_');
+function generateErrorCode(
+  context: ErrorContext,
+  level: ErrorSeverity,
+): string {
+  const prefix = ERROR_CODE_PREFIXES[context.module] ?? "ERR";
+  const operation = context.operation.toUpperCase().replace(/[^A-Z0-9]/g, "_");
 
   // Use appropriate suffix based on severity level
   switch (level) {
-    case 'error':
+    case "error":
       return `${prefix}_${operation}_FAILED`;
-    case 'warning':
+    case "warning":
       return `${prefix}_${operation}_WARN`;
-    case 'info':
+    case "info":
       return `${prefix}_${operation}`;
   }
 }
@@ -76,7 +84,7 @@ function formatForConsole(error: StructuredError): string {
     parts.push(`(db: ${error.context.databaseId})`);
   }
 
-  return parts.join(' ');
+  return parts.join(" ");
 }
 
 /**
@@ -85,7 +93,7 @@ function formatForConsole(error: StructuredError): string {
 export function createStructuredError(
   error: Error | string,
   context: ErrorContext,
-  level: ErrorSeverity = 'error'
+  level: ErrorSeverity = "error",
 ): StructuredError {
   const message = error instanceof Error ? error.message : error;
   const stack = error instanceof Error ? error.stack : undefined;
@@ -112,19 +120,19 @@ export async function logError(
   options: {
     triggerWebhook?: boolean;
     jobId?: string;
-  } = {}
+  } = {},
 ): Promise<StructuredError> {
-  const structuredError = createStructuredError(error, context, 'error');
+  const structuredError = createStructuredError(error, context, "error");
 
   // Log to console with structured format
   console.error(formatForConsole(structuredError));
   if (structuredError.stack) {
-    console.error('[Stack]', structuredError.stack);
+    console.error("[Stack]", structuredError.stack);
   }
 
   // Log metadata if present
   if (context.metadata && Object.keys(context.metadata).length > 0) {
-    console.error('[Metadata]', JSON.stringify(context.metadata));
+    console.error("[Metadata]", JSON.stringify(context.metadata));
   }
 
   // Trigger webhook for job failures
@@ -132,18 +140,18 @@ export async function logError(
     try {
       await triggerWebhooks(
         env,
-        'job_failed',
+        "job_failed",
         createJobFailedPayload(
           options.jobId,
           context.operation,
           structuredError.message,
           context.databaseId ?? null,
-          context.userId ?? null
+          context.userId ?? null,
         ),
-        isLocalDev
+        isLocalDev,
       );
     } catch (webhookError) {
-      console.error('[ErrorLogger] Failed to trigger webhook:', webhookError);
+      console.error("[ErrorLogger] Failed to trigger webhook:", webhookError);
     }
   }
 
@@ -155,14 +163,14 @@ export async function logError(
  */
 export function logWarning(
   message: string,
-  context: ErrorContext
+  context: ErrorContext,
 ): StructuredError {
-  const structuredError = createStructuredError(message, context, 'warning');
+  const structuredError = createStructuredError(message, context, "warning");
 
   console.warn(formatForConsole(structuredError));
 
   if (context.metadata && Object.keys(context.metadata).length > 0) {
-    console.warn('[Metadata]', JSON.stringify(context.metadata));
+    console.warn("[Metadata]", JSON.stringify(context.metadata));
   }
 
   return structuredError;
@@ -173,9 +181,9 @@ export function logWarning(
  */
 export function logInfo(
   message: string,
-  context: ErrorContext
+  context: ErrorContext,
 ): StructuredError {
-  const structuredError = createStructuredError(message, context, 'info');
+  const structuredError = createStructuredError(message, context, "info");
 
   console.log(formatForConsole(structuredError));
 
@@ -185,7 +193,9 @@ export function logInfo(
 /**
  * Format error for webhook payload
  */
-export function formatErrorForWebhook(error: StructuredError): Record<string, unknown> {
+export function formatErrorForWebhook(
+  error: StructuredError,
+): Record<string, unknown> {
   return {
     timestamp: error.timestamp,
     level: error.level,
@@ -210,7 +220,7 @@ export function createErrorContext(
     databaseName?: string;
     userId?: string;
     metadata?: Record<string, unknown>;
-  } = {}
+  } = {},
 ): ErrorContext {
   return {
     module,
@@ -232,7 +242,7 @@ export async function withErrorLogging<T>(
     triggerWebhook?: boolean;
     jobId?: string;
     rethrow?: boolean;
-  } = {}
+  } = {},
 ): Promise<T | null> {
   try {
     return await operation();
@@ -250,7 +260,7 @@ export async function withErrorLogging<T>(
       error instanceof Error ? error : String(error),
       context,
       isLocalDev,
-      logOptions
+      logOptions,
     );
 
     if (options.rethrow !== false) {
@@ -260,4 +270,3 @@ export async function withErrorLogging<T>(
     return null;
   }
 }
-

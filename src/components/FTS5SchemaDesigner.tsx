@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { Plus, Trash2, Loader2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useState } from "react";
+import { Plus, Trash2, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -8,15 +8,15 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Card, CardContent } from '@/components/ui/card';
-import { TokenizerPresetSelector } from './TokenizerPresetSelector';
-import { TokenizerAdvancedConfig } from './TokenizerAdvancedConfig';
-import type { FTS5TableConfig, TokenizerConfig } from '@/services/fts5-types';
-import { ErrorMessage } from '@/components/ui/error-message';
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Card, CardContent } from "@/components/ui/card";
+import { TokenizerPresetSelector } from "./TokenizerPresetSelector";
+import { TokenizerAdvancedConfig } from "./TokenizerAdvancedConfig";
+import type { FTS5TableConfig, TokenizerConfig } from "@/services/fts5-types";
+import { ErrorMessage } from "@/components/ui/error-message";
 
 interface Column {
   id: string;
@@ -30,62 +30,69 @@ interface FTS5SchemaDesignerProps {
   onCreateTable: (config: FTS5TableConfig) => Promise<void>;
 }
 
-export function FTS5SchemaDesigner({ open, onOpenChange, onCreateTable }: FTS5SchemaDesignerProps): React.JSX.Element {
-  const [tableName, setTableName] = useState('');
+export function FTS5SchemaDesigner({
+  open,
+  onOpenChange,
+  onCreateTable,
+}: FTS5SchemaDesignerProps): React.JSX.Element {
+  const [tableName, setTableName] = useState("");
   const [columns, setColumns] = useState<Column[]>([
-    { id: '1', name: 'content', unindexed: false }
+    { id: "1", name: "content", unindexed: false },
   ]);
   const [tokenizer, setTokenizer] = useState<TokenizerConfig>({
-    type: 'unicode61',
+    type: "unicode61",
     parameters: { remove_diacritics: 1 },
   });
   const [prefixIndexEnabled, setPrefixIndexEnabled] = useState(false);
-  const [prefixLengths, setPrefixLengths] = useState('2,3');
+  const [prefixLengths, setPrefixLengths] = useState("2,3");
   const [creating, setCreating] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
 
   const addColumn = (): void => {
     const newId = String(Date.now());
-    setColumns([
-      ...columns,
-      { id: newId, name: '', unindexed: false }
-    ]);
+    setColumns([...columns, { id: newId, name: "", unindexed: false }]);
   };
 
   const removeColumn = (id: string): void => {
     if (columns.length <= 1) {
-      setError('FTS5 table must have at least one column');
+      setError("FTS5 table must have at least one column");
       return;
     }
-    setColumns(columns.filter(col => col.id !== id));
-    setError('');
+    setColumns(columns.filter((col) => col.id !== id));
+    setError("");
   };
 
-  const updateColumn = (id: string, field: keyof Column, value: string | boolean): void => {
-    setColumns(columns.map(col => 
-      col.id === id ? { ...col, [field]: value } : col
-    ));
-    setError('');
+  const updateColumn = (
+    id: string,
+    field: keyof Column,
+    value: string | boolean,
+  ): void => {
+    setColumns(
+      columns.map((col) => (col.id === id ? { ...col, [field]: value } : col)),
+    );
+    setError("");
   };
 
   const validateAndCreate = async (): Promise<void> => {
-    setError('');
+    setError("");
 
     // Validate table name
     if (!tableName.trim()) {
-      setError('Table name is required');
+      setError("Table name is required");
       return;
     }
 
     if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(tableName)) {
-      setError('Table name must start with a letter or underscore and contain only letters, numbers, and underscores');
+      setError(
+        "Table name must start with a letter or underscore and contain only letters, numbers, and underscores",
+      );
       return;
     }
 
     // FTS5 table name convention
-    if (!tableName.endsWith('_fts') && !tableName.includes('fts')) {
+    if (!tableName.endsWith("_fts") && !tableName.includes("fts")) {
       const shouldContinue = confirm(
-        'FTS5 table names typically end with "_fts" for clarity. Continue anyway?'
+        'FTS5 table names typically end with "_fts" for clarity. Continue anyway?',
       );
       if (!shouldContinue) return;
     }
@@ -93,29 +100,38 @@ export function FTS5SchemaDesigner({ open, onOpenChange, onCreateTable }: FTS5Sc
     // Validate columns
     for (const col of columns) {
       if (!col.name.trim()) {
-        setError('All columns must have a name');
+        setError("All columns must have a name");
         return;
       }
       if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(col.name)) {
-        setError(`Column name "${col.name}" is invalid. Must start with a letter or underscore`);
+        setError(
+          `Column name "${col.name}" is invalid. Must start with a letter or underscore`,
+        );
         return;
       }
     }
 
     // Check for duplicate column names
-    const columnNames = columns.map(c => c.name.toLowerCase());
-    const duplicates = columnNames.filter((name, index) => columnNames.indexOf(name) !== index);
+    const columnNames = columns.map((c) => c.name.toLowerCase());
+    const duplicates = columnNames.filter(
+      (name, index) => columnNames.indexOf(name) !== index,
+    );
     if (duplicates.length > 0) {
-      setError(`Duplicate column name: ${duplicates[0] ?? ''}`);
+      setError(`Duplicate column name: ${duplicates[0] ?? ""}`);
       return;
     }
 
     // Parse prefix lengths
     let parsedPrefixLengths: number[] | undefined;
     if (prefixIndexEnabled) {
-      const lengths = prefixLengths.split(',').map(l => parseInt(l.trim(), 10)).filter(l => !isNaN(l) && l > 0);
+      const lengths = prefixLengths
+        .split(",")
+        .map((l) => parseInt(l.trim(), 10))
+        .filter((l) => !isNaN(l) && l > 0);
       if (lengths.length === 0) {
-        setError('Invalid prefix lengths. Use comma-separated numbers (e.g., 2,3,4)');
+        setError(
+          "Invalid prefix lengths. Use comma-separated numbers (e.g., 2,3,4)",
+        );
         return;
       }
       parsedPrefixLengths = lengths;
@@ -126,9 +142,9 @@ export function FTS5SchemaDesigner({ open, onOpenChange, onCreateTable }: FTS5Sc
 
       const config: FTS5TableConfig = {
         tableName,
-        columns: columns.map(c => c.name),
+        columns: columns.map((c) => c.name),
         tokenizer,
-        unindexed: columns.filter(c => c.unindexed).map(c => c.name),
+        unindexed: columns.filter((c) => c.unindexed).map((c) => c.name),
       };
 
       if (prefixIndexEnabled && parsedPrefixLengths) {
@@ -139,34 +155,42 @@ export function FTS5SchemaDesigner({ open, onOpenChange, onCreateTable }: FTS5Sc
       }
 
       await onCreateTable(config);
-      
+
       // Reset form
-      setTableName('');
-      setColumns([{ id: '1', name: 'content', unindexed: false }]);
-      setTokenizer({ type: 'unicode61', parameters: { remove_diacritics: 1 } });
+      setTableName("");
+      setColumns([{ id: "1", name: "content", unindexed: false }]);
+      setTokenizer({ type: "unicode61", parameters: { remove_diacritics: 1 } });
       setPrefixIndexEnabled(false);
-      setPrefixLengths('2,3');
+      setPrefixLengths("2,3");
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create FTS5 table');
+      setError(
+        err instanceof Error ? err.message : "Failed to create FTS5 table",
+      );
     } finally {
       setCreating(false);
     }
   };
 
   const generateSQL = (): string => {
-    const columnDefs = columns.map(col => {
-      return col.unindexed ? `${col.name} UNINDEXED` : col.name;
-    }).join(', ');
+    const columnDefs = columns
+      .map((col) => {
+        return col.unindexed ? `${col.name} UNINDEXED` : col.name;
+      })
+      .join(", ");
 
     let tokenizerStr = tokenizer.type;
     if (tokenizer.parameters) {
       const params: string[] = [];
       if (tokenizer.parameters.remove_diacritics !== undefined) {
-        params.push(`remove_diacritics ${String(tokenizer.parameters.remove_diacritics)}`);
+        params.push(
+          `remove_diacritics ${String(tokenizer.parameters.remove_diacritics)}`,
+        );
       }
       if (tokenizer.parameters.case_sensitive !== undefined) {
-        params.push(`case_sensitive ${String(tokenizer.parameters.case_sensitive)}`);
+        params.push(
+          `case_sensitive ${String(tokenizer.parameters.case_sensitive)}`,
+        );
       }
       if (tokenizer.parameters.separators) {
         params.push(`separators '${tokenizer.parameters.separators}'`);
@@ -175,14 +199,18 @@ export function FTS5SchemaDesigner({ open, onOpenChange, onCreateTable }: FTS5Sc
         params.push(`tokenchars '${tokenizer.parameters.tokenchars}'`);
       }
       if (params.length > 0) {
-        tokenizerStr += ' ' + params.join(' ');
+        tokenizerStr += " " + params.join(" ");
       }
     }
 
     let options = `tokenize='${tokenizerStr}'`;
-    
+
     if (prefixIndexEnabled && prefixLengths) {
-      const lengths = prefixLengths.split(',').map(l => l.trim()).filter(l => l).join(' ');
+      const lengths = prefixLengths
+        .split(",")
+        .map((l) => l.trim())
+        .filter((l) => l)
+        .join(" ");
       if (lengths) {
         options += `, prefix='${lengths}'`;
       }
@@ -197,7 +225,8 @@ export function FTS5SchemaDesigner({ open, onOpenChange, onCreateTable }: FTS5Sc
         <DialogHeader>
           <DialogTitle>Create FTS5 Full-Text Search Table</DialogTitle>
           <DialogDescription>
-            Design a virtual table optimized for full-text search using SQLite's FTS5 extension
+            Design a virtual table optimized for full-text search using SQLite's
+            FTS5 extension
           </DialogDescription>
         </DialogHeader>
 
@@ -213,14 +242,17 @@ export function FTS5SchemaDesigner({ open, onOpenChange, onCreateTable }: FTS5Sc
               disabled={creating}
             />
             <p className="text-xs text-muted-foreground">
-              Convention: End with "_fts" to indicate it's a full-text search table
+              Convention: End with "_fts" to indicate it's a full-text search
+              table
             </p>
           </div>
 
           {/* Columns */}
           <fieldset className="space-y-2">
             <div className="flex items-center justify-between">
-              <legend className="text-base font-semibold">Indexed Columns</legend>
+              <legend className="text-base font-semibold">
+                Indexed Columns
+              </legend>
               <Button
                 type="button"
                 variant="outline"
@@ -242,23 +274,39 @@ export function FTS5SchemaDesigner({ open, onOpenChange, onCreateTable }: FTS5Sc
                   <CardContent className="p-4">
                     <div className="flex items-center gap-4">
                       <div className="flex-1 space-y-2">
-                        <Label htmlFor={`column-name-${column.id}`} className="sr-only">Column name</Label>
+                        <Label
+                          htmlFor={`column-name-${column.id}`}
+                          className="sr-only"
+                        >
+                          Column name
+                        </Label>
                         <Input
                           id={`column-name-${column.id}`}
                           name={`column-name-${column.id}`}
                           placeholder="Column name"
                           value={column.name}
-                          onChange={(e) => updateColumn(column.id, 'name', e.target.value)}
+                          onChange={(e) =>
+                            updateColumn(column.id, "name", e.target.value)
+                          }
                           disabled={creating}
                         />
                         <div className="flex items-center space-x-2">
                           <Checkbox
                             id={`unindexed-${column.id}`}
                             checked={column.unindexed}
-                            onCheckedChange={(checked) => updateColumn(column.id, 'unindexed', checked === true)}
+                            onCheckedChange={(checked) =>
+                              updateColumn(
+                                column.id,
+                                "unindexed",
+                                checked === true,
+                              )
+                            }
                             disabled={creating}
                           />
-                          <Label htmlFor={`unindexed-${column.id}`} className="text-sm font-normal cursor-pointer">
+                          <Label
+                            htmlFor={`unindexed-${column.id}`}
+                            className="text-sm font-normal cursor-pointer"
+                          >
                             Store but don't index (for retrieval only)
                           </Label>
                         </div>
@@ -301,10 +349,15 @@ export function FTS5SchemaDesigner({ open, onOpenChange, onCreateTable }: FTS5Sc
               <Checkbox
                 id="prefix-index"
                 checked={prefixIndexEnabled}
-                onCheckedChange={(checked) => setPrefixIndexEnabled(checked === true)}
+                onCheckedChange={(checked) =>
+                  setPrefixIndexEnabled(checked === true)
+                }
                 disabled={creating}
               />
-              <Label htmlFor="prefix-index" className="font-medium cursor-pointer">
+              <Label
+                htmlFor="prefix-index"
+                className="font-medium cursor-pointer"
+              >
                 Enable prefix index (for autocomplete)
               </Label>
             </div>
@@ -319,7 +372,8 @@ export function FTS5SchemaDesigner({ open, onOpenChange, onCreateTable }: FTS5Sc
                   disabled={creating}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Comma-separated list of prefix lengths to index (e.g., 2,3 enables matching "ap", "app")
+                  Comma-separated list of prefix lengths to index (e.g., 2,3
+                  enables matching "ap", "app")
                 </p>
               </div>
             )}
@@ -328,8 +382,15 @@ export function FTS5SchemaDesigner({ open, onOpenChange, onCreateTable }: FTS5Sc
           {/* SQL Preview */}
           <div className="space-y-2">
             <h4 className="text-base font-semibold">SQL Preview</h4>
-            <pre className="p-4 bg-muted rounded-lg text-sm overflow-x-auto" aria-label="SQL Preview">
-              <code>{tableName ? generateSQL() : '-- Enter table name and columns to see SQL'}</code>
+            <pre
+              className="p-4 bg-muted rounded-lg text-sm overflow-x-auto"
+              aria-label="SQL Preview"
+            >
+              <code>
+                {tableName
+                  ? generateSQL()
+                  : "-- Enter table name and columns to see SQL"}
+              </code>
             </pre>
           </div>
 
@@ -350,11 +411,10 @@ export function FTS5SchemaDesigner({ open, onOpenChange, onCreateTable }: FTS5Sc
             disabled={creating || !tableName.trim()}
           >
             {creating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            {creating ? 'Creating...' : 'Create FTS5 Table'}
+            {creating ? "Creating..." : "Create FTS5 Table"}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
-

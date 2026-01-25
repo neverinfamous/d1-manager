@@ -117,6 +117,7 @@ cd worker && npm run dev  # Worker API
 ```
 
 Test all major features:
+
 - Database listing
 - Table browsing
 - Query execution
@@ -168,6 +169,7 @@ Look for issues labeled `good first issue` - these are great for newcomers!
 ## 🌟 Recognition
 
 Contributors are recognized in:
+
 - GitHub's automatic contributors list
 - Release notes for significant contributions
 - Our gratitude and appreciation!
@@ -189,4 +191,3 @@ Every contribution, no matter how small, makes D1 Database Manager better for ev
 ---
 
 **Made with ❤️ for the Cloudflare community**
-

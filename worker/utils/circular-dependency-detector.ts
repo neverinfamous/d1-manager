@@ -2,13 +2,13 @@
  * Represents a circular dependency cycle in the database schema
  */
 export interface CircularDependencyCycle {
-  tables: string[];           // Ordered list of tables in cycle
-  path: string;               // "users -> profiles -> settings -> users"
-  severity: 'low' | 'medium' | 'high';
-  cascadeRisk: boolean;       // Has CASCADE operations in cycle
-  restrictPresent: boolean;   // Has RESTRICT operations
-  constraintNames: string[];  // FK constraint names involved
-  message: string;            // Human-readable description
+  tables: string[]; // Ordered list of tables in cycle
+  path: string; // "users -> profiles -> settings -> users"
+  severity: "low" | "medium" | "high";
+  cascadeRisk: boolean; // Has CASCADE operations in cycle
+  restrictPresent: boolean; // Has RESTRICT operations
+  constraintNames: string[]; // FK constraint names involved
+  message: string; // Human-readable description
 }
 
 /**
@@ -30,7 +30,7 @@ interface FKGraphEdge {
 interface FKGraphNode {
   id: string;
   label: string;
-  columns: {name: string; type: string; isPK: boolean}[];
+  columns: { name: string; type: string; isPK: boolean }[];
   rowCount: number;
 }
 
@@ -46,14 +46,19 @@ export interface ForeignKeyGraph {
  * Detect circular dependencies in a foreign key graph
  * Uses depth-first search (DFS) with path tracking
  */
-export function detectCircularDependencies(graph: ForeignKeyGraph): CircularDependencyCycle[] {
+export function detectCircularDependencies(
+  graph: ForeignKeyGraph,
+): CircularDependencyCycle[] {
   if (graph.edges.length === 0) {
     return [];
   }
 
   // Build adjacency list from edges
-  const adjacencyList = new Map<string, {target: string; edge: FKGraphEdge}[]>();
-  
+  const adjacencyList = new Map<
+    string,
+    { target: string; edge: FKGraphEdge }[]
+  >();
+
   for (const edge of graph.edges) {
     const existing = adjacencyList.get(edge.source) ?? [];
     existing.push({ target: edge.target, edge });
@@ -65,7 +70,7 @@ export function detectCircularDependencies(graph: ForeignKeyGraph): CircularDepe
   // Track nodes in current recursion stack
   const recursionStack = new Set<string>();
   // Track current path for cycle extraction
-  const currentPath: {table: string; edge?: FKGraphEdge}[] = [];
+  const currentPath: { table: string; edge?: FKGraphEdge }[] = [];
   // Store detected cycles
   const cycles: CircularDependencyCycle[] = [];
   // Track seen cycles to avoid duplicates
@@ -80,7 +85,7 @@ export function detectCircularDependencies(graph: ForeignKeyGraph): CircularDepe
     currentPath.push({ table: node });
 
     const neighbors = adjacencyList.get(node) ?? [];
-    
+
     for (const { target, edge } of neighbors) {
       if (!visited.has(target)) {
         // Add edge to path before recursing
@@ -91,14 +96,16 @@ export function detectCircularDependencies(graph: ForeignKeyGraph): CircularDepe
         dfs(target);
       } else if (recursionStack.has(target)) {
         // Found a cycle - extract it from currentPath
-        const cycleStartIndex = currentPath.findIndex(p => p.table === target);
+        const cycleStartIndex = currentPath.findIndex(
+          (p) => p.table === target,
+        );
         if (cycleStartIndex !== -1) {
           const cyclePath = currentPath.slice(cycleStartIndex);
           // Add the edge that closes the cycle
           cyclePath.push({ table: target, edge });
-          
+
           const cycle = buildCycleMetadata(cyclePath);
-          
+
           // Deduplicate cycles (same cycle in different starting positions)
           const cycleKey = getCycleKey(cycle.tables);
           if (!seenCycles.has(cycleKey)) {
@@ -126,7 +133,9 @@ export function detectCircularDependencies(graph: ForeignKeyGraph): CircularDepe
 /**
  * Build cycle metadata from a path
  */
-function buildCycleMetadata(cyclePath: {table: string; edge?: FKGraphEdge}[]): CircularDependencyCycle {
+function buildCycleMetadata(
+  cyclePath: { table: string; edge?: FKGraphEdge }[],
+): CircularDependencyCycle {
   const tables: string[] = [];
   const constraintNames: string[] = [];
   let hasCascade = false;
@@ -137,15 +146,15 @@ function buildCycleMetadata(cyclePath: {table: string; edge?: FKGraphEdge}[]): C
     const pathNode = cyclePath[i];
     if (!pathNode) continue;
     tables.push(pathNode.table);
-    
+
     if (pathNode.edge) {
       const onDelete = pathNode.edge.onDelete.toUpperCase();
       constraintNames.push(pathNode.edge.id);
-      
-      if (onDelete === 'CASCADE') {
+
+      if (onDelete === "CASCADE") {
         hasCascade = true;
       }
-      if (onDelete === 'RESTRICT') {
+      if (onDelete === "RESTRICT") {
         hasRestrict = true;
       }
     }
@@ -153,27 +162,27 @@ function buildCycleMetadata(cyclePath: {table: string; edge?: FKGraphEdge}[]): C
 
   // Classify severity
   const cycleLength = tables.length;
-  let severity: 'low' | 'medium' | 'high';
-  
+  let severity: "low" | "medium" | "high";
+
   if (cycleLength > 3 || (hasCascade && cycleLength > 2)) {
-    severity = 'high';
+    severity = "high";
   } else if (cycleLength === 3 || hasCascade) {
-    severity = 'medium';
+    severity = "medium";
   } else {
-    severity = 'low';
+    severity = "low";
   }
 
   // Build path string
-  const firstTable = tables[0] ?? '';
-  const pathString = tables.join(' → ') + ' → ' + firstTable;
+  const firstTable = tables[0] ?? "";
+  const pathString = tables.join(" → ") + " → " + firstTable;
 
   // Build message
   let message = `Circular dependency detected: ${pathString}`;
   if (hasCascade) {
-    message += ' (contains CASCADE operations)';
+    message += " (contains CASCADE operations)";
   }
   if (hasRestrict) {
-    message += ' (contains RESTRICT constraints)';
+    message += " (contains RESTRICT constraints)";
   }
 
   return {
@@ -183,7 +192,7 @@ function buildCycleMetadata(cyclePath: {table: string; edge?: FKGraphEdge}[]): C
     cascadeRisk: hasCascade,
     restrictPresent: hasRestrict,
     constraintNames,
-    message
+    message,
   };
 }
 
@@ -193,8 +202,8 @@ function buildCycleMetadata(cyclePath: {table: string; edge?: FKGraphEdge}[]): C
  * e.g., [A, B, C] and [B, C, A] and [C, A, B] are the same cycle
  */
 function getCycleKey(tables: string[]): string {
-  if (tables.length === 0) return '';
-  
+  if (tables.length === 0) return "";
+
   // Find the lexicographically smallest table
   let minIndex = 0;
   for (let i = 1; i < tables.length; i++) {
@@ -204,14 +213,14 @@ function getCycleKey(tables: string[]): string {
       minIndex = i;
     }
   }
-  
+
   // Rotate the array to start with the smallest table
   const rotated = [...tables.slice(minIndex), ...tables.slice(0, minIndex)];
-  
+
   // Determine if we should reverse (to handle bidirectional cycles)
-  const forward = rotated.join(',');
-  const reversed = [...rotated].reverse().join(',');
-  
+  const forward = rotated.join(",");
+  const reversed = [...rotated].reverse().join(",");
+
   return forward < reversed ? forward : reversed;
 }
 
@@ -221,7 +230,7 @@ function getCycleKey(tables: string[]): string {
 export function wouldCreateCycle(
   graph: ForeignKeyGraph,
   sourceTable: string,
-  targetTable: string
+  targetTable: string,
 ): { wouldCreateCycle: boolean; cycle?: CircularDependencyCycle } {
   // Create a temporary graph with the new edge
   const tempGraph: ForeignKeyGraph = {
@@ -232,29 +241,32 @@ export function wouldCreateCycle(
         id: `temp_fk_${sourceTable}_${targetTable}`,
         source: sourceTable,
         target: targetTable,
-        sourceColumn: 'temp_column',
-        targetColumn: 'temp_target',
-        onDelete: 'NO ACTION',
-        onUpdate: 'NO ACTION'
-      }
-    ]
+        sourceColumn: "temp_column",
+        targetColumn: "temp_target",
+        onDelete: "NO ACTION",
+        onUpdate: "NO ACTION",
+      },
+    ],
   };
 
   // Detect cycles in the temporary graph
   const cycles = detectCircularDependencies(tempGraph);
-  
+
   // Check if any cycle involves the new edge
   for (const cycle of cycles) {
-    if (cycle.tables.includes(sourceTable) && cycle.tables.includes(targetTable)) {
+    if (
+      cycle.tables.includes(sourceTable) &&
+      cycle.tables.includes(targetTable)
+    ) {
       // Check if the cycle includes the transition from source to target
       const sourceIndex = cycle.tables.indexOf(sourceTable);
       const targetIndex = cycle.tables.indexOf(targetTable);
-      
+
       // If target comes right after source in the cycle, this is the new edge creating the cycle
       if ((sourceIndex + 1) % cycle.tables.length === targetIndex) {
         return {
           wouldCreateCycle: true,
-          cycle
+          cycle,
         };
       }
     }
@@ -269,7 +281,7 @@ export function wouldCreateCycle(
  */
 export function getBreakingSuggestions(
   cycle: CircularDependencyCycle,
-  graph: ForeignKeyGraph
+  graph: ForeignKeyGraph,
 ): {
   constraintName: string;
   sourceTable: string;
@@ -289,36 +301,37 @@ export function getBreakingSuggestions(
 
   // Find edges involved in the cycle
   for (const constraintName of cycle.constraintNames) {
-    const edge = graph.edges.find(e => e.id === constraintName);
+    const edge = graph.edges.find((e) => e.id === constraintName);
     if (!edge) continue;
 
     const onDelete = edge.onDelete.toUpperCase();
 
     // Prioritize CASCADE constraints as candidates for modification
-    if (onDelete === 'CASCADE') {
+    if (onDelete === "CASCADE") {
       suggestions.push({
         constraintName: edge.id,
         sourceTable: edge.source,
         targetTable: edge.target,
         currentAction: onDelete,
-        suggestion: 'Change ON DELETE to RESTRICT or SET NULL',
-        reason: 'CASCADE operations in circular dependencies can cause unexpected data loss'
+        suggestion: "Change ON DELETE to RESTRICT or SET NULL",
+        reason:
+          "CASCADE operations in circular dependencies can cause unexpected data loss",
       });
     }
 
     // Also suggest removing or modifying NO ACTION constraints
-    if (onDelete === 'NO ACTION') {
+    if (onDelete === "NO ACTION") {
       suggestions.push({
         constraintName: edge.id,
         sourceTable: edge.source,
         targetTable: edge.target,
         currentAction: onDelete,
-        suggestion: 'Consider removing this constraint or changing to SET NULL',
-        reason: 'This is a potential weak link that could break the circular dependency'
+        suggestion: "Consider removing this constraint or changing to SET NULL",
+        reason:
+          "This is a potential weak link that could break the circular dependency",
       });
     }
   }
 
   return suggestions;
 }
-

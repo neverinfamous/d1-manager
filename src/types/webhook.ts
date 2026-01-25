@@ -23,28 +23,28 @@
  */
 export type WebhookEventType =
   // Database lifecycle
-  | 'database_create'
-  | 'database_delete'
+  | "database_create"
+  | "database_delete"
   // Table DDL operations
-  | 'table_create'
-  | 'table_delete'
-  | 'table_update'
+  | "table_create"
+  | "table_delete"
+  | "table_update"
   // R2 snapshot lifecycle
-  | 'backup_complete'
-  | 'restore_complete'
+  | "backup_complete"
+  | "restore_complete"
   // Data transfer operations
-  | 'import_complete'
-  | 'export_complete'
+  | "import_complete"
+  | "export_complete"
   // DDL query execution
-  | 'schema_change'
+  | "schema_change"
   // Bulk operations
-  | 'bulk_delete_complete'
+  | "bulk_delete_complete"
   // Job lifecycle
-  | 'job_failed'
-  | 'batch_complete'
+  | "job_failed"
+  | "batch_complete"
   // Backward-compatible aliases (legacy)
-  | 'database_export'
-  | 'database_import';
+  | "database_export"
+  | "database_import";
 
 /**
  * Webhook from API
@@ -97,28 +97,28 @@ export interface WebhookResponse {
  */
 export const WEBHOOK_EVENT_LABELS: Record<WebhookEventType, string> = {
   // Database lifecycle
-  database_create: 'Database Created',
-  database_delete: 'Database Deleted',
+  database_create: "Database Created",
+  database_delete: "Database Deleted",
   // Table DDL operations
-  table_create: 'Table Created',
-  table_delete: 'Table Deleted',
-  table_update: 'Table Updated',
+  table_create: "Table Created",
+  table_delete: "Table Deleted",
+  table_update: "Table Updated",
   // R2 snapshot lifecycle
-  backup_complete: 'Backup Complete',
-  restore_complete: 'Restore Complete',
+  backup_complete: "Backup Complete",
+  restore_complete: "Restore Complete",
   // Data transfer operations
-  import_complete: 'Import Complete',
-  export_complete: 'Export Complete',
+  import_complete: "Import Complete",
+  export_complete: "Export Complete",
   // DDL query execution
-  schema_change: 'Schema Changed',
+  schema_change: "Schema Changed",
   // Bulk operations
-  bulk_delete_complete: 'Bulk Delete Complete',
+  bulk_delete_complete: "Bulk Delete Complete",
   // Job lifecycle
-  job_failed: 'Job Failed',
-  batch_complete: 'Batch Operation Complete',
+  job_failed: "Job Failed",
+  batch_complete: "Batch Operation Complete",
   // Backward-compatible aliases
-  database_export: 'Database Exported (Legacy)',
-  database_import: 'Database Imported (Legacy)',
+  database_export: "Database Exported (Legacy)",
+  database_import: "Database Imported (Legacy)",
 };
 
 /**
@@ -126,28 +126,28 @@ export const WEBHOOK_EVENT_LABELS: Record<WebhookEventType, string> = {
  */
 export const WEBHOOK_EVENT_DESCRIPTIONS: Record<WebhookEventType, string> = {
   // Database lifecycle
-  database_create: 'Triggered when a new database is created',
-  database_delete: 'Triggered when a database is deleted',
+  database_create: "Triggered when a new database is created",
+  database_delete: "Triggered when a database is deleted",
   // Table DDL operations
-  table_create: 'Triggered when a new table is created',
-  table_delete: 'Triggered when a table is dropped',
-  table_update: 'Triggered when a table is altered (columns, indexes)',
+  table_create: "Triggered when a new table is created",
+  table_delete: "Triggered when a table is dropped",
+  table_update: "Triggered when a table is altered (columns, indexes)",
   // R2 snapshot lifecycle
-  backup_complete: 'Triggered when an R2 backup snapshot completes',
-  restore_complete: 'Triggered when a backup is restored from R2',
+  backup_complete: "Triggered when an R2 backup snapshot completes",
+  restore_complete: "Triggered when a backup is restored from R2",
   // Data transfer operations
-  import_complete: 'Triggered when a SQL/JSON import completes',
-  export_complete: 'Triggered when a SQL/JSON export completes',
+  import_complete: "Triggered when a SQL/JSON import completes",
+  export_complete: "Triggered when a SQL/JSON export completes",
   // DDL query execution
-  schema_change: 'Triggered when a DDL query (CREATE/ALTER/DROP) executes',
+  schema_change: "Triggered when a DDL query (CREATE/ALTER/DROP) executes",
   // Bulk operations
-  bulk_delete_complete: 'Triggered when a bulk row deletion completes',
+  bulk_delete_complete: "Triggered when a bulk row deletion completes",
   // Job lifecycle
-  job_failed: 'Triggered when any tracked operation fails',
-  batch_complete: 'Triggered when a bulk operation completes',
+  job_failed: "Triggered when any tracked operation fails",
+  batch_complete: "Triggered when a bulk operation completes",
   // Backward-compatible aliases
-  database_export: 'Legacy alias for export_complete',
-  database_import: 'Legacy alias for import_complete',
+  database_export: "Legacy alias for export_complete",
+  database_import: "Legacy alias for import_complete",
 };
 
 /**
@@ -156,25 +156,25 @@ export const WEBHOOK_EVENT_DESCRIPTIONS: Record<WebhookEventType, string> = {
  */
 export const ALL_WEBHOOK_EVENTS: WebhookEventType[] = [
   // Database lifecycle
-  'database_create',
-  'database_delete',
+  "database_create",
+  "database_delete",
   // Table DDL operations
-  'table_create',
-  'table_delete',
-  'table_update',
+  "table_create",
+  "table_delete",
+  "table_update",
   // R2 snapshot lifecycle
-  'backup_complete',
-  'restore_complete',
+  "backup_complete",
+  "restore_complete",
   // Data transfer operations
-  'import_complete',
-  'export_complete',
+  "import_complete",
+  "export_complete",
   // DDL query execution
-  'schema_change',
+  "schema_change",
   // Bulk operations
-  'bulk_delete_complete',
+  "bulk_delete_complete",
   // Job lifecycle
-  'job_failed',
-  'batch_complete',
+  "job_failed",
+  "batch_complete",
 ];
 
 /**
@@ -182,7 +182,6 @@ export const ALL_WEBHOOK_EVENTS: WebhookEventType[] = [
  * Maps old event names to their new equivalents
  */
 export const LEGACY_EVENT_ALIASES: Record<string, WebhookEventType> = {
-  database_export: 'export_complete',
-  database_import: 'import_complete',
+  database_export: "export_complete",
+  database_import: "import_complete",
 };
-

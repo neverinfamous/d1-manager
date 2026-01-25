@@ -1,6 +1,19 @@
-import { Database, Code, Pencil, Copy, Upload, Download, Package, Zap, Sparkles, Cloud, RefreshCw, Trash2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import type { D1Database } from '../services/api';
+import {
+  Database,
+  Code,
+  Pencil,
+  Copy,
+  Upload,
+  Download,
+  Package,
+  Zap,
+  Sparkles,
+  Cloud,
+  RefreshCw,
+  Trash2,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import type { D1Database } from "../services/api";
 
 export interface DatabaseActionHandlers {
   onBrowse: (db: D1Database) => void;
@@ -29,14 +42,14 @@ export function DatabaseActionButtons({
   handlers,
   compact = false,
 }: DatabaseActionButtonsProps): React.JSX.Element {
-  const buttonSize = compact ? 'sm' : 'sm';
-  const iconSize = compact ? 'h-3.5 w-3.5' : 'h-4 w-4';
+  const buttonSize = compact ? "sm" : "sm";
+  const iconSize = compact ? "h-3.5 w-3.5" : "h-4 w-4";
 
   // In compact mode, all buttons are in a single row
   // In grid mode, buttons are arranged in a 4-column grid
   const containerClass = compact
-    ? 'flex items-center gap-1 flex-wrap'
-    : 'grid grid-cols-4 gap-1.5';
+    ? "flex items-center gap-1 flex-wrap"
+    : "grid grid-cols-4 gap-1.5";
 
   return (
     <div className={containerClass}>
@@ -50,7 +63,7 @@ export function DatabaseActionButtons({
         }}
         aria-label="Browse database"
         title="Browse"
-        className={compact ? 'h-7 w-7 p-0' : undefined}
+        className={compact ? "h-7 w-7 p-0" : undefined}
       >
         <Database className={iconSize} />
       </Button>
@@ -65,7 +78,7 @@ export function DatabaseActionButtons({
         }}
         aria-label="Open query console"
         title="Query"
-        className={compact ? 'h-7 w-7 p-0' : undefined}
+        className={compact ? "h-7 w-7 p-0" : undefined}
       >
         <Code className={iconSize} />
       </Button>
@@ -80,7 +93,7 @@ export function DatabaseActionButtons({
         }}
         aria-label="Rename database"
         title="Rename"
-        className={compact ? 'h-7 w-7 p-0' : undefined}
+        className={compact ? "h-7 w-7 p-0" : undefined}
       >
         <Pencil className={iconSize} />
       </Button>
@@ -95,7 +108,7 @@ export function DatabaseActionButtons({
         }}
         aria-label="Clone database"
         title="Clone"
-        className={compact ? 'h-7 w-7 p-0' : undefined}
+        className={compact ? "h-7 w-7 p-0" : undefined}
       >
         <Copy className={iconSize} />
       </Button>
@@ -110,7 +123,7 @@ export function DatabaseActionButtons({
         }}
         aria-label="Import into database"
         title="Import"
-        className={compact ? 'h-7 w-7 p-0' : undefined}
+        className={compact ? "h-7 w-7 p-0" : undefined}
       >
         <Upload className={iconSize} />
       </Button>
@@ -125,7 +138,7 @@ export function DatabaseActionButtons({
         }}
         aria-label="Download database"
         title="Download (SQL)"
-        className={compact ? 'h-7 w-7 p-0' : undefined}
+        className={compact ? "h-7 w-7 p-0" : undefined}
       >
         <Download className={iconSize} />
       </Button>
@@ -140,7 +153,7 @@ export function DatabaseActionButtons({
         }}
         aria-label="Export database"
         title="Export (SQL/JSON/CSV)"
-        className={`hover:bg-emerald-100 hover:text-emerald-700 hover:border-emerald-300 dark:hover:bg-emerald-900/30 dark:hover:text-emerald-300 dark:hover:border-emerald-700 ${compact ? 'h-7 w-7 p-0' : ''}`}
+        className={`hover:bg-emerald-100 hover:text-emerald-700 hover:border-emerald-300 dark:hover:bg-emerald-900/30 dark:hover:text-emerald-300 dark:hover:border-emerald-700 ${compact ? "h-7 w-7 p-0" : ""}`}
       >
         <Package className={iconSize} />
       </Button>
@@ -155,7 +168,7 @@ export function DatabaseActionButtons({
         }}
         aria-label="Optimize database"
         title="Optimize"
-        className={compact ? 'h-7 w-7 p-0' : undefined}
+        className={compact ? "h-7 w-7 p-0" : undefined}
       >
         <Zap className={iconSize} />
       </Button>
@@ -170,7 +183,7 @@ export function DatabaseActionButtons({
         }}
         aria-label="Full-text search (FTS5)"
         title="FTS5 Search"
-        className={`hover:bg-purple-100 hover:text-purple-700 hover:border-purple-300 dark:hover:bg-purple-900/30 dark:hover:text-purple-300 dark:hover:border-purple-700 ${compact ? 'h-7 w-7 p-0' : ''}`}
+        className={`hover:bg-purple-100 hover:text-purple-700 hover:border-purple-300 dark:hover:bg-purple-900/30 dark:hover:text-purple-300 dark:hover:border-purple-700 ${compact ? "h-7 w-7 p-0" : ""}`}
       >
         <Sparkles className={iconSize} />
       </Button>
@@ -185,7 +198,7 @@ export function DatabaseActionButtons({
         }}
         aria-label="Backup to R2"
         title="Backup to R2"
-        className={`hover:bg-blue-100 hover:text-blue-700 hover:border-blue-300 dark:hover:bg-blue-900/30 dark:hover:text-blue-300 dark:hover:border-blue-700 ${compact ? 'h-7 w-7 p-0' : ''}`}
+        className={`hover:bg-blue-100 hover:text-blue-700 hover:border-blue-300 dark:hover:bg-blue-900/30 dark:hover:text-blue-300 dark:hover:border-blue-700 ${compact ? "h-7 w-7 p-0" : ""}`}
       >
         <Cloud className={iconSize} />
       </Button>
@@ -200,7 +213,7 @@ export function DatabaseActionButtons({
         }}
         aria-label="Restore from R2"
         title="Restore from R2"
-        className={`hover:bg-green-100 hover:text-green-700 hover:border-green-300 dark:hover:bg-green-900/30 dark:hover:text-green-300 dark:hover:border-green-700 ${compact ? 'h-7 w-7 p-0' : ''}`}
+        className={`hover:bg-green-100 hover:text-green-700 hover:border-green-300 dark:hover:bg-green-900/30 dark:hover:text-green-300 dark:hover:border-green-700 ${compact ? "h-7 w-7 p-0" : ""}`}
       >
         <RefreshCw className={iconSize} />
       </Button>
@@ -215,7 +228,7 @@ export function DatabaseActionButtons({
         }}
         aria-label="Delete database"
         title="Delete"
-        className={`hover:bg-destructive/10 hover:text-destructive hover:border-destructive ${compact ? 'h-7 w-7 p-0' : 'col-span-2'}`}
+        className={`hover:bg-destructive/10 hover:text-destructive hover:border-destructive ${compact ? "h-7 w-7 p-0" : "col-span-2"}`}
       >
         <Trash2 className={iconSize} />
         {!compact && <span className="ml-1">Delete</span>}
@@ -223,4 +236,3 @@ export function DatabaseActionButtons({
     </div>
   );
 }
-
