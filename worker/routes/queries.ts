@@ -14,6 +14,63 @@ function jsonHeaders(corsHeaders: HeadersInit): Headers {
   return headers;
 }
 
+/**
+ * Sanitize error message for client response.
+ * Security: This function extracts only the SQL-relevant error message,
+ * removing any stack traces, file paths, or internal details.
+ * Returns a generic message if the error cannot be safely sanitized.
+ */
+function sanitizeErrorForClient(rawError: string): string {
+  // Strip stack traces (at Function (file:line:col) patterns)
+  let msg = rawError
+    .replace(/\s+at\s+\S+\s+\([^)]+:\d+:\d+\)/g, "")
+    .replace(/\s+at\s+[^\n]+/g, "")
+    .replace(/\n\s*at\s+/g, " ")
+    .trim();
+
+  // Remove SQLite error suffixes
+  msg = msg
+    .replace(/: SQLITE_ERROR$/, "")
+    .replace(/: SQLITE_AUTH$/, "")
+    .replace(/: SQLITE_CONSTRAINT$/, "");
+
+  // Try to extract D1 API error message
+  const jsonMatch = /Query failed: \d+ - (.+)/.exec(msg);
+  if (jsonMatch?.[1]) {
+    try {
+      const parsed = JSON.parse(jsonMatch[1]) as {
+        errors?: { message?: string; error?: string }[];
+      };
+      const firstError = parsed.errors?.[0];
+      if (firstError?.message) {
+        msg = firstError.message;
+      } else if (firstError?.error) {
+        msg = firstError.error;
+      }
+    } catch {
+      // Keep current msg if parse fails
+    }
+  }
+
+  // Security: Remove any remaining paths or sensitive patterns
+  msg = msg
+    .replace(/\/[^\s:]+\.[a-z]+/gi, "[path]") // File paths
+    .replace(/[A-Z]:\\[^\s:]+/gi, "[path]") // Windows paths
+    .replace(/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g, "[ip]"); // IP addresses
+
+  // Truncate to reasonable length
+  if (msg.length > 500) {
+    msg = msg.substring(0, 497) + "...";
+  }
+
+  // If message is empty or only whitespace, return generic error
+  if (!msg.trim()) {
+    return "Query execution failed";
+  }
+
+  return msg;
+}
+
 interface QueryBody {
   query: string;
   params?: unknown[];
@@ -179,49 +236,8 @@ export async function handleQueryRoutes(
           isLocalDev,
         );
 
-        // Extract clean error message from D1 error format
-        let cleanErrorMsg = rawErrorMsg;
-
-        // Try to extract message from JSON error format: "Query failed: 400 - {...}"
-        const jsonMatch = /Query failed: \d+ - (.+)/.exec(rawErrorMsg);
-        if (jsonMatch?.[1]) {
-          try {
-            const errorJson = JSON.parse(jsonMatch[1]) as {
-              errors?: { message?: string; error?: string }[];
-            };
-            if (
-              errorJson.errors &&
-              Array.isArray(errorJson.errors) &&
-              errorJson.errors.length > 0
-            ) {
-              cleanErrorMsg =
-                errorJson.errors[0]?.message ??
-                errorJson.errors[0]?.error ??
-                rawErrorMsg;
-            }
-          } catch {
-            // Keep raw message if JSON parsing fails
-          }
-        }
-
-        // Clean up SQLite error suffixes for cleaner display
-        cleanErrorMsg = cleanErrorMsg
-          .replace(/: SQLITE_ERROR$/, "")
-          .replace(/: SQLITE_AUTH$/, "")
-          .replace(/: SQLITE_CONSTRAINT$/, "");
-
-        // Security: Remove any stack trace patterns from error messages
-        // Stack traces typically contain "at <function> (<file>:<line>:<col>)" patterns
-        cleanErrorMsg = cleanErrorMsg
-          .replace(/\s+at\s+\S+\s+\([^)]+:\d+:\d+\)/g, "")
-          .replace(/\s+at\s+[^\n]+/g, "")
-          .replace(/\n\s*at\s+/g, " ")
-          .trim();
-
-        // Truncate excessively long error messages (may contain embedded data)
-        if (cleanErrorMsg.length > 500) {
-          cleanErrorMsg = cleanErrorMsg.substring(0, 500) + "...";
-        }
+        // Sanitize error message for client (removes stack traces, paths, etc.)
+        const clientErrorMsg = sanitizeErrorForClient(rawErrorMsg);
 
         // Store error in query history
         if (userEmail) {
@@ -230,7 +246,7 @@ export async function handleQueryRoutes(
             body.query,
             duration,
             0,
-            cleanErrorMsg,
+            clientErrorMsg,
             userEmail,
             env,
           ).catch(
@@ -248,8 +264,8 @@ export async function handleQueryRoutes(
         // Note: D1 Manager is an admin tool behind Zero Trust auth
         return new Response(
           JSON.stringify({
-            error: cleanErrorMsg,
-            message: cleanErrorMsg,
+            error: clientErrorMsg,
+            message: clientErrorMsg,
           }),
           {
             status: 400,
