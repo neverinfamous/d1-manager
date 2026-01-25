@@ -15,60 +15,135 @@ function jsonHeaders(corsHeaders: HeadersInit): Headers {
 }
 
 /**
- * Sanitize error message for client response.
- * Security: This function extracts only the SQL-relevant error message,
- * removing any stack traces, file paths, or internal details.
- * Returns a generic message if the error cannot be safely sanitized.
+ * Classify SQL error and return a static, safe error message.
+ * Security: This function uses pattern matching to identify error types
+ * and returns ONLY predefined static strings - no data from the original
+ * error is included in the response. This breaks taint tracking for CodeQL.
  */
-function sanitizeErrorForClient(rawError: string): string {
-  // Strip stack traces (at Function (file:line:col) patterns)
-  let msg = rawError
-    .replace(/\s+at\s+\S+\s+\([^)]+:\d+:\d+\)/g, "")
-    .replace(/\s+at\s+[^\n]+/g, "")
-    .replace(/\n\s*at\s+/g, " ")
-    .trim();
+function classifySqlError(rawError: string): string {
+  const errorLower = rawError.toLowerCase();
 
-  // Remove SQLite error suffixes
-  msg = msg
-    .replace(/: SQLITE_ERROR$/, "")
-    .replace(/: SQLITE_AUTH$/, "")
-    .replace(/: SQLITE_CONSTRAINT$/, "");
+  // Syntax errors
+  if (
+    errorLower.includes("syntax error") ||
+    errorLower.includes('near "') ||
+    errorLower.includes("incomplete input")
+  ) {
+    return "SQL syntax error in query";
+  }
 
-  // Try to extract D1 API error message
-  const jsonMatch = /Query failed: \d+ - (.+)/.exec(msg);
-  if (jsonMatch?.[1]) {
-    try {
-      const parsed = JSON.parse(jsonMatch[1]) as {
-        errors?: { message?: string; error?: string }[];
-      };
-      const firstError = parsed.errors?.[0];
-      if (firstError?.message) {
-        msg = firstError.message;
-      } else if (firstError?.error) {
-        msg = firstError.error;
-      }
-    } catch {
-      // Keep current msg if parse fails
+  // Table/column not found
+  if (
+    errorLower.includes("no such table") ||
+    (errorLower.includes("table") && errorLower.includes("not exist"))
+  ) {
+    return "Table not found";
+  }
+  if (
+    errorLower.includes("no such column") ||
+    (errorLower.includes("column") && errorLower.includes("not exist"))
+  ) {
+    return "Column not found";
+  }
+
+  // Constraint violations
+  if (
+    errorLower.includes("unique constraint") ||
+    errorLower.includes("duplicate")
+  ) {
+    return "Unique constraint violation - duplicate value";
+  }
+  if (errorLower.includes("foreign key constraint")) {
+    return "Foreign key constraint violation";
+  }
+  if (
+    errorLower.includes("not null constraint") ||
+    errorLower.includes("cannot be null")
+  ) {
+    return "NOT NULL constraint violation - missing required value";
+  }
+  if (errorLower.includes("check constraint")) {
+    return "CHECK constraint violation";
+  }
+  if (errorLower.includes("constraint")) {
+    return "Constraint violation";
+  }
+
+  // Data type errors
+  if (
+    errorLower.includes("datatype mismatch") ||
+    errorLower.includes("type mismatch")
+  ) {
+    return "Data type mismatch";
+  }
+
+  // Authorization errors
+  if (
+    errorLower.includes("authorization") ||
+    errorLower.includes("permission denied")
+  ) {
+    return "Authorization error - permission denied";
+  }
+
+  // Database locked/busy
+  if (
+    errorLower.includes("database is locked") ||
+    errorLower.includes("database is busy")
+  ) {
+    return "Database is temporarily busy - please retry";
+  }
+
+  // Read-only errors
+  if (errorLower.includes("readonly") || errorLower.includes("read-only")) {
+    return "Database is read-only";
+  }
+
+  // Too many rows/results
+  if (
+    errorLower.includes("too many") ||
+    errorLower.includes("limit exceeded")
+  ) {
+    return "Query result limit exceeded";
+  }
+
+  // Timeout
+  if (errorLower.includes("timeout") || errorLower.includes("timed out")) {
+    return "Query execution timed out";
+  }
+
+  // Rate limiting
+  if (
+    errorLower.includes("rate limit") ||
+    errorLower.includes("too many requests")
+  ) {
+    return "Rate limit exceeded - please wait and retry";
+  }
+
+  // Query failed with status code (D1 API error)
+  if (/query failed: [45]\d\d/.test(errorLower)) {
+    if (errorLower.includes("400")) {
+      return "Bad request - check query syntax";
+    }
+    if (errorLower.includes("401") || errorLower.includes("403")) {
+      return "Authorization error";
+    }
+    if (errorLower.includes("404")) {
+      return "Database or resource not found";
+    }
+    if (errorLower.includes("429")) {
+      return "Rate limit exceeded - please wait and retry";
+    }
+    if (
+      errorLower.includes("500") ||
+      errorLower.includes("502") ||
+      errorLower.includes("503")
+    ) {
+      return "Database service temporarily unavailable";
     }
   }
 
-  // Security: Remove any remaining paths or sensitive patterns
-  msg = msg
-    .replace(/\/[^\s:]+\.[a-z]+/gi, "[path]") // File paths
-    .replace(/[A-Z]:\\[^\s:]+/gi, "[path]") // Windows paths
-    .replace(/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g, "[ip]"); // IP addresses
-
-  // Truncate to reasonable length
-  if (msg.length > 500) {
-    msg = msg.substring(0, 497) + "...";
-  }
-
-  // If message is empty or only whitespace, return generic error
-  if (!msg.trim()) {
-    return "Query execution failed";
-  }
-
-  return msg;
+  // Generic fallback - never expose the actual error content
+  return "Query execution failed";
 }
 
 interface QueryBody {
@@ -236,8 +311,8 @@ export async function handleQueryRoutes(
           isLocalDev,
         );
 
-        // Sanitize error message for client (removes stack traces, paths, etc.)
-        const clientErrorMsg = sanitizeErrorForClient(rawErrorMsg);
+        // Classify error and return a static, safe error message
+        const clientErrorMsg = classifySqlError(rawErrorMsg);
 
         // Store error in query history
         if (userEmail) {
