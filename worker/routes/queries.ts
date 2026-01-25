@@ -210,6 +210,19 @@ export async function handleQueryRoutes(
           .replace(/: SQLITE_AUTH$/, "")
           .replace(/: SQLITE_CONSTRAINT$/, "");
 
+        // Security: Remove any stack trace patterns from error messages
+        // Stack traces typically contain "at <function> (<file>:<line>:<col>)" patterns
+        cleanErrorMsg = cleanErrorMsg
+          .replace(/\s+at\s+\S+\s+\([^)]+:\d+:\d+\)/g, "")
+          .replace(/\s+at\s+[^\n]+/g, "")
+          .replace(/\n\s*at\s+/g, " ")
+          .trim();
+
+        // Truncate excessively long error messages (may contain embedded data)
+        if (cleanErrorMsg.length > 500) {
+          cleanErrorMsg = cleanErrorMsg.substring(0, 500) + "...";
+        }
+
         // Store error in query history
         if (userEmail) {
           await storeQueryHistory(
@@ -231,8 +244,8 @@ export async function handleQueryRoutes(
           );
         }
 
-        // Return detailed error message to authenticated admin users
-        // lgtm[js/stack-trace-exposure] - Intentional: D1 Manager is an admin tool behind Zero Trust auth; SQL error details help admins debug queries
+        // Return sanitized SQL error message to authenticated admin users
+        // Note: D1 Manager is an admin tool behind Zero Trust auth
         return new Response(
           JSON.stringify({
             error: cleanErrorMsg,

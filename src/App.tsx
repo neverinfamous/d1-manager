@@ -1276,7 +1276,9 @@ export default function App(): React.JSX.Element {
                   </p>
                   <p className="text-xs text-amber-700 dark:text-amber-300">
                     {migrationStatus.pendingMigrations.length} migration
-                    {migrationStatus.pendingMigrations.length !== 1 ? "s" : ""}{" "}
+                    {migrationStatus.pendingMigrations.length !== 1
+                      ? "s"
+                      : ""}{" "}
                     pending
                     {migrationStatus.legacy?.isLegacy &&
                       " (legacy installation detected)"}

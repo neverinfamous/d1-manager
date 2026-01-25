@@ -71,6 +71,7 @@ jobs:
           fail-on: error
 
   # Build each platform on native architecture (avoids QEMU emulation issues)
+  # Images are built but NOT pushed yet - push happens after security-scan passes
   build-platform:
     needs: [lint, codeql]
     strategy:
@@ -134,36 +135,20 @@ jobs:
           tags: |
             type=sha,prefix=sha-,format=short
 
-      - name: Build and push platform image
+      - name: Build platform image (no push - security scan first)
         id: build
         uses: docker/build-push-action@v6
         with:
           context: .
           file: Dockerfile
           platforms: ${{ matrix.platform }}
-          push: ${{ github.event_name != 'pull_request' }}
+          push: false
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.platform }}
           cache-to: type=gha,scope=${{ matrix.platform }},mode=max
           provenance: mode=max
           sbom: true
-
-      - name: Export digest
-        if: github.event_name != 'pull_request'
-        run: |
-          mkdir -p /tmp/digests
-          digest="${{ steps.build.outputs.digest }}"
-          touch "/tmp/digests/${digest#sha256:}"
-
-      - name: Upload digest
-        if: github.event_name != 'pull_request'
-        uses: actions/upload-artifact@v6
-        with:
-          name: digests-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}
-          path: /tmp/digests/*
-          if-no-files-found: error
-          retention-days: 1
 
   # Security scan with Docker Scout (blocks on critical/high fixable vulns)
   security-scan:
@@ -216,10 +201,84 @@ jobs:
         with:
           sarif_file: scout-results.sarif
 
+  # Push platform images AFTER security scan passes
+  # This job gates Docker Hub publishing on security verification
+  push-platform:
+    needs: [build-platform, security-scan]
+    if: github.event_name != 'pull_request'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          flavor: |
+            latest=false
+            suffix=-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}
+          tags: |
+            type=sha,prefix=sha-,format=short
+
+      - name: Build and push platform image (from cache)
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          platforms: ${{ matrix.platform }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.platform }}
+          provenance: mode=max
+          sbom: true
+
+      - name: Export digest
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - name: Upload digest
+        uses: actions/upload-artifact@v6
+        with:
+          name: digests-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
   # Merge platform images into multi-arch manifest
   merge-and-push:
     runs-on: ubuntu-latest
-    needs: [build-platform, security-scan]
+    needs: [push-platform]
     if: github.event_name != 'pull_request'
     permissions:
       contents: read
