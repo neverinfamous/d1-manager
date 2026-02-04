@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   ArrowLeft,
   Table,
@@ -309,23 +309,7 @@ export function DatabaseView({
     setTimeout(() => setIdCopied(false), 2000);
   };
 
-  useEffect(() => {
-    void loadTables(false); // Use cache on initial load for instant switching
-    void loadTableColors();
-    void loadFTS5TableNames();
-    void loadR2BackupStatus();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [databaseId]);
-
-  // Reload tables when refreshTrigger changes (e.g., after undo restore)
-  useEffect(() => {
-    if (refreshTrigger !== undefined && refreshTrigger > 0) {
-      void loadTables(true); // Skip cache to get fresh data
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [refreshTrigger]);
-
-  const loadR2BackupStatus = async (): Promise<void> => {
+  const loadR2BackupStatus = useCallback(async (): Promise<void> => {
     try {
       const status = await getR2BackupStatus();
       setR2BackupStatus(status);
@@ -336,38 +320,55 @@ export function DatabaseView({
         doAvailable: false,
       });
     }
-  };
+  }, []);
 
-  const loadTables = async (skipCache = false): Promise<void> => {
-    try {
-      setLoading(true);
-      setError(null);
-      const result = await listTables(databaseId, skipCache);
-      setTables(result);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load tables");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const loadTables = useCallback(
+    async (skipCache = false): Promise<void> => {
+      try {
+        setLoading(true);
+        setError(null);
+        const result = await listTables(databaseId, skipCache);
+        setTables(result);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load tables");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [databaseId],
+  );
 
-  const loadTableColors = async (): Promise<void> => {
+  const loadTableColors = useCallback(async (): Promise<void> => {
     try {
       const colors = await api.getTableColors(databaseId);
       setTableColors(colors);
     } catch {
       // Colors are optional, silently ignore failures
     }
-  };
+  }, [databaseId]);
 
-  const loadFTS5TableNames = async (): Promise<void> => {
+  const loadFTS5TableNames = useCallback(async (): Promise<void> => {
     try {
       const fts5Tables = await listFTS5Tables(databaseId);
       setFts5TableNames(new Set(fts5Tables.map((t) => t.name)));
     } catch {
       // Badges are optional, silently ignore failures
     }
-  };
+  }, [databaseId]);
+
+  useEffect(() => {
+    void loadTables(false); // Use cache on initial load for instant switching
+    void loadTableColors();
+    void loadFTS5TableNames();
+    void loadR2BackupStatus();
+  }, [loadTables, loadTableColors, loadFTS5TableNames, loadR2BackupStatus]);
+
+  // Reload tables when refreshTrigger changes (e.g., after undo restore)
+  useEffect(() => {
+    if (refreshTrigger !== undefined && refreshTrigger > 0) {
+      void loadTables(true); // Skip cache to get fresh data
+    }
+  }, [refreshTrigger, loadTables]);
 
   const handleTableColorChange = async (
     tableName: string,

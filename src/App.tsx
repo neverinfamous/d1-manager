@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from "react";
+import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import {
   api,
   type D1Database,
@@ -455,39 +455,42 @@ export default function App(): React.JSX.Element {
     }
   };
 
-  const loadAllR2BackupCounts = async (dbs: D1Database[]): Promise<void> => {
-    if (dbs.length === 0 || !r2BackupStatus?.configured) {
-      setR2BackupCounts({});
-      return;
-    }
-
-    setR2BackupCountsLoading(true);
-    try {
-      const counts: Record<string, number> = {};
-
-      // Load R2 backups for each database in parallel
-      const results = await Promise.allSettled(
-        dbs.map(async (db) => {
-          const backups = await listR2Backups(db.uuid);
-          return { dbId: db.uuid, count: backups.length };
-        }),
-      );
-
-      for (const result of results) {
-        if (result.status === "fulfilled") {
-          counts[result.value.dbId] = result.value.count;
-        }
+  const loadAllR2BackupCounts = useCallback(
+    async (dbs: D1Database[]): Promise<void> => {
+      if (dbs.length === 0 || !r2BackupStatus?.configured) {
+        setR2BackupCounts({});
+        return;
       }
 
-      setR2BackupCounts(counts);
-    } catch {
-      setR2BackupCounts({});
-    } finally {
-      setR2BackupCountsLoading(false);
-    }
-  };
+      setR2BackupCountsLoading(true);
+      try {
+        const counts: Record<string, number> = {};
 
-  const loadOrphanedBackups = async (): Promise<void> => {
+        // Load R2 backups for each database in parallel
+        const results = await Promise.allSettled(
+          dbs.map(async (db) => {
+            const backups = await listR2Backups(db.uuid);
+            return { dbId: db.uuid, count: backups.length };
+          }),
+        );
+
+        for (const result of results) {
+          if (result.status === "fulfilled") {
+            counts[result.value.dbId] = result.value.count;
+          }
+        }
+
+        setR2BackupCounts(counts);
+      } catch {
+        setR2BackupCounts({});
+      } finally {
+        setR2BackupCountsLoading(false);
+      }
+    },
+    [r2BackupStatus?.configured],
+  );
+
+  const loadOrphanedBackups = useCallback(async (): Promise<void> => {
     if (!r2BackupStatus?.configured) {
       setOrphanedBackups([]);
       return;
@@ -502,7 +505,7 @@ export default function App(): React.JSX.Element {
     } finally {
       setOrphanedBackupsLoading(false);
     }
-  };
+  }, [r2BackupStatus?.configured]);
 
   const handleDeleteOrphanedBackups = async (
     databaseId: string,
@@ -547,8 +550,13 @@ export default function App(): React.JSX.Element {
       }
       void loadOrphanedBackups();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showUndoDatabasePicker, r2BackupStatus?.configured]);
+  }, [
+    showUndoDatabasePicker,
+    r2BackupStatus?.configured,
+    databases,
+    loadAllR2BackupCounts,
+    loadOrphanedBackups,
+  ]);
 
   const loadDatabases = async (): Promise<void> => {
     try {

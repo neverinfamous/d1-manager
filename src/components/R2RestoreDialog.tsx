@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   Dialog,
   DialogContent,
@@ -59,15 +59,7 @@ export function R2RestoreDialog({
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDownloading, setIsDownloading] = useState<number | null>(null);
 
-  // Load backups on open
-  useEffect(() => {
-    if (open) {
-      void loadBackups();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, databaseId]);
-
-  const loadBackups = async (): Promise<void> => {
+  const loadBackups = useCallback(async (): Promise<void> => {
     setLoading(true);
     setError(null);
     try {
@@ -78,7 +70,14 @@ export function R2RestoreDialog({
     } finally {
       setLoading(false);
     }
-  };
+  }, [databaseId]);
+
+  // Load backups on open
+  useEffect(() => {
+    if (open) {
+      void loadBackups();
+    }
+  }, [open, loadBackups]);
 
   const handleRestore = async (): Promise<void> => {
     if (!selectedBackup) return;

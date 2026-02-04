@@ -223,88 +223,93 @@ export function TableView({
     void loadForeignKeys();
   }, [databaseId, tableName]);
 
+  const loadTableData = useCallback(
+    async (skipSchemaCache = false): Promise<void> => {
+      try {
+        setError(null);
+
+        // Parse FK filter if present (format: "column:value")
+        let fkColumn: string | null = null;
+        let fkValue: string | null = null;
+        if (fkFilter) {
+          const colonIndex = fkFilter.indexOf(":");
+          if (colonIndex > 0) {
+            fkColumn = fkFilter.substring(0, colonIndex);
+            fkValue = fkFilter.substring(colonIndex + 1);
+          }
+        }
+
+        // Build WHERE clause for FK filter
+        const buildWhereClause = (): string => {
+          if (fkColumn && fkValue !== null) {
+            const escapedValue = fkValue.replace(/'/g, "''");
+            return ` WHERE "${fkColumn}" = '${escapedValue}'`;
+          }
+          return "";
+        };
+
+        // Build count query with FK filter
+        const buildCountQuery = (): string => {
+          return `SELECT COUNT(*) as count FROM "${tableName}"${buildWhereClause()}`;
+        };
+
+        // Build data query with FK filter
+        const buildDataQuery = (): string => {
+          const offset = (page - 1) * rowsPerPage;
+          return `SELECT * FROM "${tableName}"${buildWhereClause()} LIMIT ${rowsPerPage} OFFSET ${offset}`;
+        };
+
+        // Phase 1: Load schema first (instant if cached)
+        // This allows us to show the table structure immediately
+        const schemaResult = await getTableSchema(
+          databaseId,
+          tableName,
+          skipSchemaCache,
+        );
+        setSchema(schemaResult);
+
+        // If this is the first load, hide the full loading state now that we have schema
+        setLoading((prev) => {
+          if (prev) {
+            setLoadingRows(true);
+            return false;
+          }
+          setLoadingRows(true);
+          return prev;
+        });
+
+        // Phase 2: Load rows and count (always fresh)
+        const [dataResult, countResult] = await Promise.all([
+          executeQuery(databaseId, buildDataQuery(), [], true),
+          executeQuery(databaseId, buildCountQuery(), [], true).catch(
+            () => null,
+          ), // Non-critical
+        ]);
+
+        setData(dataResult.results);
+
+        // Extract count from result
+        if (countResult?.results[0]) {
+          const countRow = countResult.results[0];
+          setTotalCount(Number(countRow["count"]) || null);
+        } else {
+          setTotalCount(null);
+        }
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Failed to load table data",
+        );
+      } finally {
+        setLoading(false);
+        setLoadingRows(false);
+      }
+    },
+    [databaseId, tableName, page, fkFilter],
+  );
+
   useEffect(() => {
     void loadTableData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [databaseId, tableName, page, fkFilter]);
-
-  const loadTableData = async (skipSchemaCache = false): Promise<void> => {
-    try {
-      setError(null);
-
-      // Parse FK filter if present (format: "column:value")
-      let fkColumn: string | null = null;
-      let fkValue: string | null = null;
-      if (fkFilter) {
-        const colonIndex = fkFilter.indexOf(":");
-        if (colonIndex > 0) {
-          fkColumn = fkFilter.substring(0, colonIndex);
-          fkValue = fkFilter.substring(colonIndex + 1);
-        }
-      }
-
-      // Build WHERE clause for FK filter
-      const buildWhereClause = (): string => {
-        if (fkColumn && fkValue !== null) {
-          const escapedValue = fkValue.replace(/'/g, "''");
-          return ` WHERE "${fkColumn}" = '${escapedValue}'`;
-        }
-        return "";
-      };
-
-      // Build count query with FK filter
-      const buildCountQuery = (): string => {
-        return `SELECT COUNT(*) as count FROM "${tableName}"${buildWhereClause()}`;
-      };
-
-      // Build data query with FK filter
-      const buildDataQuery = (): string => {
-        const offset = (page - 1) * rowsPerPage;
-        return `SELECT * FROM "${tableName}"${buildWhereClause()} LIMIT ${rowsPerPage} OFFSET ${offset}`;
-      };
-
-      // Phase 1: Load schema first (instant if cached)
-      // This allows us to show the table structure immediately
-      const schemaResult = await getTableSchema(
-        databaseId,
-        tableName,
-        skipSchemaCache,
-      );
-      setSchema(schemaResult);
-
-      // If this is the first load, hide the full loading state now that we have schema
-      if (loading) {
-        setLoading(false);
-        setLoadingRows(true);
-      } else {
-        // Subsequent loads (refresh, pagination) - show row loading indicator
-        setLoadingRows(true);
-      }
-
-      // Phase 2: Load rows and count (always fresh)
-      const [dataResult, countResult] = await Promise.all([
-        executeQuery(databaseId, buildDataQuery(), [], true),
-        executeQuery(databaseId, buildCountQuery(), [], true).catch(() => null), // Non-critical
-      ]);
-
-      setData(dataResult.results);
-
-      // Extract count from result
-      if (countResult?.results[0]) {
-        const countRow = countResult.results[0];
-        setTotalCount(Number(countRow["count"]) || null);
-      } else {
-        setTotalCount(null);
-      }
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to load table data",
-      );
-    } finally {
-      setLoading(false);
-      setLoadingRows(false);
-    }
-  };
+  }, [loadTableData]);
 
   // Memoize formatValue to prevent recreation on each render
   const formatValue = useCallback((value: unknown): string => {
