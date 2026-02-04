@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Loader2,
   Copy,
@@ -98,6 +98,24 @@ export function CloneDatabaseDialog({
     percent: number;
   } | null>(null);
 
+  const loadTables = useCallback(async (): Promise<void> => {
+    setLoadingTables(true);
+    try {
+      const tables = await listTables(database.uuid);
+      // Include both regular tables and virtual tables (FTS5)
+      const filteredTables = tables.filter(
+        (t) => t.type === "table" || t.type === "virtual",
+      );
+      setAvailableTables(filteredTables);
+      // Select all by default
+      setSelectedTables(filteredTables.map((t) => t.name));
+    } catch {
+      setError("Failed to load tables");
+    } finally {
+      setLoadingTables(false);
+    }
+  }, [database.uuid]);
+
   // Reset state when dialog opens/closes
   useEffect(() => {
     if (open) {
@@ -115,26 +133,7 @@ export function CloneDatabaseDialog({
       setCloning(false);
       void loadTables();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, database.name, database.uuid]);
-
-  const loadTables = async (): Promise<void> => {
-    setLoadingTables(true);
-    try {
-      const tables = await listTables(database.uuid);
-      // Include both regular tables and virtual tables (FTS5)
-      const filteredTables = tables.filter(
-        (t) => t.type === "table" || t.type === "virtual",
-      );
-      setAvailableTables(filteredTables);
-      // Select all by default
-      setSelectedTables(filteredTables.map((t) => t.name));
-    } catch {
-      setError("Failed to load tables");
-    } finally {
-      setLoadingTables(false);
-    }
-  };
+  }, [open, database.name, loadTables]);
 
   const hasFTS5 = database.fts5_count !== undefined && database.fts5_count > 0;
   const isFullClone =

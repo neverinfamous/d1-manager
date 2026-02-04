@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Zap,
   RefreshCw,
@@ -73,37 +73,39 @@ export function IndexAnalyzer({
   const [backingUp, setBackingUp] = useState(false);
   const [backupComplete, setBackupComplete] = useState(false);
 
-  useEffect(() => {
-    // Auto-load analysis on mount (uses cache)
-    void loadAnalysis(false);
-    // Load R2 backup status
-    void loadR2Status();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [databaseId]);
-
-  const loadR2Status = async (): Promise<void> => {
+  const loadR2Status = useCallback(async (): Promise<void> => {
     try {
       const status = await getR2BackupStatus();
       setR2BackupStatus(status);
     } catch {
       setR2BackupStatus(null);
     }
-  };
+  }, []);
 
-  const loadAnalysis = async (skipCache = false): Promise<void> => {
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await analyzeIndexes(databaseId, skipCache);
-      setAnalysis(result);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to analyze indexes",
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+  const loadAnalysis = useCallback(
+    async (skipCache = false): Promise<void> => {
+      setLoading(true);
+      setError(null);
+      try {
+        const result = await analyzeIndexes(databaseId, skipCache);
+        setAnalysis(result);
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Failed to analyze indexes",
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    [databaseId],
+  );
+
+  useEffect(() => {
+    // Auto-load analysis on mount (uses cache)
+    void loadAnalysis(false);
+    // Load R2 backup status
+    void loadR2Status();
+  }, [loadAnalysis, loadR2Status]);
 
   const handleCopySQL = (sql: string): void => {
     void navigator.clipboard.writeText(sql);

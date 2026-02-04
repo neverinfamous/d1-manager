@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Loader2, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -59,26 +59,7 @@ export function FTS5FromTableConverter({
   const [converting, setConverting] = useState(false);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    if (open) {
-      void loadTables();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, databaseId]);
-
-  useEffect(() => {
-    if (sourceTable) {
-      void loadColumns(sourceTable);
-      // Auto-generate FTS table name
-      const ftsName = sourceTable.endsWith("_fts")
-        ? sourceTable
-        : `${sourceTable}_fts`;
-      setFtsTableName(ftsName);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sourceTable]);
-
-  const loadTables = async (): Promise<void> => {
+  const loadTables = useCallback(async (): Promise<void> => {
     try {
       setLoadingTables(true);
       const result = await listTables(databaseId);
@@ -90,33 +71,53 @@ export function FTS5FromTableConverter({
     } finally {
       setLoadingTables(false);
     }
-  };
+  }, [databaseId]);
 
-  const loadColumns = async (tableName: string): Promise<void> => {
-    try {
-      const schema = await getTableSchema(databaseId, tableName);
-      setColumns(schema);
-      // Auto-select text columns
-      const textColumns = schema
-        .filter(
-          (col) =>
-            col.type.toUpperCase().includes("TEXT") ||
-            col.type.toUpperCase().includes("VARCHAR"),
-        )
-        .map((col) => col.name);
-      const fallbackColumn = schema[0]?.name;
-      setSelectedColumns(
-        textColumns.length > 0
-          ? textColumns
-          : fallbackColumn
-            ? [fallbackColumn]
-            : [],
-      );
-    } catch {
-      setColumns([]);
-      setSelectedColumns([]);
+  const loadColumns = useCallback(
+    async (tableName: string): Promise<void> => {
+      try {
+        const schema = await getTableSchema(databaseId, tableName);
+        setColumns(schema);
+        // Auto-select text columns
+        const textColumns = schema
+          .filter(
+            (col) =>
+              col.type.toUpperCase().includes("TEXT") ||
+              col.type.toUpperCase().includes("VARCHAR"),
+          )
+          .map((col) => col.name);
+        const fallbackColumn = schema[0]?.name;
+        setSelectedColumns(
+          textColumns.length > 0
+            ? textColumns
+            : fallbackColumn
+              ? [fallbackColumn]
+              : [],
+        );
+      } catch {
+        setColumns([]);
+        setSelectedColumns([]);
+      }
+    },
+    [databaseId],
+  );
+
+  useEffect(() => {
+    if (open) {
+      void loadTables();
     }
-  };
+  }, [open, loadTables]);
+
+  useEffect(() => {
+    if (sourceTable) {
+      void loadColumns(sourceTable);
+      // Auto-generate FTS table name
+      const ftsName = sourceTable.endsWith("_fts")
+        ? sourceTable
+        : `${sourceTable}_fts`;
+      setFtsTableName(ftsName);
+    }
+  }, [sourceTable, loadColumns]);
 
   const toggleColumn = (columnName: string): void => {
     setSelectedColumns((prev) =>

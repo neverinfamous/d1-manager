@@ -117,46 +117,28 @@ export function BackupRestoreHub({
   const [scheduledBackup, setScheduledBackup] =
     useState<ScheduledBackupType | null>(null);
 
-  // Load data when dialog opens
-  useEffect(() => {
-    if (open) {
-      void loadUndoHistory();
-      void checkR2Status();
-      void loadScheduledBackup();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, databaseId]);
-
-  // Load R2 backups when dialog opens (regardless of tab) so count shows in tab label
-  useEffect(() => {
-    if (open && r2Configured) {
-      void loadR2Backups();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, databaseId, r2Configured]);
-
   // Check if R2 is configured
-  const checkR2Status = async (): Promise<void> => {
+  const checkR2Status = useCallback(async (): Promise<void> => {
     try {
       const status = await getR2BackupStatus();
       setR2Configured(status.configured);
     } catch {
       setR2Configured(false);
     }
-  };
+  }, []);
 
   // Load scheduled backup for this database
-  const loadScheduledBackup = async (): Promise<void> => {
+  const loadScheduledBackup = useCallback(async (): Promise<void> => {
     try {
       const schedule = await getScheduledBackup(databaseId);
       setScheduledBackup(schedule);
     } catch {
       // Ignore errors - scheduled backup is optional
     }
-  };
+  }, [databaseId]);
 
   // Load undo history
-  const loadUndoHistory = async (): Promise<void> => {
+  const loadUndoHistory = useCallback(async (): Promise<void> => {
     try {
       setUndoLoading(true);
       setUndoError(null);
@@ -169,10 +151,10 @@ export function BackupRestoreHub({
     } finally {
       setUndoLoading(false);
     }
-  };
+  }, [databaseId]);
 
   // Load R2 backups
-  const loadR2Backups = async (): Promise<void> => {
+  const loadR2Backups = useCallback(async (): Promise<void> => {
     try {
       setR2Loading(true);
       setR2Error(null);
@@ -185,7 +167,23 @@ export function BackupRestoreHub({
     } finally {
       setR2Loading(false);
     }
-  };
+  }, [databaseId]);
+
+  // Load data when dialog opens
+  useEffect(() => {
+    if (open) {
+      void loadUndoHistory();
+      void checkR2Status();
+      void loadScheduledBackup();
+    }
+  }, [open, loadUndoHistory, checkR2Status, loadScheduledBackup]);
+
+  // Load R2 backups when dialog opens (regardless of tab) so count shows in tab label
+  useEffect(() => {
+    if (open && r2Configured) {
+      void loadR2Backups();
+    }
+  }, [open, r2Configured, loadR2Backups]);
 
   // Handle undo restore
   const handleUndoRestore = async (entry: UndoHistoryEntry): Promise<void> => {

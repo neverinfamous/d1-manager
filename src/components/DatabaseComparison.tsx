@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import {
   GitCompare,
   Loader2,
@@ -64,16 +64,61 @@ export function DatabaseComparison({
   const [migrationSteps, setMigrationSteps] = useState<MigrationStep[]>([]);
   const [generatingMigration, setGeneratingMigration] = useState(false);
 
-  // Auto-run comparison when pre-selected databases are provided
-  React.useEffect(() => {
-    if (preSelectedDatabases?.[0] && preSelectedDatabases[1] && !autoRan) {
-      setAutoRan(true);
-      void handleCompare();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [preSelectedDatabases]);
+  const formatColumnDef = useCallback((col: ColumnInfo): string => {
+    let def = col.type || "ANY";
+    if (col.pk > 0) def += " PRIMARY KEY";
+    if (col.notnull && col.pk === 0) def += " NOT NULL";
+    if (col.dflt_value) def += ` DEFAULT ${col.dflt_value}`;
+    return def;
+  }, []);
 
-  const handleCompare = async (): Promise<void> => {
+  const compareColumns = useCallback(
+    (leftCols: ColumnInfo[], rightCols: ColumnInfo[]): ColumnDiff[] => {
+      const leftColMap = new Map(leftCols.map((c) => [c.name, c]));
+      const rightColMap = new Map(rightCols.map((c) => [c.name, c]));
+      const allColNames = new Set([
+        ...leftColMap.keys(),
+        ...rightColMap.keys(),
+      ]);
+
+      const diffs: ColumnDiff[] = [];
+
+      for (const colName of allColNames) {
+        const leftCol = leftColMap.get(colName);
+        const rightCol = rightColMap.get(colName);
+
+        if (leftCol && !rightCol) {
+          diffs.push({
+            column: colName,
+            status: "removed",
+            leftDef: formatColumnDef(leftCol),
+          });
+        } else if (!leftCol && rightCol) {
+          diffs.push({
+            column: colName,
+            status: "added",
+            rightDef: formatColumnDef(rightCol),
+          });
+        } else if (leftCol && rightCol) {
+          const leftDef = formatColumnDef(leftCol);
+          const rightDef = formatColumnDef(rightCol);
+          const isModified = leftDef !== rightDef;
+
+          diffs.push({
+            column: colName,
+            status: isModified ? "modified" : "unchanged",
+            leftDef,
+            rightDef,
+          });
+        }
+      }
+
+      return diffs;
+    },
+    [formatColumnDef],
+  );
+
+  const handleCompare = useCallback(async (): Promise<void> => {
     if (!leftDb || !rightDb) {
       setError("Please select two databases to compare");
       return;
@@ -140,58 +185,15 @@ export function DatabaseComparison({
     } finally {
       setComparing(false);
     }
-  };
+  }, [leftDb, rightDb, compareColumns]);
 
-  const compareColumns = (
-    leftCols: ColumnInfo[],
-    rightCols: ColumnInfo[],
-  ): ColumnDiff[] => {
-    const leftColMap = new Map(leftCols.map((c) => [c.name, c]));
-    const rightColMap = new Map(rightCols.map((c) => [c.name, c]));
-    const allColNames = new Set([...leftColMap.keys(), ...rightColMap.keys()]);
-
-    const diffs: ColumnDiff[] = [];
-
-    for (const colName of allColNames) {
-      const leftCol = leftColMap.get(colName);
-      const rightCol = rightColMap.get(colName);
-
-      if (leftCol && !rightCol) {
-        diffs.push({
-          column: colName,
-          status: "removed",
-          leftDef: formatColumnDef(leftCol),
-        });
-      } else if (!leftCol && rightCol) {
-        diffs.push({
-          column: colName,
-          status: "added",
-          rightDef: formatColumnDef(rightCol),
-        });
-      } else if (leftCol && rightCol) {
-        const leftDef = formatColumnDef(leftCol);
-        const rightDef = formatColumnDef(rightCol);
-        const isModified = leftDef !== rightDef;
-
-        diffs.push({
-          column: colName,
-          status: isModified ? "modified" : "unchanged",
-          leftDef,
-          rightDef,
-        });
-      }
+  // Auto-run comparison when pre-selected databases are provided
+  React.useEffect(() => {
+    if (preSelectedDatabases?.[0] && preSelectedDatabases[1] && !autoRan) {
+      setAutoRan(true);
+      void handleCompare();
     }
-
-    return diffs;
-  };
-
-  const formatColumnDef = (col: ColumnInfo): string => {
-    let def = col.type || "ANY";
-    if (col.pk > 0) def += " PRIMARY KEY";
-    if (col.notnull && col.pk === 0) def += " NOT NULL";
-    if (col.dflt_value) def += ` DEFAULT ${col.dflt_value}`;
-    return def;
-  };
+  }, [preSelectedDatabases, autoRan, handleCompare]);
 
   const toggleTable = (tableName: string): void => {
     const newExpanded = new Set(expandedTables);

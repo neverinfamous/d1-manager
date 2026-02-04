@@ -184,42 +184,44 @@ export function DrizzleConsole({
     setError(null);
   }, []);
 
+  const handleIntrospect = useCallback(
+    async (skipCache = false): Promise<void> => {
+      setLoading(true);
+      clearResults();
+      addLog("Starting database introspection...");
+
+      try {
+        const result: IntrospectionResult = await introspectDatabase(
+          databaseId,
+          skipCache,
+        );
+
+        if (result.success && result.schema) {
+          setSchema(result.schema);
+          setTables(result.tables ?? []);
+          addLog(
+            `Introspection complete: ${result.tables?.length ?? 0} tables found`,
+          );
+        } else {
+          setError(result.error ?? "Introspection failed");
+          addLog(`Error: ${result.error ?? "Unknown error"}`);
+        }
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Introspection failed";
+        setError(message);
+        addLog(`Error: ${message}`);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [databaseId, addLog, clearResults],
+  );
+
   // Auto-run introspect on mount
   useEffect(() => {
     void handleIntrospect(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [databaseId]);
-
-  const handleIntrospect = async (skipCache = false): Promise<void> => {
-    setLoading(true);
-    clearResults();
-    addLog("Starting database introspection...");
-
-    try {
-      const result: IntrospectionResult = await introspectDatabase(
-        databaseId,
-        skipCache,
-      );
-
-      if (result.success && result.schema) {
-        setSchema(result.schema);
-        setTables(result.tables ?? []);
-        addLog(
-          `Introspection complete: ${result.tables?.length ?? 0} tables found`,
-        );
-      } else {
-        setError(result.error ?? "Introspection failed");
-        addLog(`Error: ${result.error ?? "Unknown error"}`);
-      }
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Introspection failed";
-      setError(message);
-      addLog(`Error: ${message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [handleIntrospect]);
 
   const handleMigrationStatus = async (): Promise<void> => {
     setLoading(true);

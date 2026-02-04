@@ -6,7 +6,7 @@
  * Enables cross-account migration via portable download files.
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Dialog,
   DialogContent,
@@ -85,6 +85,22 @@ export function ExportDatabaseDialog({
   const [completed, setCompleted] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const loadTables = useCallback(async (): Promise<void> => {
+    setLoadingTables(true);
+    try {
+      const tables = await listTables(database.uuid);
+      const exportableTables = tables.filter(
+        (t) => t.type === "table" || t.type === "virtual",
+      );
+      setAvailableTables(exportableTables);
+      setSelectedTables(exportableTables.map((t) => t.name));
+    } catch {
+      setError("Failed to load tables");
+    } finally {
+      setLoadingTables(false);
+    }
+  }, [database.uuid]);
+
   // Reset state when dialog opens
   useEffect(() => {
     if (open) {
@@ -102,24 +118,7 @@ export function ExportDatabaseDialog({
       setError(null);
       void loadTables();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, database.uuid]);
-
-  const loadTables = async (): Promise<void> => {
-    setLoadingTables(true);
-    try {
-      const tables = await listTables(database.uuid);
-      const exportableTables = tables.filter(
-        (t) => t.type === "table" || t.type === "virtual",
-      );
-      setAvailableTables(exportableTables);
-      setSelectedTables(exportableTables.map((t) => t.name));
-    } catch {
-      setError("Failed to load tables");
-    } finally {
-      setLoadingTables(false);
-    }
-  };
+  }, [open, loadTables]);
 
   const hasFTS5 = availableTables.some((t) => t.type === "virtual");
   const isFullExport = selectedTables.length === availableTables.length;

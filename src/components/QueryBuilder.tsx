@@ -121,42 +121,7 @@ export function QueryBuilder({
   // Real-time SQL validation
   const validation = useMemo(() => validateSql(editedSQL), [editedSQL]);
 
-  useEffect(() => {
-    void loadTables();
-    void loadSavedQueries();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [databaseId]);
-
-  useEffect(() => {
-    if (selectedTable) {
-      void loadTableSchema();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedTable]);
-
-  useEffect(() => {
-    generateSQL();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    selectedTable,
-    selectedColumns,
-    conditions,
-    orderBy,
-    orderDirection,
-    limit,
-  ]);
-
-  // Sync editedSQL with generatedSQL when it changes (unless manually edited)
-  useEffect(() => {
-    if (generatedSQL !== lastGeneratedSQL.current) {
-      lastGeneratedSQL.current = generatedSQL;
-      if (!isManuallyEdited) {
-        setEditedSQL(generatedSQL);
-      }
-    }
-  }, [generatedSQL, isManuallyEdited]);
-
-  const loadTables = async (): Promise<void> => {
+  const loadTables = useCallback(async (): Promise<void> => {
     try {
       const tableList = await listTables(databaseId);
       // Include both regular tables and virtual tables (FTS5, etc.)
@@ -167,20 +132,9 @@ export function QueryBuilder({
     } catch {
       // Silently ignore failures
     }
-  };
+  }, [databaseId]);
 
-  const loadTableSchema = async (): Promise<void> => {
-    try {
-      const schema = await getTableSchema(databaseId, selectedTable);
-      setColumns(schema);
-      setSelectedColumns(["*"]);
-      setConditions([]);
-    } catch {
-      // Silently ignore failures
-    }
-  };
-
-  const loadSavedQueries = async (): Promise<void> => {
+  const loadSavedQueries = useCallback(async (): Promise<void> => {
     setLoadingQueries(true);
     try {
       // First try to load from API
@@ -225,9 +179,20 @@ export function QueryBuilder({
     } finally {
       setLoadingQueries(false);
     }
-  };
+  }, [databaseId]);
 
-  const generateSQL = (): void => {
+  const loadTableSchema = useCallback(async (): Promise<void> => {
+    try {
+      const schemaData = await getTableSchema(databaseId, selectedTable);
+      setColumns(schemaData);
+      setSelectedColumns(["*"]);
+      setConditions([]);
+    } catch {
+      // Silently ignore failures
+    }
+  }, [databaseId, selectedTable]);
+
+  const generateSQL = useCallback((): void => {
     if (!selectedTable) {
       setGeneratedSQL("");
       return;
@@ -265,7 +230,39 @@ export function QueryBuilder({
 
     sql += ";";
     setGeneratedSQL(sql);
-  };
+  }, [
+    selectedTable,
+    selectedColumns,
+    conditions,
+    orderBy,
+    orderDirection,
+    limit,
+  ]);
+
+  useEffect(() => {
+    void loadTables();
+    void loadSavedQueries();
+  }, [loadTables, loadSavedQueries]);
+
+  useEffect(() => {
+    if (selectedTable) {
+      void loadTableSchema();
+    }
+  }, [selectedTable, loadTableSchema]);
+
+  useEffect(() => {
+    generateSQL();
+  }, [generateSQL]);
+
+  // Sync editedSQL with generatedSQL when it changes (unless manually edited)
+  useEffect(() => {
+    if (generatedSQL !== lastGeneratedSQL.current) {
+      lastGeneratedSQL.current = generatedSQL;
+      if (!isManuallyEdited) {
+        setEditedSQL(generatedSQL);
+      }
+    }
+  }, [generatedSQL, isManuallyEdited]);
 
   const addCondition = (): void => {
     setConditions([

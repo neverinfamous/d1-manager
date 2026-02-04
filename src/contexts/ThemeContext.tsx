@@ -1,4 +1,3 @@
-/* eslint-disable react-refresh/only-export-components */
 import { createContext, useEffect, useState, useMemo } from "react";
 import type { ReactNode } from "react";
 

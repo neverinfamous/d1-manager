@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Plus,
   RefreshCw,
@@ -84,58 +84,60 @@ export function FTS5Manager({
   const [rebuildingTable, setRebuildingTable] = useState<string | null>(null);
   const [optimizingTable, setOptimizingTable] = useState<string | null>(null);
 
+  const loadFTS5Tables = useCallback(
+    async (skipCache = false): Promise<void> => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        // Load FTS5 tables and regular tables in parallel (use cache on initial load)
+        const [tables, allTables] = await Promise.all([
+          listFTS5Tables(databaseId, skipCache),
+          listTables(databaseId, skipCache).catch(() => []), // Non-critical, default to empty
+        ]);
+
+        setFts5Tables(tables);
+
+        // Show "Convert to FTS5" button when there are regular tables available to convert
+        const regularTables = allTables.filter((t) => t.type === "table");
+        setCanConvertTables(regularTables.length > 0);
+
+        // Load stats for all tables in parallel (much faster)
+        if (tables.length > 0) {
+          const statsPromises = tables.map(async (table) => {
+            try {
+              const stat = await getFTS5Stats(databaseId, table.name);
+              return { name: table.name, stat };
+            } catch {
+              return { name: table.name, stat: null };
+            }
+          });
+
+          const statsResults = await Promise.all(statsPromises);
+          const stats: Record<string, FTS5StatsType> = {};
+          for (const result of statsResults) {
+            if (result.stat) {
+              stats[result.name] = result.stat;
+            }
+          }
+          setTableStats(stats);
+        } else {
+          setTableStats({});
+        }
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Failed to load FTS5 tables",
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    [databaseId],
+  );
+
   useEffect(() => {
     void loadFTS5Tables();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [databaseId]);
-
-  const loadFTS5Tables = async (skipCache = false): Promise<void> => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      // Load FTS5 tables and regular tables in parallel (use cache on initial load)
-      const [tables, allTables] = await Promise.all([
-        listFTS5Tables(databaseId, skipCache),
-        listTables(databaseId, skipCache).catch(() => []), // Non-critical, default to empty
-      ]);
-
-      setFts5Tables(tables);
-
-      // Show "Convert to FTS5" button when there are regular tables available to convert
-      const regularTables = allTables.filter((t) => t.type === "table");
-      setCanConvertTables(regularTables.length > 0);
-
-      // Load stats for all tables in parallel (much faster)
-      if (tables.length > 0) {
-        const statsPromises = tables.map(async (table) => {
-          try {
-            const stat = await getFTS5Stats(databaseId, table.name);
-            return { name: table.name, stat };
-          } catch {
-            return { name: table.name, stat: null };
-          }
-        });
-
-        const statsResults = await Promise.all(statsPromises);
-        const stats: Record<string, FTS5StatsType> = {};
-        for (const result of statsResults) {
-          if (result.stat) {
-            stats[result.name] = result.stat;
-          }
-        }
-        setTableStats(stats);
-      } else {
-        setTableStats({});
-      }
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to load FTS5 tables",
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [loadFTS5Tables]);
 
   const handleCreateFTS5Table = async (
     config: FTS5TableConfig,

@@ -120,6 +120,20 @@ export default tseslint.config(
       "no-console": "warn",
     },
   },
+  // Context files: Allow co-located Provider/Hook exports (standard React pattern)
+  {
+    files: ["src/contexts/**/*.{ts,tsx}"],
+    rules: {
+      "react-refresh/only-export-components": "off",
+    },
+  },
+  // UI component library: Allow utility exports alongside components
+  {
+    files: ["src/components/ui/**/*.{ts,tsx}"],
+    rules: {
+      "react-refresh/only-export-components": "off",
+    },
+  },
   // Worker configuration - allows console.log
   {
     extends: [
