@@ -1,11 +1,11 @@
 # D1 Database Manager for Cloudflare
 
-**Last Updated: February 4, 2026**
+**Last Updated February 10, 2026**
 
 [![GitHub](https://img.shields.io/badge/GitHub-neverinfamous/d1--manager-blue?logo=github)](https://github.com/neverinfamous/d1-manager)
 [![Docker Pulls](https://img.shields.io/docker/pulls/writenotenow/d1-manager)](https://hub.docker.com/r/writenotenow/d1-manager)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-![Version](https://img.shields.io/badge/version-v2.4.0-green)
+![Version](https://img.shields.io/badge/version-v2.5.0-green)
 ![Status](https://img.shields.io/badge/status-Production%2FStable-brightgreen)
 [![Security](https://img.shields.io/badge/Security-Enhanced-green.svg)](https://github.com/neverinfamous/d1-manager/blob/main/SECURITY.md)
 [![CodeQL](https://img.shields.io/badge/CodeQL-Passing-brightgreen.svg)](https://github.com/neverinfamous/d1-manager/security/code-scanning)
@@ -82,7 +82,7 @@ A modern, full-featured web application for managing Cloudflare D1 databases wit
 - **Undo/Rollback with safeguards** - Automatic undo snapshots or R2 backups for all destructive operations (delete database/table, rename, STRICT mode, FTS5 convert, modify column)
 - **FTS5 Full-Text Search** - Manage virtual tables, convert to/from regular tables, dedicated FTS5 search mode in main Search tab, and quick actions on FTS5 table cards
 - **Index Analyzer** - Smart index recommendations plus "Create All Indexes" one-click apply with optional R2 backup and progress tracking
-- **Metrics Dashboard** - Query volume, P90 latency, rows read, and storage trends via GraphQL Analytics.
+- **Metrics Dashboard** - Query volume (reads/writes), P90 latency, rows read, and storage trends via GraphQL Analytics with time range selector (24h/7d/30d)
 - NEW! **Query Insights** Tab for slow query analysis with performance badges and sortable table
 - NEW! **Health Dashboard** - System health score, backup coverage alerts, failed backup tracking, and replication status overview
 - **Time Travel** - View bookmarks, checkpoint history, manual checkpoint capture, and CLI restore commands

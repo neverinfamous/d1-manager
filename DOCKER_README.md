@@ -1,11 +1,11 @@
 # D1 Database Manager
 
-**Last Updated: February 4, 2026**
+**Last Updated February 10, 2026**
 
 [![GitHub](https://img.shields.io/badge/GitHub-neverinfamous/d1--manager-blue?logo=github)](https://github.com/neverinfamous/d1-manager)
 [![Docker Pulls](https://img.shields.io/docker/pulls/writenotenow/d1-manager)](https://hub.docker.com/r/writenotenow/d1-manager)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-![Version](https://img.shields.io/badge/version-v2.4.0-green)
+![Version](https://img.shields.io/badge/version-v2.5.0-green)
 ![Status](https://img.shields.io/badge/status-Production%2FStable-brightgreen)
 [![Security](https://img.shields.io/badge/Security-Enhanced-green.svg)](https://github.com/neverinfamous/d1-manager/blob/main/SECURITY.md)
 [![CodeQL](https://img.shields.io/badge/CodeQL-Passing-brightgreen.svg)](https://github.com/neverinfamous/d1-manager/security/code-scanning)
@@ -188,6 +188,7 @@ npx wrangler d1 execute d1-manager-metadata --remote --file=worker/migrations/00
 | `002_add_color_tags.sql`           | If you don't have color tags yet                    |
 | `003_add_error_message_column.sql` | If you have job history but no error_message column |
 | `004_add_webhooks.sql`             | If you don't have the webhooks table yet            |
+| `005_add_scheduled_backups.sql`    | If you don't have the scheduled_backups table yet   |
 
 > **Note:** New installations should use the automated migration system or `schema.sql`.
 
@@ -293,7 +294,7 @@ docker compose pull && docker compose up -d
 
 | Property        | Value                        |
 | --------------- | ---------------------------- |
-| Base Image      | `node:22-alpine`             |
+| Base Image      | `node:24-alpine`             |
 | Size            | ~150MB                       |
 | Architectures   | `linux/amd64`, `linux/arm64` |
 | Port            | `8787`                       |
@@ -307,8 +308,8 @@ docker compose pull && docker compose up -d
 | Tag          | Description                                   |
 | ------------ | --------------------------------------------- |
 | `latest`     | Latest stable release                         |
-| `v2.4.0`     | Specific version (recommended for production) |
-| `v2.3.0`     | Previous stable release                       |
+| `v2.5.0`     | Specific version (recommended for production) |
+| `v2.4.0`     | Previous stable release                       |
 | `sha-XXXXXX` | Commit SHA for reproducible builds            |
 
 ---
@@ -375,7 +376,7 @@ curl -X GET "https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/d1/data
 ## 📞 Support
 
 - 🐛 **Bug Reports:** [GitHub Issues](https://github.com/neverinfamous/d1-manager/issues)
-- 💬 **Discussions:** [GitHub Discussions](https://github.com/neverinfamous/d1-manager/discussions)
+- 💡 **Feature Requests:** [GitHub Discussions](https://github.com/neverinfamous/d1-manager/discussions)
 - 📧 **Email:** admin@adamic.tech
 
 ---

@@ -11,6 +11,9 @@ import {
   ArrowRight,
   AlertCircle,
   CheckCircle2,
+  Download,
+  Globe,
+  Server,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -92,6 +95,13 @@ export function QueryBuilder({
   const [resultColumns, setResultColumns] = useState<string[]>([]);
   const [executing, setExecuting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasExecuted, setHasExecuted] = useState(false);
+  const [executionTime, setExecutionTime] = useState<number | null>(null);
+  const [executionMeta, setExecutionMeta] = useState<{
+    rowsAffected?: number;
+    servedByRegion?: string;
+    servedByPrimary?: boolean;
+  } | null>(null);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [queryName, setQueryName] = useState("");
   const [queryDescription, setQueryDescription] = useState("");
@@ -525,7 +535,27 @@ export function QueryBuilder({
     try {
       setExecuting(true);
       setError(null);
+
+      const startTime = performance.now();
       const response = await executeQuery(databaseId, currentSQL);
+      const endTime = performance.now();
+
+      setExecutionTime(endTime - startTime);
+      setExecutionMeta({
+        ...(response.meta?.rows_written !== undefined && {
+          rowsAffected: response.meta.rows_written,
+        }),
+        ...(response.meta?.rows_read !== undefined &&
+          !response.meta.rows_written && {
+            rowsAffected: response.meta.rows_read,
+          }),
+        ...(response.meta?.served_by_region && {
+          servedByRegion: response.meta.served_by_region,
+        }),
+        ...(response.meta?.served_by_primary !== undefined && {
+          servedByPrimary: response.meta.served_by_primary,
+        }),
+      });
 
       if (response.results.length > 0) {
         const rows = response.results;
@@ -540,8 +570,10 @@ export function QueryBuilder({
         setResults([]);
         setResultColumns([]);
       }
+      setHasExecuted(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Query execution failed");
+      setHasExecuted(false);
     } finally {
       setExecuting(false);
     }
@@ -999,52 +1031,143 @@ export function QueryBuilder({
       )}
 
       {/* Results */}
-      {results.length > 0 && (
+      {hasExecuted && (
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">
-              Results ({results.length} {results.length === 1 ? "row" : "rows"})
-            </CardTitle>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium">
+                Results ({results.length}{" "}
+                {results.length === 1 ? "row" : "rows"})
+              </CardTitle>
+              <div className="flex items-center gap-4">
+                {executionTime !== null && (
+                  <span className="text-xs text-muted-foreground">
+                    Executed in {executionTime.toFixed(2)}ms
+                  </span>
+                )}
+                {executionMeta?.servedByRegion && (
+                  <span
+                    className="text-xs text-muted-foreground flex items-center gap-1"
+                    title={
+                      executionMeta.servedByPrimary
+                        ? "Served by primary database"
+                        : "Served by read replica"
+                    }
+                  >
+                    {executionMeta.servedByPrimary ? (
+                      <Server className="h-3 w-3" />
+                    ) : (
+                      <Globe className="h-3 w-3 text-blue-500" />
+                    )}
+                    {executionMeta.servedByRegion}
+                    {!executionMeta.servedByPrimary && (
+                      <span className="text-blue-500">(replica)</span>
+                    )}
+                  </span>
+                )}
+                {results.length > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      try {
+                        const csvRows: string[] = [];
+                        csvRows.push(
+                          resultColumns.map((col) => `"${col}"`).join(","),
+                        );
+                        for (const row of results) {
+                          const values = resultColumns.map((col) => {
+                            const cell = row[col];
+                            if (cell === null) return "NULL";
+                            if (cell === undefined) return "";
+                            const str =
+                              typeof cell === "object"
+                                ? JSON.stringify(cell)
+                                : String(cell as string | number | boolean);
+                            if (
+                              str.includes(",") ||
+                              str.includes('"') ||
+                              str.includes("\n")
+                            ) {
+                              return `"${str.replace(/"/g, '""')}"`;
+                            }
+                            return str;
+                          });
+                          csvRows.push(values.join(","));
+                        }
+                        const csvContent = csvRows.join("\n");
+                        const blob = new Blob([csvContent], {
+                          type: "text/csv;charset=utf-8;",
+                        });
+                        const link = document.createElement("a");
+                        const url = URL.createObjectURL(blob);
+                        link.href = url;
+                        link.download = `query_results_${String(Date.now())}.csv`;
+                        document.body.appendChild(link);
+                        link.click();
+                        setTimeout(() => {
+                          document.body.removeChild(link);
+                          URL.revokeObjectURL(url);
+                        }, 100);
+                      } catch {
+                        // Export failed silently
+                      }
+                    }}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Export CSV
+                  </Button>
+                )}
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-muted/50">
-                  <tr>
-                    {resultColumns.map((col, index) => (
-                      <th
-                        key={index}
-                        className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
-                      >
-                        {col}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {results.map((row, rowIndex) => (
-                    <tr key={rowIndex} className="hover:bg-muted/50">
-                      {resultColumns.map((col, cellIndex) => (
-                        <td
-                          key={cellIndex}
-                          className="px-4 py-2 text-sm whitespace-nowrap"
+            {results.length === 0 ? (
+              <div className="text-center py-8 text-sm text-muted-foreground">
+                {executionMeta?.rowsAffected !== undefined
+                  ? `Query executed successfully. ${String(executionMeta.rowsAffected)} row(s) affected.`
+                  : "Query returned no results"}
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      {resultColumns.map((col, index) => (
+                        <th
+                          key={index}
+                          className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
                         >
-                          <span
-                            className={
-                              row[col] === null
-                                ? "italic text-muted-foreground"
-                                : ""
-                            }
-                          >
-                            {formatValue(row[col])}
-                          </span>
-                        </td>
+                          {col}
+                        </th>
                       ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {results.map((row, rowIndex) => (
+                      <tr key={rowIndex} className="hover:bg-muted/50">
+                        {resultColumns.map((col, cellIndex) => (
+                          <td
+                            key={cellIndex}
+                            className="px-4 py-2 text-sm whitespace-nowrap"
+                          >
+                            <span
+                              className={
+                                row[col] === null
+                                  ? "italic text-muted-foreground"
+                                  : ""
+                              }
+                            >
+                              {formatValue(row[col])}
+                            </span>
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
