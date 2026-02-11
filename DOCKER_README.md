@@ -188,6 +188,7 @@ npx wrangler d1 execute d1-manager-metadata --remote --file=worker/migrations/00
 | `002_add_color_tags.sql`           | If you don't have color tags yet                    |
 | `003_add_error_message_column.sql` | If you have job history but no error_message column |
 | `004_add_webhooks.sql`             | If you don't have the webhooks table yet            |
+| `005_add_scheduled_backups.sql`    | If you don't have the scheduled_backups table yet   |
 
 > **Note:** New installations should use the automated migration system or `schema.sql`.
 
@@ -375,7 +376,7 @@ curl -X GET "https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/d1/data
 ## 📞 Support
 
 - 🐛 **Bug Reports:** [GitHub Issues](https://github.com/neverinfamous/d1-manager/issues)
-- 💬 **Discussions:** [GitHub Discussions](https://github.com/neverinfamous/d1-manager/discussions)
+- 💡 **Feature Requests:** [GitHub Discussions](https://github.com/neverinfamous/d1-manager/discussions)
 - 📧 **Email:** admin@adamic.tech
 
 ---

@@ -82,7 +82,7 @@ A modern, full-featured web application for managing Cloudflare D1 databases wit
 - **Undo/Rollback with safeguards** - Automatic undo snapshots or R2 backups for all destructive operations (delete database/table, rename, STRICT mode, FTS5 convert, modify column)
 - **FTS5 Full-Text Search** - Manage virtual tables, convert to/from regular tables, dedicated FTS5 search mode in main Search tab, and quick actions on FTS5 table cards
 - **Index Analyzer** - Smart index recommendations plus "Create All Indexes" one-click apply with optional R2 backup and progress tracking
-- **Metrics Dashboard** - Query volume, P90 latency, rows read, and storage trends via GraphQL Analytics.
+- **Metrics Dashboard** - Query volume (reads/writes), P90 latency, rows read, and storage trends via GraphQL Analytics with time range selector (24h/7d/30d)
 - NEW! **Query Insights** Tab for slow query analysis with performance badges and sortable table
 - NEW! **Health Dashboard** - System health score, backup coverage alerts, failed backup tracking, and replication status overview
 - **Time Travel** - View bookmarks, checkpoint history, manual checkpoint capture, and CLI restore commands
