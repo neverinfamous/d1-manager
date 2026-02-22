@@ -359,11 +359,13 @@ export function DatabaseComparison({
         if (errorMsg.includes("duplicate column name")) {
           throw new Error(
             `Migration failed at statement ${statementIndex}/${statements.length}: Column already exists (run "Compare" again to refresh schema)\n\nStatement: ${preview}`,
+            { cause: err },
           );
         }
 
         throw new Error(
           `Migration failed at statement ${statementIndex}/${statements.length}: ${errorMsg}\n\nStatement: ${preview}`,
+          { cause: err },
         );
       }
     }

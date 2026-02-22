@@ -1,6 +1,6 @@
 # D1 Database Manager for Cloudflare
 
-**Last Updated February 10, 2026**
+**Last Updated February 22, 2026**
 
 [![GitHub](https://img.shields.io/badge/GitHub-neverinfamous/d1--manager-blue?logo=github)](https://github.com/neverinfamous/d1-manager)
 [![Docker Pulls](https://img.shields.io/docker/pulls/writenotenow/d1-manager)](https://hub.docker.com/r/writenotenow/d1-manager)
@@ -17,7 +17,7 @@ A modern, full-featured web application for managing Cloudflare D1 databases wit
 
 ## Tech Stack
 
-**Frontend**: React 19.2.4 | Vite 7.3.1 | TypeScript 5.9.3 | Tailwind CSS 4.1.17 | shadcn/ui
+**Frontend**: React 19.2.4 | Vite 7.3.1 | TypeScript 5.9.3 | Tailwind CSS 4.2.0 | shadcn/ui
 
 **Backend**: Cloudflare Workers + KV + D1 + R2 + Durable Objects + Zero Trust
 

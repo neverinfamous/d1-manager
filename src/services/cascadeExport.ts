@@ -297,7 +297,6 @@ export class CascadeExportService {
         pdf.text(splitLines, margin, yPosition);
         yPosition += splitLines.length * 5;
       }
-      yPosition += 5;
     }
 
     // Add graph visualization if available
