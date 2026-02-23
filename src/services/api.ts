@@ -617,6 +617,7 @@ class APIService {
     } catch (error) {
       throw new Error(
         error instanceof Error ? error.message : "Failed to export databases",
+        { cause: error },
       );
     }
   }
@@ -689,6 +690,7 @@ class APIService {
     } catch (error) {
       throw new Error(
         error instanceof Error ? error.message : "Failed to import database",
+        { cause: error },
       );
     }
   }
@@ -757,6 +759,7 @@ class APIService {
     } catch (error) {
       throw new Error(
         error instanceof Error ? error.message : "Failed to rename database",
+        { cause: error },
       );
     }
   }
@@ -940,6 +943,7 @@ class APIService {
     } catch (error) {
       throw new Error(
         error instanceof Error ? error.message : "Failed to clone database",
+        { cause: error },
       );
     }
   }
@@ -1626,6 +1630,7 @@ class APIService {
     } catch (error) {
       throw new Error(
         error instanceof Error ? error.message : "Failed to export table",
+        { cause: error },
       );
     }
   }
@@ -1710,6 +1715,7 @@ class APIService {
     } catch (error) {
       throw new Error(
         error instanceof Error ? error.message : "Failed to export tables",
+        { cause: error },
       );
     }
   }

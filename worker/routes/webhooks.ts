@@ -509,7 +509,7 @@ async function testWebhook(
   corsHeaders: CorsHeaders,
   isLocalDev: boolean,
 ): Promise<Response> {
-  let webhook: Webhook | null = null;
+  let webhook: Webhook | null;
 
   if (isLocalDev) {
     webhook = MOCK_WEBHOOKS.find((w) => w.id === webhookId) ?? null;

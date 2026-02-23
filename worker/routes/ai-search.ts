@@ -803,29 +803,51 @@ export async function handleAISearchRoutes(
       // Use AI binding if available
       if (env.AI) {
         try {
-          const searchParams: {
-            query: string;
-            rewrite_query: boolean;
-            max_num_results: number;
-            ranking_options?: { score_threshold: number };
-            reranking?: { enabled: boolean; model?: string };
-          } = {
-            query: body.query,
-            rewrite_query: body.rewrite_query ?? false,
-            max_num_results: body.max_num_results ?? 10,
+          const searchRequest: Parameters<
+            ReturnType<typeof env.AI.aiSearch.get>["search"]
+          >[0] = {
+            messages: [{ role: "user", content: body.query }],
+            ai_search_options: {
+              retrieval: {
+                max_num_results: body.max_num_results ?? 10,
+                ...(body.score_threshold !== undefined && {
+                  match_threshold: body.score_threshold,
+                }),
+              },
+              ...(body.reranking !== undefined && {
+                reranking: {
+                  enabled: body.reranking.enabled,
+                  ...(body.reranking.model && {
+                    model: body.reranking.model as
+                      | "@cf/baai/bge-reranker-base"
+                      | "",
+                  }),
+                },
+              }),
+              ...(body.rewrite_query && { query_rewrite: { enabled: true } }),
+            },
           };
 
-          if (body.score_threshold !== undefined) {
-            searchParams.ranking_options = {
-              score_threshold: body.score_threshold,
-            };
-          }
-          if (body.reranking !== undefined) {
-            searchParams.reranking = body.reranking;
-          }
+          const v2Result = await env.AI.aiSearch
+            .get(instanceName)
+            .search(searchRequest);
 
-          const result =
-            await env.AI.autorag(instanceName).search(searchParams);
+          const result = {
+            object: "vector_store.search_results.page" as const,
+            search_query: v2Result.search_query,
+            data: v2Result.chunks.map((chunk) => ({
+              file_id: chunk.item.key,
+              filename: chunk.item.key,
+              score: chunk.score,
+              attributes: (chunk.item.metadata ?? {}) as Record<
+                string,
+                string | number | boolean | null
+              >,
+              content: [{ type: "text" as const, text: chunk.text }],
+            })),
+            has_more: false,
+            next_page: null,
+          };
 
           return new Response(JSON.stringify(result), {
             headers: { "Content-Type": "application/json", ...corsHeaders },
@@ -929,33 +951,36 @@ export async function handleAISearchRoutes(
         try {
           if (body.stream === true) {
             // Streaming response
-            const streamParams: {
-              query: string;
-              rewrite_query: boolean;
-              max_num_results: number;
-              stream: true;
-              ranking_options?: { score_threshold: number };
-              reranking?: { enabled: boolean; model?: string };
-            } = {
-              query: body.query,
-              rewrite_query: body.rewrite_query ?? false,
-              max_num_results: body.max_num_results ?? 10,
-              stream: true,
-            };
+            const streamResult = await env.AI.aiSearch
+              .get(instanceName)
+              .chatCompletions({
+                messages: [{ role: "user", content: body.query }],
+                stream: true,
+                ai_search_options: {
+                  retrieval: {
+                    max_num_results: body.max_num_results ?? 10,
+                    ...(body.score_threshold !== undefined && {
+                      match_threshold: body.score_threshold,
+                    }),
+                  },
+                  ...(body.reranking !== undefined && {
+                    reranking: {
+                      enabled: body.reranking.enabled,
+                      ...(body.reranking.model && {
+                        model: body.reranking.model as
+                          | "@cf/baai/bge-reranker-base"
+                          | "",
+                      }),
+                    },
+                  }),
+                  ...(body.rewrite_query && {
+                    query_rewrite: { enabled: true },
+                  }),
+                },
+              });
 
-            if (body.score_threshold !== undefined) {
-              streamParams.ranking_options = {
-                score_threshold: body.score_threshold,
-              };
-            }
-            if (body.reranking !== undefined) {
-              streamParams.reranking = body.reranking;
-            }
-
-            const streamResult =
-              await env.AI.autorag(instanceName).aiSearch(streamParams);
-
-            return new Response(streamResult.body, {
+            const streamResponse = streamResult as Response;
+            return new Response(streamResponse.body, {
               headers: {
                 "Content-Type": "text/event-stream",
                 "Cache-Control": "no-cache",
@@ -965,29 +990,32 @@ export async function handleAISearchRoutes(
             });
           } else {
             // Non-streaming response
-            const searchParams: {
-              query: string;
-              rewrite_query: boolean;
-              max_num_results: number;
-              ranking_options?: { score_threshold: number };
-              reranking?: { enabled: boolean; model?: string };
-            } = {
-              query: body.query,
-              rewrite_query: body.rewrite_query ?? false,
-              max_num_results: body.max_num_results ?? 10,
-            };
-
-            if (body.score_threshold !== undefined) {
-              searchParams.ranking_options = {
-                score_threshold: body.score_threshold,
-              };
-            }
-            if (body.reranking !== undefined) {
-              searchParams.reranking = body.reranking;
-            }
-
-            const result =
-              await env.AI.autorag(instanceName).aiSearch(searchParams);
+            const result = await env.AI.aiSearch
+              .get(instanceName)
+              .chatCompletions({
+                messages: [{ role: "user", content: body.query }],
+                ai_search_options: {
+                  retrieval: {
+                    max_num_results: body.max_num_results ?? 10,
+                    ...(body.score_threshold !== undefined && {
+                      match_threshold: body.score_threshold,
+                    }),
+                  },
+                  ...(body.reranking !== undefined && {
+                    reranking: {
+                      enabled: body.reranking.enabled,
+                      ...(body.reranking.model && {
+                        model: body.reranking.model as
+                          | "@cf/baai/bge-reranker-base"
+                          | "",
+                      }),
+                    },
+                  }),
+                  ...(body.rewrite_query && {
+                    query_rewrite: { enabled: true },
+                  }),
+                },
+              });
 
             return new Response(JSON.stringify(result), {
               headers: { "Content-Type": "application/json", ...corsHeaders },

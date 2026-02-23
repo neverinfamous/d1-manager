@@ -387,7 +387,7 @@ export function TableView({
           return dataSortDirection === "asc" ? 1 : -1;
 
         // Compare based on type
-        let comparison = 0;
+        let comparison: number;
         if (typeof aVal === "number" && typeof bVal === "number") {
           comparison = aVal - bVal;
         } else {

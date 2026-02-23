@@ -154,7 +154,7 @@ export function QueryConsole({
       if (!textareaRef.current) return;
 
       const context = parseContext(text, cursorPos);
-      let suggestionItems: Suggestion[] = [];
+      let suggestionItems: Suggestion[];
 
       // Get suggestions based on context type
       if (context.type === "table") {
