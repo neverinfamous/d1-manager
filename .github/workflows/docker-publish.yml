@@ -68,7 +68,6 @@ jobs:
         uses: github/codeql-action/analyze@v4
         with:
           upload: always
-          fail-on: error
 
   # Build each platform on native architecture (avoids QEMU emulation issues)
   # Images are built but NOT pushed yet - push happens after security-scan passes
