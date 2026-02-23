@@ -2,10 +2,10 @@ name: Build and Push Docker Images
 
 on:
   push:
-    branches: [master]
+    branches: [main]
     tags: ["v*"]
   pull_request:
-    branches: [master]
+    branches: [main]
 
 env:
   REGISTRY: docker.io
@@ -287,7 +287,7 @@ jobs:
       deployments: write
 
     environment:
-      name: ${{ github.ref == 'refs/heads/master' && 'production' || '' }}
+      name: ${{ github.ref == 'refs/heads/main' && 'production' || '' }}
       url: https://hub.docker.com/r/writenotenow/d1-manager
 
     steps:
@@ -350,7 +350,7 @@ jobs:
 
       # Update Docker Hub description
       - name: Update Docker Hub Description
-        if: github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/main'
         uses: peter-evans/dockerhub-description@v5
         continue-on-error: true
         timeout-minutes: 5
@@ -362,7 +362,7 @@ jobs:
           short-description: "Cloudflare D1 Manager with SQL Console, Drizzle, Visual Schema/ER tools, Scheduled Backups."
 
       - name: Deployment Summary
-        if: github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/main'
         run: |
           echo "✅ Successfully published Docker images to production"
           echo "🐳 Registry: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
