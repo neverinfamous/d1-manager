@@ -17,7 +17,7 @@ A modern, full-featured web application for managing Cloudflare D1 databases wit
 
 ## Tech Stack
 
-**Frontend**: React 19.2.4 | Vite 7.3.1 | TypeScript 5.9.3 | Tailwind CSS 4.2.0 | shadcn/ui
+**Frontend**: React | Vite | TypeScript | Tailwind CSS | shadcn/ui
 
 **Backend**: Cloudflare Workers + KV + D1 + R2 + Durable Objects + Zero Trust
 
