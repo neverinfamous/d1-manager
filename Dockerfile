@@ -15,17 +15,19 @@ WORKDIR /app
 # Upgrade npm to latest version to fix CVE-2024-21538 (cross-spawn vulnerability)
 RUN npm install -g npm@latest
 
-# Patch npm's own dependencies to fix CVE-2025-64756 (glob), CVE-2026-23745, CVE-2026-23950, CVE-2026-24842, CVE-2026-26960 (tar), GHSA-7h2j-956f-4vf2 (@isaacs/brace-expansion)
-# npm@11.6.2 bundles vulnerable versions glob@11.0.3, glob@10.4.5 (in node-gyp), tar@7.5.1, @isaacs/brace-expansion@5.0.0
+# Patch npm's own dependencies to fix CVE-2025-64756 (glob), CVE-2026-23745, CVE-2026-23950, CVE-2026-24842, CVE-2026-26960 (tar), GHSA-7h2j-956f-4vf2 (@isaacs/brace-expansion), CVE-2026-27903, CVE-2026-27904 (minimatch)
+# npm@11.6.2 bundles vulnerable versions glob@11.0.3, glob@10.4.5 (in node-gyp), tar@7.5.1, @isaacs/brace-expansion@5.0.0, minimatch@10.2.2
 # We download patched versions first, then replace all vulnerable ones
 RUN cd /tmp && \
     npm pack glob@11.1.0 && \
     npm pack tar@7.5.8 && \
     npm pack @isaacs/brace-expansion@5.0.1 && \
+    npm pack minimatch@10.2.4 && \
     rm -rf /usr/local/lib/node_modules/npm/node_modules/glob && \
     rm -rf /usr/local/lib/node_modules/npm/node_modules/tar && \
     rm -rf /usr/local/lib/node_modules/npm/node_modules/@isaacs/brace-expansion && \
     rm -rf /usr/local/lib/node_modules/npm/node_modules/node-gyp/node_modules/glob && \
+    rm -rf /usr/local/lib/node_modules/npm/node_modules/minimatch && \
     tar -xzf glob-11.1.0.tgz && \
     cp -r package /usr/local/lib/node_modules/npm/node_modules/glob && \
     (mkdir -p /usr/local/lib/node_modules/npm/node_modules/node-gyp/node_modules && \
@@ -35,6 +37,8 @@ RUN cd /tmp && \
     tar -xzf isaacs-brace-expansion-5.0.1.tgz && \
     mkdir -p /usr/local/lib/node_modules/npm/node_modules/@isaacs && \
     mv package /usr/local/lib/node_modules/npm/node_modules/@isaacs/brace-expansion && \
+    tar -xzf minimatch-10.2.4.tgz && \
+    mv package /usr/local/lib/node_modules/npm/node_modules/minimatch && \
     rm -rf /tmp/*
 
 # Install build dependencies
@@ -65,17 +69,19 @@ WORKDIR /app
 # Upgrade npm to latest version to fix CVE-2024-21538 (cross-spawn vulnerability)
 RUN npm install -g npm@latest
 
-# Patch npm's own dependencies to fix CVE-2025-64756 (glob), CVE-2026-23745, CVE-2026-23950, CVE-2026-24842, CVE-2026-26960 (tar), GHSA-7h2j-956f-4vf2 (@isaacs/brace-expansion)
-# npm@11.6.2 bundles vulnerable versions glob@11.0.3, glob@10.4.5 (in node-gyp), tar@7.5.1, @isaacs/brace-expansion@5.0.0
+# Patch npm's own dependencies to fix CVE-2025-64756 (glob), CVE-2026-23745, CVE-2026-23950, CVE-2026-24842, CVE-2026-26960 (tar), GHSA-7h2j-956f-4vf2 (@isaacs/brace-expansion), CVE-2026-27903, CVE-2026-27904 (minimatch)
+# npm@11.6.2 bundles vulnerable versions glob@11.0.3, glob@10.4.5 (in node-gyp), tar@7.5.1, @isaacs/brace-expansion@5.0.0, minimatch@10.2.2
 # We download patched versions first, then replace all vulnerable ones
 RUN cd /tmp && \
     npm pack glob@11.1.0 && \
     npm pack tar@7.5.8 && \
     npm pack @isaacs/brace-expansion@5.0.1 && \
+    npm pack minimatch@10.2.4 && \
     rm -rf /usr/local/lib/node_modules/npm/node_modules/glob && \
     rm -rf /usr/local/lib/node_modules/npm/node_modules/tar && \
     rm -rf /usr/local/lib/node_modules/npm/node_modules/@isaacs/brace-expansion && \
     rm -rf /usr/local/lib/node_modules/npm/node_modules/node-gyp/node_modules/glob && \
+    rm -rf /usr/local/lib/node_modules/npm/node_modules/minimatch && \
     tar -xzf glob-11.1.0.tgz && \
     cp -r package /usr/local/lib/node_modules/npm/node_modules/glob && \
     (mkdir -p /usr/local/lib/node_modules/npm/node_modules/node-gyp/node_modules && \
@@ -85,12 +91,14 @@ RUN cd /tmp && \
     tar -xzf isaacs-brace-expansion-5.0.1.tgz && \
     mkdir -p /usr/local/lib/node_modules/npm/node_modules/@isaacs && \
     mv package /usr/local/lib/node_modules/npm/node_modules/@isaacs/brace-expansion && \
+    tar -xzf minimatch-10.2.4.tgz && \
+    mv package /usr/local/lib/node_modules/npm/node_modules/minimatch && \
     rm -rf /tmp/*
 
 # Install runtime dependencies and upgrade to fix CVEs
 # Security Notes:
-# - Application dependencies: glob@11.1.0, tar@7.5.8, @isaacs/brace-expansion@5.0.1 (patched via package.json overrides)
-# - npm CLI dependencies: glob@11.1.0, tar@7.5.8, @isaacs/brace-expansion@5.0.1 (manually patched in npm's installation)
+# - Application dependencies: glob@11.1.0, tar@7.5.8, @isaacs/brace-expansion@5.0.1, minimatch@10.2.4 (patched via package.json overrides)
+# - npm CLI dependencies: glob@11.1.0, tar@7.5.8, @isaacs/brace-expansion@5.0.1, minimatch@10.2.4 (manually patched in npm's installation)
 # - curl 8.18.0-r0 (from edge): CVE-2025-14819, CVE-2025-14017, CVE-2025-14524 (curl vulnerabilities)
 # - busybox: CVE-2025-60876 (wget CRLF injection) - not exploitable (D1 Manager uses curl, not wget)
 # - zlib: CVE-2026-22184 (buffer overflow in untgz) - NOT EXPLOITABLE (D1 Manager does not use untgz utility)
@@ -134,4 +142,3 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 # Default command: Run Wrangler in development mode
 # Override with specific commands for production deployment
 CMD ["npx", "wrangler", "dev", "--ip", "0.0.0.0", "--port", "8787"]
-
