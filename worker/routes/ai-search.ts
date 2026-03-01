@@ -803,9 +803,7 @@ export async function handleAISearchRoutes(
       // Use AI binding if available
       if (env.AI) {
         try {
-          const searchRequest: Parameters<
-            ReturnType<typeof env.AI.aiSearch.get>["search"]
-          >[0] = {
+          const searchRequest: AiSearchSearchRequest = {
             messages: [{ role: "user", content: body.query }],
             ai_search_options: {
               retrieval: {
@@ -828,7 +826,7 @@ export async function handleAISearchRoutes(
             },
           };
 
-          const v2Result = await env.AI.aiSearch
+          const v2Result = await env.AI.aiSearch()
             .get(instanceName)
             .search(searchRequest);
 
@@ -951,7 +949,7 @@ export async function handleAISearchRoutes(
         try {
           if (body.stream === true) {
             // Streaming response
-            const streamResult = await env.AI.aiSearch
+            const streamResult = await env.AI.aiSearch()
               .get(instanceName)
               .chatCompletions({
                 messages: [{ role: "user", content: body.query }],
@@ -990,7 +988,7 @@ export async function handleAISearchRoutes(
             });
           } else {
             // Non-streaming response
-            const result = await env.AI.aiSearch
+            const result = await env.AI.aiSearch()
               .get(instanceName)
               .chatCompletions({
                 messages: [{ role: "user", content: body.query }],
