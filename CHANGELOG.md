@@ -6,9 +6,15 @@ All notable changes to the D1 Database Manager are documented here.
 
 ## [Unreleased]
 
+---
+
+## [2.6.2] - March 7, 2026
+
 ### Documentation
 
 - **Changelog Migrated:** Moved `Changelog.md` from the wiki repository into the main project root as `CHANGELOG.md`.
+- **README Link Fix:** Fixed broken changelog link in README.md (`shttps://` → `https://`).
+- **Updated Changelog Links:** Updated changelog links in README.md and DOCKER_README.md to point to the new root location.
 
 ---
 
