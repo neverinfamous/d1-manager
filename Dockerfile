@@ -97,8 +97,8 @@ RUN cd /tmp && \
 
 # Install runtime dependencies and upgrade to fix CVEs
 # Security Notes:
-# - Application dependencies: glob@11.1.0, tar@7.5.10, @isaacs/brace-expansion@5.0.1, minimatch@10.2.4 (patched via package.json overrides)
-# - npm CLI dependencies: glob@11.1.0, tar@7.5.10, @isaacs/brace-expansion@5.0.1, minimatch@10.2.4 (manually patched in npm's installation)
+# - Application dependencies: minimatch@10.2.4 (patched via package.json override); overrides for glob@11.1.0, tar@7.5.10, and @isaacs/brace-expansion@5.0.1 are precautionary and may not currently appear in the installed dependency graph.
+# - npm CLI bundled dependencies: glob@11.1.0, tar@7.5.10, @isaacs/brace-expansion@5.0.1, minimatch@10.2.4 (manually patched in npm's installation)
 # - curl 8.18.0-r0 (from edge): CVE-2025-14819, CVE-2025-14017, CVE-2025-14524 (curl vulnerabilities)
 # - busybox: CVE-2025-60876 (wget CRLF injection) - not exploitable (D1 Manager uses curl, not wget)
 # - zlib: CVE-2026-22184 (buffer overflow in untgz) - NOT EXPLOITABLE (D1 Manager does not use untgz utility)
