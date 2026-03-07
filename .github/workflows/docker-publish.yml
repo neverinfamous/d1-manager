@@ -2,7 +2,6 @@ name: Build and Push Docker Images
 
 on:
   push:
-    branches: [main]
     tags: ["v*"]
   pull_request:
     branches: [main]
@@ -108,17 +107,13 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Read version from VERSION file
+      - name: Read version from package.json
         id: version
         run: |
-          if [ -f "VERSION" ]; then
-            VERSION=$(head -1 VERSION | tr -d '[:space:]')
-          fi
-          if [ -z "$VERSION" ]; then
-            VERSION=$(grep -oP '"version":\s*"\K[0-9.]+' package.json | head -1)
-          fi
-          if [ -z "$VERSION" ]; then
-            VERSION="1.0.0"
+          VERSION=$(jq -r '.version // empty' package.json || echo "")
+          if [ -z "$VERSION" ] || [ "$VERSION" = "null" ]; then
+            echo "Error: Failed to extract version from package.json" >&2
+            exit 1
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Detected version: $VERSION"
@@ -287,7 +282,7 @@ jobs:
       deployments: write
 
     environment:
-      name: ${{ github.ref == 'refs/heads/main' && 'production' || '' }}
+      name: ${{ startsWith(github.ref, 'refs/tags/v') && 'production' || '' }}
       url: https://hub.docker.com/r/writenotenow/d1-manager
 
     steps:
@@ -314,14 +309,10 @@ jobs:
       - name: Read version
         id: version
         run: |
-          if [ -f "VERSION" ]; then
-            VERSION=$(head -1 VERSION | tr -d '[:space:]')
-          fi
-          if [ -z "$VERSION" ]; then
-            VERSION=$(grep -oP '"version":\s*"\K[0-9.]+' package.json | head -1)
-          fi
-          if [ -z "$VERSION" ]; then
-            VERSION="1.0.0"
+          VERSION=$(jq -r '.version // empty' package.json || echo "")
+          if [ -z "$VERSION" ] || [ "$VERSION" = "null" ]; then
+            echo "Error: Failed to extract version from package.json" >&2
+            exit 1
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
@@ -334,8 +325,8 @@ jobs:
             latest=auto
           tags: |
             type=semver,pattern=v{{version}}
-            type=raw,value=v${{ steps.version.outputs.version }},enable={{is_default_branch}}
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=v${{ steps.version.outputs.version }},enable=${{ github.event_name != 'pull_request' }}
+            type=raw,value=latest,enable=${{ github.event_name != 'pull_request' }}
             type=sha,prefix=sha-,format=short
 
       - name: Create and push manifest
@@ -350,7 +341,7 @@ jobs:
 
       # Update Docker Hub description
       - name: Update Docker Hub Description
-        if: github.ref == 'refs/heads/main'
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: peter-evans/dockerhub-description@v5
         continue-on-error: true
         timeout-minutes: 5
@@ -362,7 +353,7 @@ jobs:
           short-description: "Cloudflare D1 Manager with SQL Console, Drizzle, Visual Schema/ER tools, Scheduled Backups."
 
       - name: Deployment Summary
-        if: github.ref == 'refs/heads/main'
+        if: startsWith(github.ref, 'refs/tags/v')
         run: |
           echo "✅ Successfully published Docker images to production"
           echo "🐳 Registry: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
