@@ -13,7 +13,7 @@
 
 A modern, full-featured web application for managing Cloudflare D1 databases with enterprise-grade authentication via Cloudflare Access (Zero Trust). Self-host on Cloudflare Workers or run locally for development.
 
-**[Live Demo](https://d1.adamic.tech/)** • **[Docker](https://hub.docker.com/r/writenotenow/d1-manager)** • **[Wiki](https://github.com/neverinfamous/d1-manager/wiki)** • **[Changelog](https://github.com/neverinfamous/d1-manager/wiki/Changelog)** • **[Release Article](https://adamic.tech/articles/d1-manager)**
+**[Live Demo](https://d1.adamic.tech/)** • **[Docker](https://hub.docker.com/r/writenotenow/d1-manager)** • **[Wiki](https://github.com/neverinfamous/d1-manager/wiki)** • **[Changelog](shttps://github.com/neverinfamous/d1-manager/blob/main/CHANGELOG.md)** • **[Release Article](https://adamic.tech/articles/d1-manager)**
 
 ## Tech Stack
 
