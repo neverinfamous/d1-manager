@@ -6,6 +6,19 @@ All notable changes to the D1 Database Manager are documented here.
 
 ## [Unreleased]
 
+## [2.6.3] - March 10, 2026
+
+### Changed
+
+- **Dependency Updates**
+  - `@cloudflare/workers-types`: 4.20260307.1 → 4.20260310.1 (patch)
+  - `@types/node`: 25.3.5 → 25.4.0 (minor)
+  - `jose`: 6.2.0 → 6.2.1 (patch)
+  - `typescript-eslint`: 8.56.1 → 8.57.0 (minor)
+  - `wrangler`: 4.71.0 → 4.72.0 (minor)
+  - `tar` override: 7.5.10 → 7.5.11 (patch) — npm + Docker layers
+  - GitHub Actions: `docker/setup-buildx-action` (v3 → v4), `docker/login-action` (v3 → v4), `docker/metadata-action` (v5 → v6), `docker/build-push-action` (v6 → v7)
+
 ---
 
 ## [2.6.2] - March 7, 2026
@@ -1003,7 +1016,8 @@ This major release transforms D1 Database Manager into an enterprise-ready solut
   - Fixed job tracking nullish coalescing operators
   - Updated time travel utilities with proper type annotations
 
-[Unreleased]: https://github.com/neverinfamous/d1-manager/compare/v2.6.2...HEAD
+[Unreleased]: https://github.com/neverinfamous/d1-manager/compare/v2.6.3...HEAD
+[2.6.3]: https://github.com/neverinfamous/d1-manager/compare/v2.6.2...v2.6.3
 [2.6.2]: https://github.com/neverinfamous/d1-manager/compare/v2.6.1...v2.6.2
 [2.6.1]: https://github.com/neverinfamous/d1-manager/compare/v2.6.0...v2.6.1
 [2.6.0]: https://github.com/neverinfamous/d1-manager/compare/v2.5.0...v2.6.0

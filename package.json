@@ -1,7 +1,7 @@
 {
   "name": "d1-manager",
   "private": true,
-  "version": "2.6.2",
+  "version": "2.6.3",
   "type": "module",
   "engines": {
     "node": ">=24.0.0"
@@ -70,7 +70,7 @@
     "esbuild": "$esbuild",
     "cross-spawn": "^7.0.5",
     "glob": "11.1.0",
-    "tar": "7.5.10",
+    "tar": "7.5.11",
     "minimatch": "10.2.4",
     "eslint-plugin-react-hooks": {
       "eslint": "$eslint"
