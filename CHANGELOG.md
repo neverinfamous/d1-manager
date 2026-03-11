@@ -6,6 +6,8 @@ All notable changes to the D1 Database Manager are documented here.
 
 ## [Unreleased]
 
+## [2.6.3] - March 10, 2026
+
 ### Changed
 
 - **Dependency Updates**
@@ -1014,7 +1016,8 @@ This major release transforms D1 Database Manager into an enterprise-ready solut
   - Fixed job tracking nullish coalescing operators
   - Updated time travel utilities with proper type annotations
 
-[Unreleased]: https://github.com/neverinfamous/d1-manager/compare/v2.6.2...HEAD
+[Unreleased]: https://github.com/neverinfamous/d1-manager/compare/v2.6.3...HEAD
+[2.6.3]: https://github.com/neverinfamous/d1-manager/compare/v2.6.2...v2.6.3
 [2.6.2]: https://github.com/neverinfamous/d1-manager/compare/v2.6.1...v2.6.2
 [2.6.1]: https://github.com/neverinfamous/d1-manager/compare/v2.6.0...v2.6.1
 [2.6.0]: https://github.com/neverinfamous/d1-manager/compare/v2.5.0...v2.6.0
