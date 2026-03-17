@@ -307,8 +307,8 @@ docker compose pull && docker compose up -d
 | ------------ | --------------------------------------------- |
 | `latest`     | Latest stable release                         |
 | `v2.6.4`     | Specific version (recommended for production) |
-| `v2.6.1`     | Previous stable release                       |
-| `v2.6.0`     | Earlier release                               |
+| `v2.6.3`     | Previous stable release                       |
+| `v2.6.2`     | Earlier release                               |
 | `sha-XXXXXX` | Commit SHA for reproducible builds            |
 
 ---
