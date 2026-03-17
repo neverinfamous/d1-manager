@@ -6,6 +6,27 @@ All notable changes to the D1 Database Manager are documented here.
 
 ## [Unreleased]
 
+## [2.6.4] - March 17, 2026
+
+### Changed
+
+**Dependency Updates**
+
+- Bump `@types/node` from 25.4.0 to 25.5.0
+- Bump `esbuild` from 0.27.3 to 0.27.4
+- Bump `@cloudflare/workers-types` and `wrangler`
+- Bump `drizzle-kit` from 0.31.9 to 0.31.10
+- Bump `jspdf` from 4.2.0 to 4.2.1
+- Bump `typescript-eslint` from 8.57.0 to 8.57.1
+- Bump `@vitejs/plugin-react` from 5.1.4 to 5.2.0
+- Update GitHub Actions dependencies
+
+### Security
+
+- Pin `undici` to `7.24.4` to fix high severity vulnerabilities (GHSA-f269-vfmq-vjvj, GHSA-2mjp-6q6p-2qxm, GHSA-4992-7rv2-5pvq, etc.) in `npm audit`
+
+---
+
 ## [2.6.3] - March 10, 2026
 
 ### Changed
@@ -1016,7 +1037,8 @@ This major release transforms D1 Database Manager into an enterprise-ready solut
   - Fixed job tracking nullish coalescing operators
   - Updated time travel utilities with proper type annotations
 
-[Unreleased]: https://github.com/neverinfamous/d1-manager/compare/v2.6.3...HEAD
+[Unreleased]: https://github.com/neverinfamous/d1-manager/compare/v2.6.4...HEAD
+[2.6.4]: https://github.com/neverinfamous/d1-manager/compare/v2.6.3...v2.6.4
 [2.6.3]: https://github.com/neverinfamous/d1-manager/compare/v2.6.2...v2.6.3
 [2.6.2]: https://github.com/neverinfamous/d1-manager/compare/v2.6.1...v2.6.2
 [2.6.1]: https://github.com/neverinfamous/d1-manager/compare/v2.6.0...v2.6.1
