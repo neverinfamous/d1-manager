@@ -54,7 +54,7 @@
     "clsx": "^2.1.1",
     "drizzle-kit": "^0.31.9",
     "esbuild": "^0.27.3",
-    "eslint": "^10.0.2",
+    "eslint": "^10.1.0",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.4.0",
