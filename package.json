@@ -54,7 +54,7 @@
     "clsx": "^2.1.1",
     "drizzle-kit": "^0.31.9",
     "esbuild": "^0.27.3",
-    "eslint": "^10.0.2",
+    "eslint": "^10.1.0",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.4.0",
@@ -62,7 +62,7 @@
     "tailwind-merge": "^3.5.0",
     "tailwindcss": "^4.2.0",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.56.1",
+    "typescript-eslint": "^8.57.2",
     "vite": "^7.3.1",
     "wrangler": "^4.69.0"
   },
