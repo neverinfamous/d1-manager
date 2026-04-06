@@ -20,7 +20,7 @@ export function FTS5SearchResults({
   results,
   viewMode = "card",
 }: FTS5SearchResultsProps): React.JSX.Element {
-  const [expandedResults, setExpandedResults] = useState<Set<number>>(
+  const [expandedResults, setExpandedResults] = useState(
     new Set(),
   );
 

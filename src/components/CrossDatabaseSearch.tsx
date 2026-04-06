@@ -172,7 +172,7 @@ export function CrossDatabaseSearch({
   const [progress, setProgress] = useState<SearchProgress | null>(null);
 
   // Database selection state
-  const [selectedDatabases, setSelectedDatabases] = useState<Set<string>>(
+  const [selectedDatabases, setSelectedDatabases] = useState(
     new Set(),
   );
   const [showDatabaseSelector, setShowDatabaseSelector] = useState(true);
@@ -203,9 +203,9 @@ export function CrossDatabaseSearch({
   const [searchMode, setSearchMode] = useState<"all" | "fts5">("all");
 
   // FTS5 Search state
-  const [fts5DatabaseId, setFts5DatabaseId] = useState<string>("");
+  const [fts5DatabaseId, setFts5DatabaseId] = useState("");
   const [fts5Tables, setFts5Tables] = useState<FTS5TableInfo[]>([]);
-  const [fts5TableName, setFts5TableName] = useState<string>("");
+  const [fts5TableName, setFts5TableName] = useState("");
   const [fts5Query, setFts5Query] = useState("");
   const [fts5Results, setFts5Results] = useState<FTS5SearchResult[]>([]);
   const [fts5Searching, setFts5Searching] = useState(false);

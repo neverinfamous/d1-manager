@@ -142,7 +142,7 @@ function ForeignKeyVisualizerContent({
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showLegend, setShowLegend] = useState(true);
-  const [filterTable, setFilterTable] = useState<string>("all");
+  const [filterTable, setFilterTable] = useState("all");
   const [highlightCycles, setHighlightCycles] = useState(false);
   const [cycles, setCycles] = useState<CircularDependencyCycle[]>([]);
   const [isFullscreen, setIsFullscreen] = useState(false);

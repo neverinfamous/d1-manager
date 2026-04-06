@@ -83,14 +83,14 @@ export function QueryBuilder({
   onSendToEditor,
 }: QueryBuilderProps): React.JSX.Element {
   const [tables, setTables] = useState<TableInfo[]>([]);
-  const [selectedTable, setSelectedTable] = useState<string>("");
+  const [selectedTable, setSelectedTable] = useState("");
   const [columns, setColumns] = useState<ColumnInfo[]>([]);
-  const [selectedColumns, setSelectedColumns] = useState<string[]>(["*"]);
+  const [selectedColumns, setSelectedColumns] = useState(["*"]);
   const [conditions, setConditions] = useState<QueryCondition[]>([]);
-  const [orderBy, setOrderBy] = useState<string>("");
+  const [orderBy, setOrderBy] = useState("");
   const [orderDirection, setOrderDirection] = useState<"ASC" | "DESC">("ASC");
-  const [limit, setLimit] = useState<string>("100");
-  const [generatedSQL, setGeneratedSQL] = useState<string>("");
+  const [limit, setLimit] = useState("100");
+  const [generatedSQL, setGeneratedSQL] = useState("");
   const [results, setResults] = useState<Record<string, unknown>[]>([]);
   const [resultColumns, setResultColumns] = useState<string[]>([]);
   const [executing, setExecuting] = useState(false);
@@ -111,9 +111,9 @@ export function QueryBuilder({
   const [loadingQueries, setLoadingQueries] = useState(false);
 
   // Track manual SQL edits
-  const [editedSQL, setEditedSQL] = useState<string>("");
+  const [editedSQL, setEditedSQL] = useState("");
   const [isManuallyEdited, setIsManuallyEdited] = useState(false);
-  const lastGeneratedSQL = useRef<string>("");
+  const lastGeneratedSQL = useRef("");
 
   // Refs for editor
   const textareaRef = useRef<HTMLTextAreaElement>(null);

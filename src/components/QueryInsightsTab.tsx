@@ -99,7 +99,7 @@ export function QueryInsightsTab({
   queryInsights,
 }: QueryInsightsTabProps): React.JSX.Element {
   const [sortField, setSortField] = useState<SortField>("totalTime");
-  const [expandedQueries, setExpandedQueries] = useState<Set<string>>(
+  const [expandedQueries, setExpandedQueries] = useState(
     new Set(),
   );
 
