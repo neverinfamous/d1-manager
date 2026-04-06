@@ -17,30 +17,31 @@ export default defineConfig({
       output: {
         // Manual chunks for better code splitting - split large vendor deps
         manualChunks(id) {
-          if (id.includes("node_modules")) {
+          const normalizedId = id.replace(/\\/g, "/");
+          if (normalizedId.includes("node_modules")) {
             if (
-              id.includes("/node_modules/react/") ||
-              id.includes("/node_modules/react-dom/") ||
-              id.includes("/node_modules/scheduler/")
+              normalizedId.includes("/node_modules/react/") ||
+              normalizedId.includes("/node_modules/react-dom/") ||
+              normalizedId.includes("/node_modules/scheduler/")
             )
               return "vendor-react";
             if (
-              id.includes("@reactflow") ||
-              id.includes("reactflow") ||
-              id.includes("dagre")
+              normalizedId.includes("@reactflow") ||
+              normalizedId.includes("reactflow") ||
+              normalizedId.includes("dagre")
             )
               return "vendor-reactflow";
-            if (id.includes("jspdf") || id.includes("html2canvas"))
+            if (normalizedId.includes("jspdf") || normalizedId.includes("html2canvas"))
               return "vendor-pdf";
-            if (id.includes("jszip")) return "vendor-zip";
-            if (id.includes("@radix-ui")) return "vendor-ui";
-            if (id.includes("lucide-react")) return "vendor-icons";
-            if (id.includes("sql-formatter") || id.includes("prismjs"))
+            if (normalizedId.includes("jszip")) return "vendor-zip";
+            if (normalizedId.includes("@radix-ui")) return "vendor-ui";
+            if (normalizedId.includes("lucide-react")) return "vendor-icons";
+            if (normalizedId.includes("sql-formatter") || normalizedId.includes("prismjs"))
               return "vendor-sql";
             if (
-              id.includes("diff") ||
-              id.includes("drizzle-orm") ||
-              id.includes("jose")
+              normalizedId.includes("diff") ||
+              normalizedId.includes("drizzle-orm") ||
+              normalizedId.includes("jose")
             )
               return "vendor-utils";
           }

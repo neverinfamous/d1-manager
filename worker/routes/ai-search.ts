@@ -992,13 +992,13 @@ export async function handleAISearchRoutes(
 
             if (!responseBody) {
               return new Response(
-                JSON.stringify({ 
-                  error: "AI Search Stream Error", 
-                  details: "Failed to initialize standard ReadableStream payload" 
+                JSON.stringify({
+                  error: "AI Search Stream Error",
+                  details: "Failed to initialize standard ReadableStream payload",
                 }),
-                { 
-                  status: 500, 
-                  headers: { "Content-Type": "application/json", ...corsHeaders } 
+                {
+                  status: 500,
+                  headers: { "Content-Type": "application/json", ...corsHeaders },
                 }
               );
             }
