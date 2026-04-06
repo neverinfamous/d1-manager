@@ -279,8 +279,7 @@ export function DatabaseView({
 
   // Cascade simulator state
   const [showCascadeSimulator, setShowCascadeSimulator] = useState(false);
-  const [cascadeSimulatorTable, setCascadeSimulatorTable] =
-    useState("");
+  const [cascadeSimulatorTable, setCascadeSimulatorTable] = useState("");
 
   // Table colors for visual organization
   const [tableColors, setTableColors] = useState<Record<string, DatabaseColor>>(

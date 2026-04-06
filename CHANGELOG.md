@@ -5,7 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [Unreleased](https://github.com/neverinfamous/d1-manager/compare/v2.6.5...HEAD)
+
+## [2.6.5](https://github.com/neverinfamous/d1-manager/releases/tag/v2.6.5) - 2026-04-06
+
+### Changed
+
+- **Dependency Updates:**
+  - Upgraded `vite` to `v8.0.4` and `@vitejs/plugin-react` to `v6.0.1`, including a refactor of `vite.config.ts` to use functional `manualChunks` definition for Rollup 4 compatibility.
+  - Upgraded `typescript` to `v6.0.2` and updated TS `useState`/`useRef` strict inferences in contexts and `aiSearch` usage definitions to resolve deprecation/TypeScript 6 strictness.
+  - Upgraded `esbuild` to `v0.28.0`.
+  - Upgraded `lucide-react` to `v1.7.0`.
+
+### Security
+
+- Patched Docker build transitive dependencies `tar` to `v7.5.13` to resolve known vulnerabilities.
+- Added explicit npm overrides for `flatted` (v3.4.2), `picomatch` (v4.0.4), `tar` (v7.5.13), and `minimatch` (v10.2.5) to secure dependency chains against severe CVEs.
 
 ## [2.6.4] - 2026-03-17
 
@@ -77,7 +92,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Replaced `Parameters<ReturnType<typeof env.AI.aiSearch.get>["search"]>[0]` with direct `AiSearchSearchRequest` type
 - **Default Branch Migration**: Renamed default branch from `master` to `main`
   - Updated all GitHub Actions workflow triggers and conditional checks across 4 workflow files
-**CI/CD**
+    **CI/CD**
 
 - **Removed Dependabot Auto-Merge Workflow**: Deleted `dependabot-auto-merge.yml` to prevent automatic merging of dependency PRs
   - Dependabot will still open PRs for visibility into available updates
@@ -88,7 +103,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Updated `{{is_default_branch}}` to `github.event_name != 'pull_request'`
 - **VERSION File Removal**: Deleted VERSION file; Docker workflow now reads version directly from `package.json` via `jq` (single source of truth)
   - Fails hard if version extraction fails (no silent `1.0.0` fallback)
-**Dependencies**
+    **Dependencies**
 
 - **@radix-ui/react-label**: Updated 2.1.7 → 2.1.8
 - **@radix-ui/react-progress**: Updated 1.1.7 → 1.1.8
@@ -140,7 +155,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - GitHub Actions workflows updated to use Node 24.x as primary version
   - `package.json` now includes `engines` field requiring Node.js >=24.0.0
   - README prerequisites updated to specify Node.js 24+ (LTS)
-**Dependencies**
+    **Dependencies**
 
 - **@babel/core**: Updated 7.28.6 → 7.29.0
 - **@cloudflare/workers-types**: Updated 4.20260114.0 → 4.20260210.0
@@ -160,13 +175,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **drizzle-kit**: Updated 0.31.8 → 0.31.9
 - **tar**: Updated override 7.5.2 → 7.5.7 (CVE-2026-23745, CVE-2026-23950, CVE-2026-24842)
 - **@isaacs/brace-expansion**: Added override ^5.0.1 (GHSA-7h2j-956f-4vf2)
-**CI/CD**
+  **CI/CD**
 
 - **Fixed Docker Security Gate**: Restructured `docker-publish.yml` to properly gate Docker Hub publishing on security scan results
   - Previous: Platform images were pushed during `build-platform` before security scan ran
   - Now: Images are built in `build-platform` (no push), scanned in `security-scan`, then pushed in new `push-platform` job only after scan passes
   - Ensures no Docker images are published if security vulnerabilities are detected
-**Code Quality**
+    **Code Quality**
 
 - **ESLint Remediation**: Eliminated all `eslint-disable` comments from the codebase
   - Applied `useCallback` memoization pattern to 15 React components for proper `react-hooks/exhaustive-deps` compliance
@@ -269,15 +284,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Export Rate Limiting**: Increased inter-table delay from 100ms to 300ms with exponential backoff retry (2s→4s→8s) for 429 errors
 - **Import Cache Refresh**: Database list now automatically refreshes after successful import (no page reload needed)
-**Developer Experience**
+  **Developer Experience**
 
 - **Auto-detect local vs production**: Environment configuration simplified with `.env.development` auto-loaded by Vite during `npm run dev`. No more manually commenting/uncommenting `.env` to switch between dev and prod.
 - **Simplified** Wrangler config - `wrangler.toml` now committed to repo; removed `wrangler.toml.example` and `wrangler.jsonc`
-**CI/CD**
+  **CI/CD**
 
 - **Fixed** Docker gating to properly block on CodeQL security alerts - Added `fail-on: error` to CodeQL analyze step
 - **Improved** Docker Scout scanning to use official `docker/scout-action@v1` with `only-fixed: true` filter - Only blocks on fixable critical/high vulnerabilities, uploads SARIF to GitHub Security tab
-**Dependencies**
+  **Dependencies**
 
 - **wrangler**: Updated 4.54.0 → 4.57.0
 - **vite**: Updated 7.3.0 → 7.3.1
@@ -329,7 +344,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Added** [[Upgrade Guide]] to wiki - Comprehensive documentation for the automated in-app upgrade system covering all 5 schema migrations
 - **Updated** [[Webhooks]] wiki page - Complete rewrite for 13-event webhook engine with streamlined event categories
-**CI/CD**
+  **CI/CD**
 
 - **Explicit Docker Gating**: Docker image publishing is now gated on lint and CodeQL verification
   - Added `lint` prerequisite job to `docker-publish.yml` (ESLint, frontend build, worker dry-run)
@@ -345,7 +360,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `actions/checkout`: v5 → v6
   - `actions/upload-artifact`: v4 → v6
   - `actions/download-artifact`: v4 → v7
-**Dependencies**
+    **Dependencies**
 
 - **ESLint Group**: Updated `eslint` 9.36.0 → 9.39.2, `eslint-plugin-react-refresh` 0.4.14 → 0.4.26, `typescript-eslint` 8.50.1 → 8.52.0, `globals` 16.4.0 → 17.0.0
 - **Types Group**: Updated `@types/node` 24.9.1 → 24.9.3, `@types/react` 19.2.2 → 19.2.3, `@types/react-dom` 19.2.2 → 19.2.3
@@ -688,7 +703,7 @@ This major release transforms D1 Database Manager into an enterprise-ready solut
 ### Changed
 
 - **Query Console UI**: Moved Clear button to the left side of the card header for better visual hierarchy
-**Performance**
+  **Performance**
 
 - **ER Diagram Load Optimization**: ER Diagram now loads with a single API call instead of N+1 calls
   - Added `includeSchemas` parameter to `/api/tables/{dbId}/foreign-keys` endpoint
@@ -730,7 +745,7 @@ This major release transforms D1 Database Manager into an enterprise-ready solut
   - Instant page revisits within cache window
   - Refresh button forces fresh data fetch
   - Shorter TTL (2 min) since metrics data updates more frequently
-**Optimized**
+    **Optimized**
 
 - **Table Schema Caching**: Added 5-minute client-side caching
   - Schema fetched once per table per session

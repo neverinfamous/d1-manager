@@ -18,14 +18,27 @@ export default defineConfig({
         // Manual chunks for better code splitting - split large vendor deps
         manualChunks(id) {
           if (id.includes("node_modules")) {
-            if (id.includes("react") || id.includes("scheduler")) return "vendor-react";
-            if (id.includes("@reactflow") || id.includes("reactflow") || id.includes("dagre")) return "vendor-reactflow";
-            if (id.includes("jspdf") || id.includes("html2canvas")) return "vendor-pdf";
+            if (id.includes("react") || id.includes("scheduler"))
+              return "vendor-react";
+            if (
+              id.includes("@reactflow") ||
+              id.includes("reactflow") ||
+              id.includes("dagre")
+            )
+              return "vendor-reactflow";
+            if (id.includes("jspdf") || id.includes("html2canvas"))
+              return "vendor-pdf";
             if (id.includes("jszip")) return "vendor-zip";
             if (id.includes("@radix-ui")) return "vendor-ui";
             if (id.includes("lucide-react")) return "vendor-icons";
-            if (id.includes("sql-formatter") || id.includes("prismjs")) return "vendor-sql";
-            if (id.includes("diff") || id.includes("drizzle-orm") || id.includes("jose")) return "vendor-utils";
+            if (id.includes("sql-formatter") || id.includes("prismjs"))
+              return "vendor-sql";
+            if (
+              id.includes("diff") ||
+              id.includes("drizzle-orm") ||
+              id.includes("jose")
+            )
+              return "vendor-utils";
           }
         },
       },

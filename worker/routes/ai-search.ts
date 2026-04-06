@@ -979,14 +979,18 @@ export async function handleAISearchRoutes(
               });
 
             const streamResponse = streamResult as unknown as Response;
-            return new Response(streamResponse.body ?? (streamResult as unknown as ReadableStream), {
-              headers: {
-                "Content-Type": "text/event-stream",
-                "Cache-Control": "no-cache",
-                Connection: "keep-alive",
-                ...corsHeaders,
+            return new Response(
+              streamResponse.body ??
+                (streamResult as unknown as ReadableStream),
+              {
+                headers: {
+                  "Content-Type": "text/event-stream",
+                  "Cache-Control": "no-cache",
+                  Connection: "keep-alive",
+                  ...corsHeaders,
+                },
               },
-            });
+            );
           } else {
             // Non-streaming response
             const result = await env.AI.aiSearch()

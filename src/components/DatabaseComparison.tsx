@@ -52,9 +52,7 @@ export function DatabaseComparison({
   onClose: _onClose,
 }: DatabaseComparisonProps): React.JSX.Element {
   const [leftDb, setLeftDb] = useState(preSelectedDatabases?.[0] ?? "");
-  const [rightDb, setRightDb] = useState(
-    preSelectedDatabases?.[1] ?? "",
-  );
+  const [rightDb, setRightDb] = useState(preSelectedDatabases?.[1] ?? "");
   const [comparing, setComparing] = useState(false);
   const [diffs, setDiffs] = useState<SchemaDiff[]>([]);
   const [expandedTables, setExpandedTables] = useState(new Set());

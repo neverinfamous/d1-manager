@@ -97,9 +97,7 @@ export function BackupRestoreHub({
   const [r2Loading, setR2Loading] = useState(false);
   const [r2Error, setR2Error] = useState<string | null>(null);
   const [r2Configured, setR2Configured] = useState<boolean | null>(null);
-  const [selectedBackups, setSelectedBackups] = useState(
-    new Set(),
-  );
+  const [selectedBackups, setSelectedBackups] = useState(new Set());
   const [selectedBackupForRestore, setSelectedBackupForRestore] =
     useState<R2BackupListItem | null>(null);
   const [showR2RestoreConfirm, setShowR2RestoreConfirm] = useState(false);
