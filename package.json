@@ -1,7 +1,7 @@
 {
   "name": "d1-manager",
   "private": true,
-  "version": "2.6.5",
+  "version": "2.6.6",
   "type": "module",
   "engines": {
     "node": ">=24.0.0"
