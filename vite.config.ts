@@ -16,31 +16,17 @@ export default defineConfig({
     rollupOptions: {
       output: {
         // Manual chunks for better code splitting - split large vendor deps
-        manualChunks: {
-          "vendor-react": ["react", "react-dom", "scheduler"],
-          "vendor-reactflow": [
-            "reactflow",
-            "@reactflow/core",
-            "@reactflow/minimap",
-            "@reactflow/controls",
-            "@reactflow/background",
-            "dagre",
-          ],
-          "vendor-pdf": ["jspdf", "html2canvas"],
-          "vendor-zip": ["jszip"],
-          "vendor-ui": [
-            "@radix-ui/react-dialog",
-            "@radix-ui/react-select",
-            "@radix-ui/react-checkbox",
-            "@radix-ui/react-label",
-            "@radix-ui/react-radio-group",
-            "@radix-ui/react-accordion",
-            "@radix-ui/react-progress",
-            "@radix-ui/react-slot",
-          ],
-          "vendor-icons": ["lucide-react"],
-          "vendor-sql": ["sql-formatter", "prismjs"],
-          "vendor-utils": ["diff", "drizzle-orm", "jose"],
+        manualChunks(id) {
+          if (id.includes("node_modules")) {
+            if (id.includes("react") || id.includes("scheduler")) return "vendor-react";
+            if (id.includes("@reactflow") || id.includes("reactflow") || id.includes("dagre")) return "vendor-reactflow";
+            if (id.includes("jspdf") || id.includes("html2canvas")) return "vendor-pdf";
+            if (id.includes("jszip")) return "vendor-zip";
+            if (id.includes("@radix-ui")) return "vendor-ui";
+            if (id.includes("lucide-react")) return "vendor-icons";
+            if (id.includes("sql-formatter") || id.includes("prismjs")) return "vendor-sql";
+            if (id.includes("diff") || id.includes("drizzle-orm") || id.includes("jose")) return "vendor-utils";
+          }
         },
       },
     },

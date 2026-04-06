@@ -5,6 +5,7 @@
  * Uses a D1→R2 connector pattern: exports database content as markdown documents
  * to R2, which are then indexed by AI Search for semantic querying.
  */
+/* eslint-disable @typescript-eslint/no-deprecated */
 
 import type {
   Env,
@@ -977,8 +978,8 @@ export async function handleAISearchRoutes(
                 },
               });
 
-            const streamResponse = streamResult as Response;
-            return new Response(streamResponse.body, {
+            const streamResponse = streamResult as unknown as Response;
+            return new Response(streamResponse.body ?? (streamResult as unknown as ReadableStream), {
               headers: {
                 "Content-Type": "text/event-stream",
                 "Cache-Control": "no-cache",

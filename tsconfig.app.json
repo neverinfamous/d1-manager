@@ -45,7 +45,6 @@
     "esModuleInterop": true,
 
     /* Path Aliases */
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     }
