@@ -3,7 +3,7 @@
 [![GitHub](https://img.shields.io/badge/GitHub-neverinfamous/d1--manager-blue?logo=github)](https://github.com/neverinfamous/d1-manager)
 [![Docker Pulls](https://img.shields.io/docker/pulls/writenotenow/d1-manager)](https://hub.docker.com/r/writenotenow/d1-manager)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-![Version](https://img.shields.io/badge/version-v2.6.5-green)
+[![Version](https://img.shields.io/github/v/release/neverinfamous/d1-manager?label=version&color=green)](https://github.com/neverinfamous/d1-manager/releases)
 ![Status](https://img.shields.io/badge/status-Production%2FStable-brightgreen)
 [![Security](https://img.shields.io/badge/Security-Enhanced-green.svg)](https://github.com/neverinfamous/d1-manager/blob/main/SECURITY.md)
 [![CodeQL](https://img.shields.io/badge/CodeQL-Passing-brightgreen.svg)](https://github.com/neverinfamous/d1-manager/security/code-scanning)
@@ -308,9 +308,7 @@ docker compose pull && docker compose up -d
 | Tag          | Description                                   |
 | ------------ | --------------------------------------------- |
 | `latest`     | Latest stable release                         |
-| `v2.6.5`     | Specific version (recommended for production) |
-| `v2.6.4`     | Previous stable release                       |
-| `v2.6.3`     | Earlier release                               |
+| `vX.Y.Z`     | Specific version (recommended for production) |
 | `sha-XXXXXX` | Commit SHA for reproducible builds            |
 
 ---
