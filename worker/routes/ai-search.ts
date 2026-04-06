@@ -6,6 +6,8 @@
  * to R2, which are then indexed by AI Search for semantic querying.
  */
 /* eslint-disable @typescript-eslint/no-deprecated */
+// Cloudflare AI Search compatibility types are currently sourced from an upstream
+// deprecated type surface and cannot be replaced here without changing the integration.
 
 import type {
   Env,
@@ -978,11 +980,15 @@ export async function handleAISearchRoutes(
                 },
               });
 
-            const streamResponse = streamResult as unknown as Response;
-            return new Response(
-              streamResponse.body ??
-                (streamResult as unknown as ReadableStream),
-              {
+            const responseBody =
+              streamResult instanceof Response
+                ? streamResult.body
+                : streamResult instanceof ReadableStream
+                  ? streamResult
+                  : ((streamResult as unknown as Response).body ??
+                      (streamResult as unknown as ReadableStream));
+
+            return new Response(responseBody, {
                 headers: {
                   "Content-Type": "text/event-stream",
                   "Cache-Control": "no-cache",

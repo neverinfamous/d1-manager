@@ -18,7 +18,11 @@ export default defineConfig({
         // Manual chunks for better code splitting - split large vendor deps
         manualChunks(id) {
           if (id.includes("node_modules")) {
-            if (id.includes("react") || id.includes("scheduler"))
+            if (
+              id.includes("/node_modules/react/") ||
+              id.includes("/node_modules/react-dom/") ||
+              id.includes("/node_modules/scheduler/")
+            )
               return "vendor-react";
             if (
               id.includes("@reactflow") ||

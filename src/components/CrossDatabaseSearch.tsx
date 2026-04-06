@@ -172,7 +172,7 @@ export function CrossDatabaseSearch({
   const [progress, setProgress] = useState<SearchProgress | null>(null);
 
   // Database selection state
-  const [selectedDatabases, setSelectedDatabases] = useState(new Set());
+  const [selectedDatabases, setSelectedDatabases] = useState(new Set<string>());
   const [showDatabaseSelector, setShowDatabaseSelector] = useState(true);
   const [databaseFilter, setDatabaseFilter] = useState("");
   const [copiedDbId, setCopiedDbId] = useState<string | null>(null);

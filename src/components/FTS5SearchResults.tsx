@@ -20,7 +20,7 @@ export function FTS5SearchResults({
   results,
   viewMode = "card",
 }: FTS5SearchResultsProps): React.JSX.Element {
-  const [expandedResults, setExpandedResults] = useState(new Set());
+  const [expandedResults, setExpandedResults] = useState(new Set<number>());
 
   const toggleExpand = (index: number): void => {
     setExpandedResults((prev) => {
