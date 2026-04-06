@@ -16,18 +16,20 @@ WORKDIR /app
 RUN npm install -g npm@latest
 
 # Patch npm's own dependencies to fix CVE-2025-64756 (glob), CVE-2026-23745, CVE-2026-23950, CVE-2026-24842, CVE-2026-26960 (tar), GHSA-7h2j-956f-4vf2 (@isaacs/brace-expansion), CVE-2026-27903, CVE-2026-27904 (minimatch)
-# npm@11.6.2 bundles vulnerable versions glob@11.0.3, glob@10.4.5 (in node-gyp), tar@7.5.1, @isaacs/brace-expansion@5.0.0, minimatch@10.2.2
+# Recent npm versions bundle vulnerable versions glob@11.0.3, glob@10.4.5 (in node-gyp), tar@7.5.1, @isaacs/brace-expansion@5.0.0, minimatch@10.2.2, picomatch@4.0.3
 # We download patched versions first, then replace all vulnerable ones
 RUN cd /tmp && \
     npm pack glob@11.1.0 && \
     npm pack tar@7.5.13 && \
     npm pack @isaacs/brace-expansion@5.0.1 && \
     npm pack minimatch@10.2.5 && \
+    npm pack picomatch@4.0.4 && \
     rm -rf /usr/local/lib/node_modules/npm/node_modules/glob && \
     rm -rf /usr/local/lib/node_modules/npm/node_modules/tar && \
     rm -rf /usr/local/lib/node_modules/npm/node_modules/@isaacs/brace-expansion && \
     rm -rf /usr/local/lib/node_modules/npm/node_modules/node-gyp/node_modules/glob && \
     rm -rf /usr/local/lib/node_modules/npm/node_modules/minimatch && \
+    rm -rf /usr/local/lib/node_modules/npm/node_modules/tinyglobby/node_modules/picomatch && \
     tar -xzf glob-11.1.0.tgz && \
     cp -r package /usr/local/lib/node_modules/npm/node_modules/glob && \
     (mkdir -p /usr/local/lib/node_modules/npm/node_modules/node-gyp/node_modules && \
@@ -39,6 +41,9 @@ RUN cd /tmp && \
     mv package /usr/local/lib/node_modules/npm/node_modules/@isaacs/brace-expansion && \
     tar -xzf minimatch-10.2.5.tgz && \
     mv package /usr/local/lib/node_modules/npm/node_modules/minimatch && \
+    tar -xzf picomatch-4.0.4.tgz && \
+    mkdir -p /usr/local/lib/node_modules/npm/node_modules/tinyglobby/node_modules && \
+    mv package /usr/local/lib/node_modules/npm/node_modules/tinyglobby/node_modules/picomatch && \
     rm -rf /tmp/*
 
 # Install build dependencies
@@ -70,18 +75,20 @@ WORKDIR /app
 RUN npm install -g npm@latest
 
 # Patch npm's own dependencies to fix CVE-2025-64756 (glob), CVE-2026-23745, CVE-2026-23950, CVE-2026-24842, CVE-2026-26960 (tar), GHSA-7h2j-956f-4vf2 (@isaacs/brace-expansion), CVE-2026-27903, CVE-2026-27904 (minimatch)
-# npm@11.6.2 bundles vulnerable versions glob@11.0.3, glob@10.4.5 (in node-gyp), tar@7.5.1, @isaacs/brace-expansion@5.0.0, minimatch@10.2.2
+# Recent npm versions bundle vulnerable versions glob@11.0.3, glob@10.4.5 (in node-gyp), tar@7.5.1, @isaacs/brace-expansion@5.0.0, minimatch@10.2.2, picomatch@4.0.3
 # We download patched versions first, then replace all vulnerable ones
 RUN cd /tmp && \
     npm pack glob@11.1.0 && \
     npm pack tar@7.5.13 && \
     npm pack @isaacs/brace-expansion@5.0.1 && \
     npm pack minimatch@10.2.5 && \
+    npm pack picomatch@4.0.4 && \
     rm -rf /usr/local/lib/node_modules/npm/node_modules/glob && \
     rm -rf /usr/local/lib/node_modules/npm/node_modules/tar && \
     rm -rf /usr/local/lib/node_modules/npm/node_modules/@isaacs/brace-expansion && \
     rm -rf /usr/local/lib/node_modules/npm/node_modules/node-gyp/node_modules/glob && \
     rm -rf /usr/local/lib/node_modules/npm/node_modules/minimatch && \
+    rm -rf /usr/local/lib/node_modules/npm/node_modules/tinyglobby/node_modules/picomatch && \
     tar -xzf glob-11.1.0.tgz && \
     cp -r package /usr/local/lib/node_modules/npm/node_modules/glob && \
     (mkdir -p /usr/local/lib/node_modules/npm/node_modules/node-gyp/node_modules && \
@@ -93,6 +100,9 @@ RUN cd /tmp && \
     mv package /usr/local/lib/node_modules/npm/node_modules/@isaacs/brace-expansion && \
     tar -xzf minimatch-10.2.5.tgz && \
     mv package /usr/local/lib/node_modules/npm/node_modules/minimatch && \
+    tar -xzf picomatch-4.0.4.tgz && \
+    mkdir -p /usr/local/lib/node_modules/npm/node_modules/tinyglobby/node_modules && \
+    mv package /usr/local/lib/node_modules/npm/node_modules/tinyglobby/node_modules/picomatch && \
     rm -rf /tmp/*
 
 # Install runtime dependencies and upgrade to fix CVEs
