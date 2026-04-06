@@ -5,7 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased](https://github.com/neverinfamous/d1-manager/compare/v2.6.6...HEAD)
+## [Unreleased](https://github.com/neverinfamous/d1-manager/compare/v2.6.7...HEAD)
+
+## [2.6.7](https://github.com/neverinfamous/d1-manager/releases/tag/v2.6.7) - 2026-04-06
+
+### Changed
+
+- Upgraded `vite` to `v8.0.5`.
+
 
 ## [2.6.6](https://github.com/neverinfamous/d1-manager/releases/tag/v2.6.6) - 2026-04-06
 
@@ -1015,7 +1022,9 @@ This major release transforms D1 Database Manager into an enterprise-ready solut
   - Improved query parser with consistent type definitions
   - Fixed job tracking nullish coalescing operators
   - Updated time travel utilities with proper type annotations
-[Unreleased]: https://github.com/neverinfamous/d1-manager/compare/v2.6.5...HEAD
+[Unreleased]: https://github.com/neverinfamous/d1-manager/compare/v2.6.7...HEAD
+[2.6.7]: https://github.com/neverinfamous/d1-manager/compare/v2.6.6...v2.6.7
+[2.6.6]: https://github.com/neverinfamous/d1-manager/compare/v2.6.5...v2.6.6
 [2.6.5]: https://github.com/neverinfamous/d1-manager/compare/v2.6.4...v2.6.5
 [2.6.4]: https://github.com/neverinfamous/d1-manager/compare/v2.6.3...v2.6.4
 [2.6.3]: https://github.com/neverinfamous/d1-manager/compare/v2.6.2...v2.6.3
