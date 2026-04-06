@@ -26,12 +26,12 @@ export interface SchemaContext {
  */
 export function useSchemaContext(databaseId: string): SchemaContext {
   const [tables, setTables] = useState<string[]>([]);
-  const [columns, setColumns] = useState<Map<string, string[]>>(new Map());
+  const [columns, setColumns] = useState(new Map<string, string[]>());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Track in-flight column fetch requests to avoid duplicates
-  const pendingFetches = useRef<Map<string, Promise<string[]>>>(new Map());
+  const pendingFetches = useRef(new Map<string, Promise<string[]>>());
 
   // Fetch table list on mount or when databaseId changes
   useEffect(() => {

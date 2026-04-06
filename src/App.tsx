@@ -187,17 +187,17 @@ const getStoredViewMode = (): DatabaseViewMode => {
 export default function App(): React.JSX.Element {
   const [databases, setDatabases] = useState<D1Database[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string>("");
+  const [error, setError] = useState("");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [newDbName, setNewDbName] = useState("");
-  const [createDbError, setCreateDbError] = useState<string>("");
+  const [createDbError, setCreateDbError] = useState("");
   const [creating, setCreating] = useState(false);
   const [currentView, setCurrentView] = useState<View>({ type: "list" });
   const [showComparison, setShowComparison] = useState(false);
   const [databaseSearchQuery, setDatabaseSearchQuery] = useState("");
   const [databaseViewMode, setDatabaseViewMode] =
     useState<DatabaseViewMode>(getStoredViewMode);
-  const [dbGridSortField, setDbGridSortField] = useState<string>("name");
+  const [dbGridSortField, setDbGridSortField] = useState("name");
   const [dbGridSortDirection, setDbGridSortDirection] = useState<
     "asc" | "desc"
   >("asc");

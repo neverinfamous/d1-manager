@@ -142,7 +142,7 @@ export function DrizzleConsole({
     string | null
   >(null);
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
-  const [pastedSchema, setPastedSchema] = useState<string>("");
+  const [pastedSchema, setPastedSchema] = useState("");
   const [comparisonResult, setComparisonResult] =
     useState<SchemaComparisonResult | null>(null);
 

@@ -97,18 +97,14 @@ export function BackupRestoreHub({
   const [r2Loading, setR2Loading] = useState(false);
   const [r2Error, setR2Error] = useState<string | null>(null);
   const [r2Configured, setR2Configured] = useState<boolean | null>(null);
-  const [selectedBackups, setSelectedBackups] = useState<Set<string>>(
-    new Set(),
-  );
+  const [selectedBackups, setSelectedBackups] = useState(new Set<string>());
   const [selectedBackupForRestore, setSelectedBackupForRestore] =
     useState<R2BackupListItem | null>(null);
   const [showR2RestoreConfirm, setShowR2RestoreConfirm] = useState(false);
   const [isR2Restoring, setIsR2Restoring] = useState(false);
   const [deleteTargets, setDeleteTargets] = useState<R2BackupListItem[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [downloadingTimestamps, setDownloadingTimestamps] = useState<
-    Set<number>
-  >(new Set());
+  const [downloadingTimestamps, setDownloadingTimestamps] = useState(new Set<number>());
 
   // Info panel state
   const [showInfoPanel, setShowInfoPanel] = useState(false);

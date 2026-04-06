@@ -339,7 +339,7 @@ export function ScheduledBackupManager({
 }: ScheduledBackupManagerProps): React.ReactElement {
   const [schedules, setSchedules] = useState<ScheduledBackup[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string>("");
+  const [error, setError] = useState("");
   const [r2Configured, setR2Configured] = useState<boolean | null>(null);
 
   // Dialog states

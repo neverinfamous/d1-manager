@@ -150,7 +150,7 @@ export function DatabaseView({
   );
 
   // Table grid sort state
-  const [tableGridSortField, setTableGridSortField] = useState<string>("name");
+  const [tableGridSortField, setTableGridSortField] = useState("name");
   const [tableGridSortDirection, setTableGridSortDirection] = useState<
     "asc" | "desc"
   >("asc");
@@ -279,8 +279,7 @@ export function DatabaseView({
 
   // Cascade simulator state
   const [showCascadeSimulator, setShowCascadeSimulator] = useState(false);
-  const [cascadeSimulatorTable, setCascadeSimulatorTable] =
-    useState<string>("");
+  const [cascadeSimulatorTable, setCascadeSimulatorTable] = useState("");
 
   // Table colors for visual organization
   const [tableColors, setTableColors] = useState<Record<string, DatabaseColor>>(
@@ -288,7 +287,7 @@ export function DatabaseView({
   );
 
   // FTS5 table names for badge display
-  const [fts5TableNames, setFts5TableNames] = useState<Set<string>>(new Set());
+  const [fts5TableNames, setFts5TableNames] = useState(new Set<string>());
 
   // R2 backup state
   const [r2BackupStatus, setR2BackupStatus] = useState<R2BackupStatus | null>(

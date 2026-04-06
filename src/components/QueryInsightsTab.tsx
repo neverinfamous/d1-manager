@@ -99,9 +99,7 @@ export function QueryInsightsTab({
   queryInsights,
 }: QueryInsightsTabProps): React.JSX.Element {
   const [sortField, setSortField] = useState<SortField>("totalTime");
-  const [expandedQueries, setExpandedQueries] = useState<Set<string>>(
-    new Set(),
-  );
+  const [expandedQueries, setExpandedQueries] = useState(new Set<string>());
 
   const sortedInsights = useMemo(() => {
     const sorted = [...queryInsights];

@@ -61,7 +61,7 @@ export function AISearchPanel({
   const [compatibility, setCompatibility] =
     useState<AISearchCompatibility | null>(null);
   const [instances, setInstances] = useState<AISearchInstance[]>([]);
-  const [selectedInstance, setSelectedInstance] = useState<string>("");
+  const [selectedInstance, setSelectedInstance] = useState("");
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [searching, setSearching] = useState(false);

@@ -75,7 +75,7 @@ export function ImportDatabaseDialog({
 
   // File state
   const [file, setFile] = useState<File | null>(null);
-  const [fileContent, setFileContent] = useState<string>("");
+  const [fileContent, setFileContent] = useState("");
   const [detectedFormat, setDetectedFormat] = useState<ImportFormat>("sql");
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);

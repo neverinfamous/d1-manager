@@ -19,4 +19,4 @@ pnpm-debug.log*
 *.swo
 *~
 .turbo/
-
+tmp/

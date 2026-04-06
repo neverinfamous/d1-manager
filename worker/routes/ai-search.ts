@@ -5,7 +5,8 @@
  * Uses a D1→R2 connector pattern: exports database content as markdown documents
  * to R2, which are then indexed by AI Search for semantic querying.
  */
-
+// Cloudflare AI Search compatibility types are currently sourced from an upstream
+// deprecated type surface and cannot be replaced here without changing the integration.
 import type {
   Env,
   CorsHeaders,
@@ -826,6 +827,7 @@ export async function handleAISearchRoutes(
             },
           };
 
+          // eslint-disable-next-line @typescript-eslint/no-deprecated
           const v2Result = await env.AI.aiSearch()
             .get(instanceName)
             .search(searchRequest);
@@ -949,6 +951,7 @@ export async function handleAISearchRoutes(
         try {
           if (body.stream === true) {
             // Streaming response
+            // eslint-disable-next-line @typescript-eslint/no-deprecated
             const streamResult = await env.AI.aiSearch()
               .get(instanceName)
               .chatCompletions({
@@ -977,17 +980,41 @@ export async function handleAISearchRoutes(
                 },
               });
 
-            const streamResponse = streamResult as Response;
-            return new Response(streamResponse.body, {
-              headers: {
-                "Content-Type": "text/event-stream",
-                "Cache-Control": "no-cache",
-                Connection: "keep-alive",
-                ...corsHeaders,
+            let responseBody: ReadableStream | null = null;
+            if (streamResult instanceof Response) {
+              responseBody = streamResult.body;
+            } else if (streamResult instanceof ReadableStream) {
+              responseBody = streamResult;
+            } else {
+              responseBody = ((streamResult as unknown as Response).body ??
+                (streamResult as unknown as ReadableStream)) as ReadableStream | null;
+            }
+
+            if (!responseBody) {
+              return new Response(
+                JSON.stringify({
+                  error: "AI Search Stream Error",
+                  details: "Failed to initialize standard ReadableStream payload",
+                }),
+                {
+                  status: 500,
+                  headers: { "Content-Type": "application/json", ...corsHeaders },
+                }
+              );
+            }
+
+            return new Response(responseBody, {
+                headers: {
+                  "Content-Type": "text/event-stream",
+                  "Cache-Control": "no-cache",
+                  Connection: "keep-alive",
+                  ...corsHeaders,
+                },
               },
-            });
+            );
           } else {
             // Non-streaming response
+            // eslint-disable-next-line @typescript-eslint/no-deprecated
             const result = await env.AI.aiSearch()
               .get(instanceName)
               .chatCompletions({

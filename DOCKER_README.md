@@ -3,13 +3,15 @@
 [![GitHub](https://img.shields.io/badge/GitHub-neverinfamous/d1--manager-blue?logo=github)](https://github.com/neverinfamous/d1-manager)
 [![Docker Pulls](https://img.shields.io/docker/pulls/writenotenow/d1-manager)](https://hub.docker.com/r/writenotenow/d1-manager)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-![Version](https://img.shields.io/badge/version-v2.6.4-green)
+[![Version](https://img.shields.io/github/v/release/neverinfamous/d1-manager?label=version&color=green)](https://github.com/neverinfamous/d1-manager/releases)
 ![Status](https://img.shields.io/badge/status-Production%2FStable-brightgreen)
 [![Security](https://img.shields.io/badge/Security-Enhanced-green.svg)](https://github.com/neverinfamous/d1-manager/blob/main/SECURITY.md)
 [![CodeQL](https://img.shields.io/badge/CodeQL-Passing-brightgreen.svg)](https://github.com/neverinfamous/d1-manager/security/code-scanning)
 [![Type Safety](https://img.shields.io/badge/TypeScript-Strict-blue.svg)](https://github.com/neverinfamous/d1-manager)
 
-This Docker image provides a modern, full-featured web application for managing Cloudflare D1 databases with enterprise-grade authentication via Cloudflare Access (Zero Trust). Run D1 Database Manager in Docker for development, testing, or self-hosted deployments.
+Modern web GUI for Cloudflare D1 databases featuring Zero Trust authentication.
+
+Run D1 Database Manager in Docker for development, testing, or self-hosted deployments. Get full visual control over schemas, data migrations, SQL execution, and portable database export/import via Cloudflare Access.
 
 **[Live Demo Site](https://d1.adamic.tech/)** • **[GitHub](https://github.com/neverinfamous/d1-manager)** • **[Wiki](https://github.com/neverinfamous/d1-manager/wiki)** • **[Changelog](https://github.com/neverinfamous/d1-manager/blob/main/CHANGELOG.md)** • **[Release Article](https://adamic.tech/articles/d1-manager)**
 
@@ -306,9 +308,7 @@ docker compose pull && docker compose up -d
 | Tag          | Description                                   |
 | ------------ | --------------------------------------------- |
 | `latest`     | Latest stable release                         |
-| `v2.6.4`     | Specific version (recommended for production) |
-| `v2.6.3`     | Previous stable release                       |
-| `v2.6.2`     | Earlier release                               |
+| `vX.Y.Z`     | Specific version (recommended for production) |
 | `sha-XXXXXX` | Commit SHA for reproducible builds            |
 
 ---

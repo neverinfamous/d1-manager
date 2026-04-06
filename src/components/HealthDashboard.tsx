@@ -32,7 +32,7 @@ import {
 export function HealthDashboard(): React.ReactElement {
   const [health, setHealth] = useState<HealthSummary | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string>("");
+  const [error, setError] = useState("");
 
   const loadHealth = useCallback(async (skipCache = false): Promise<void> => {
     try {

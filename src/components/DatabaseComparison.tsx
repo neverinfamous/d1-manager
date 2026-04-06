@@ -51,13 +51,11 @@ export function DatabaseComparison({
   preSelectedDatabases,
   onClose: _onClose,
 }: DatabaseComparisonProps): React.JSX.Element {
-  const [leftDb, setLeftDb] = useState<string>(preSelectedDatabases?.[0] ?? "");
-  const [rightDb, setRightDb] = useState<string>(
-    preSelectedDatabases?.[1] ?? "",
-  );
+  const [leftDb, setLeftDb] = useState(preSelectedDatabases?.[0] ?? "");
+  const [rightDb, setRightDb] = useState(preSelectedDatabases?.[1] ?? "");
   const [comparing, setComparing] = useState(false);
   const [diffs, setDiffs] = useState<SchemaDiff[]>([]);
-  const [expandedTables, setExpandedTables] = useState<Set<string>>(new Set());
+  const [expandedTables, setExpandedTables] = useState(new Set<string>());
   const [error, setError] = useState<string | null>(null);
   const [autoRan, setAutoRan] = useState(false);
   const [showMigrationDialog, setShowMigrationDialog] = useState(false);
