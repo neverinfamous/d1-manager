@@ -9,7 +9,9 @@
 [![CodeQL](https://img.shields.io/badge/CodeQL-Passing-brightgreen.svg)](https://github.com/neverinfamous/d1-manager/security/code-scanning)
 [![Type Safety](https://img.shields.io/badge/TypeScript-Strict-blue.svg)](https://github.com/neverinfamous/d1-manager)
 
-This Docker image provides a modern, full-featured web application for managing Cloudflare D1 databases with enterprise-grade authentication via Cloudflare Access (Zero Trust). Run D1 Database Manager in Docker for development, testing, or self-hosted deployments.
+Modern web GUI for Cloudflare D1 databases featuring Zero Trust authentication.
+
+Run D1 Database Manager in Docker for development, testing, or self-hosted deployments. Get full visual control over schemas, data migrations, SQL execution, and portable database export/import via Cloudflare Access.
 
 **[Live Demo Site](https://d1.adamic.tech/)** • **[GitHub](https://github.com/neverinfamous/d1-manager)** • **[Wiki](https://github.com/neverinfamous/d1-manager/wiki)** • **[Changelog](https://github.com/neverinfamous/d1-manager/blob/main/CHANGELOG.md)** • **[Release Article](https://adamic.tech/articles/d1-manager)**
 
