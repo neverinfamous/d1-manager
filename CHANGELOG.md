@@ -1,12 +1,13 @@
 # Changelog
 
-All notable changes to the D1 Database Manager are documented here.
+All notable changes to this project will be documented in this file.
 
----
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-## [2.6.4] - March 17, 2026
+## [2.6.4] - 2026-03-17
 
 ### Changed
 
@@ -25,9 +26,7 @@ All notable changes to the D1 Database Manager are documented here.
 
 - Pin `undici` to `7.24.4` to fix high severity vulnerabilities (GHSA-f269-vfmq-vjvj, GHSA-2mjp-6q6p-2qxm, GHSA-4992-7rv2-5pvq, etc.) in `npm audit`
 
----
-
-## [2.6.3] - March 10, 2026
+## [2.6.3] - 2026-03-10
 
 ### Changed
 
@@ -40,28 +39,24 @@ All notable changes to the D1 Database Manager are documented here.
   - `tar` override: 7.5.10 → 7.5.11 (patch) — npm + Docker layers
   - GitHub Actions: `docker/setup-buildx-action` (v3 → v4), `docker/login-action` (v3 → v4), `docker/metadata-action` (v5 → v6), `docker/build-push-action` (v6 → v7)
 
----
+## [2.6.2] - 2026-03-07
 
-## [2.6.2] - March 7, 2026
+### Changed
 
-### Documentation
+**Documentation**
 
 - **Changelog Migrated:** Moved `Changelog.md` from the wiki repository into the main project root as `CHANGELOG.md`.
 - **README Link Fix:** Fixed broken changelog link in README.md (`shttps://` → `https://`).
 - **Updated Changelog Links:** Updated changelog links in README.md and DOCKER_README.md to point to the new root location.
 
----
-
-## [2.6.1] - March 7, 2026
+## [2.6.1] - 2026-03-07
 
 ### Security
 
 - **GHSA-qffp-2rhf-9h96** (tar path traversal): Updated tar override 7.5.8 → 7.5.10
   - Updated Dockerfile npm CLI tar patching from 7.5.8 → 7.5.10 in both builder and runtime stages
 
----
-
-## [2.6.0] - March 7, 2026
+## [2.6.0] - 2026-03-07
 
 ### Changed
 
@@ -82,24 +77,7 @@ All notable changes to the D1 Database Manager are documented here.
   - Replaced `Parameters<ReturnType<typeof env.AI.aiSearch.get>["search"]>[0]` with direct `AiSearchSearchRequest` type
 - **Default Branch Migration**: Renamed default branch from `master` to `main`
   - Updated all GitHub Actions workflow triggers and conditional checks across 4 workflow files
-
-### Security
-
-- **GHSA-3ppc-4f35-3m26** (minimatch ReDoS): Resolved all 11 npm audit vulnerabilities
-  - ESLint 10 upgrade eliminated eslint-chain minimatch vulnerability (was 10 of 11)
-  - Added `@typescript-eslint/typescript-estree` minimatch override ^10.2.1 for remaining transitive dependency
-  - Removed `brace-expansion` ^2.0.2 override (incompatible with minimatch 10.x; original vulnerability no longer relevant)
-- **GHSA-7r86-cg39-jmmj / GHSA-23c5-xmqv-rm74 / CVE-2026-27903 / CVE-2026-27904** (minimatch ReDoS): Updated minimatch override to ^10.2.4 and promoted to top-level override
-  - Addresses combinatorial backtracking via multiple non-adjacent GLOBSTAR segments
-  - Addresses catastrophically backtracking regular expressions from nested `*()` extglobs
-  - Previous scoped override under `@typescript-eslint/typescript-estree` only covered one transitive path; top-level override covers all consumers (eslint, eslint config-array)
-  - Updated Dockerfile npm CLI minimatch patching from 10.2.2 → 10.2.4 in both builder and runtime stages
-- **CVE-2026-26960** (tar path traversal): Updated tar override 7.5.7 → 7.5.10 to address additional path traversal vulnerabilities
-  - Updated Dockerfile npm CLI tar patching from 7.5.7 → 7.5.8 in both builder and runtime stages
-- **GHSA-qffp-2rhf-9h96** (tar path traversal): Updated tar override 7.5.8 → 7.5.10
-- **P111 Exact Pinning**: Changed glob (`11.1.0`), tar (`7.5.8`), and minimatch (`10.2.4`) overrides from caret ranges to exact version pins to prevent lockfile drift from Dockerfile patch versions
-
-### CI/CD
+**CI/CD**
 
 - **Removed Dependabot Auto-Merge Workflow**: Deleted `dependabot-auto-merge.yml` to prevent automatic merging of dependency PRs
   - Dependabot will still open PRs for visibility into available updates
@@ -110,8 +88,7 @@ All notable changes to the D1 Database Manager are documented here.
   - Updated `{{is_default_branch}}` to `github.event_name != 'pull_request'`
 - **VERSION File Removal**: Deleted VERSION file; Docker workflow now reads version directly from `package.json` via `jq` (single source of truth)
   - Fails hard if version extraction fails (no silent `1.0.0` fallback)
-
-### Dependencies
+**Dependencies**
 
 - **@radix-ui/react-label**: Updated 2.1.7 → 2.1.8
 - **@radix-ui/react-progress**: Updated 1.1.7 → 1.1.8
@@ -138,9 +115,23 @@ All notable changes to the D1 Database Manager are documented here.
 - **postcss**: Updated 8.5.6 → 8.5.8
 - **wrangler**: Updated 4.64.0 → 4.71.0
 
----
+### Security
 
-## [2.5.0] - February 10, 2026
+- **GHSA-3ppc-4f35-3m26** (minimatch ReDoS): Resolved all 11 npm audit vulnerabilities
+  - ESLint 10 upgrade eliminated eslint-chain minimatch vulnerability (was 10 of 11)
+  - Added `@typescript-eslint/typescript-estree` minimatch override ^10.2.1 for remaining transitive dependency
+  - Removed `brace-expansion` ^2.0.2 override (incompatible with minimatch 10.x; original vulnerability no longer relevant)
+- **GHSA-7r86-cg39-jmmj / GHSA-23c5-xmqv-rm74 / CVE-2026-27903 / CVE-2026-27904** (minimatch ReDoS): Updated minimatch override to ^10.2.4 and promoted to top-level override
+  - Addresses combinatorial backtracking via multiple non-adjacent GLOBSTAR segments
+  - Addresses catastrophically backtracking regular expressions from nested `*()` extglobs
+  - Previous scoped override under `@typescript-eslint/typescript-estree` only covered one transitive path; top-level override covers all consumers (eslint, eslint config-array)
+  - Updated Dockerfile npm CLI minimatch patching from 10.2.2 → 10.2.4 in both builder and runtime stages
+- **CVE-2026-26960** (tar path traversal): Updated tar override 7.5.7 → 7.5.10 to address additional path traversal vulnerabilities
+  - Updated Dockerfile npm CLI tar patching from 7.5.7 → 7.5.8 in both builder and runtime stages
+- **GHSA-qffp-2rhf-9h96** (tar path traversal): Updated tar override 7.5.8 → 7.5.10
+- **P111 Exact Pinning**: Changed glob (`11.1.0`), tar (`7.5.8`), and minimatch (`10.2.4`) overrides from caret ranges to exact version pins to prevent lockfile drift from Dockerfile patch versions
+
+## [2.5.0] - 2026-02-10
 
 ### Changed
 
@@ -149,16 +140,7 @@ All notable changes to the D1 Database Manager are documented here.
   - GitHub Actions workflows updated to use Node 24.x as primary version
   - `package.json` now includes `engines` field requiring Node.js >=24.0.0
   - README prerequisites updated to specify Node.js 24+ (LTS)
-
-### Fixed
-
-- **Query Builder Results Display**: Fixed bug where clicking Execute in the Query Builder tab produced no visual feedback despite the query executing successfully on the backend
-  - Results panel was gated on `results.length > 0`, hiding the panel entirely for zero-row results and providing no execution feedback
-  - Now displays Results panel after every successful execution with row count, execution time, and served-by region/replica metadata
-  - Handles zero-result queries with "Query returned no results" or "X row(s) affected" messaging
-  - Added CSV export button for result data (matching SQL Editor feature parity)
-
-### Dependencies
+**Dependencies**
 
 - **@babel/core**: Updated 7.28.6 → 7.29.0
 - **@cloudflare/workers-types**: Updated 4.20260114.0 → 4.20260210.0
@@ -178,6 +160,27 @@ All notable changes to the D1 Database Manager are documented here.
 - **drizzle-kit**: Updated 0.31.8 → 0.31.9
 - **tar**: Updated override 7.5.2 → 7.5.7 (CVE-2026-23745, CVE-2026-23950, CVE-2026-24842)
 - **@isaacs/brace-expansion**: Added override ^5.0.1 (GHSA-7h2j-956f-4vf2)
+**CI/CD**
+
+- **Fixed Docker Security Gate**: Restructured `docker-publish.yml` to properly gate Docker Hub publishing on security scan results
+  - Previous: Platform images were pushed during `build-platform` before security scan ran
+  - Now: Images are built in `build-platform` (no push), scanned in `security-scan`, then pushed in new `push-platform` job only after scan passes
+  - Ensures no Docker images are published if security vulnerabilities are detected
+**Code Quality**
+
+- **ESLint Remediation**: Eliminated all `eslint-disable` comments from the codebase
+  - Applied `useCallback` memoization pattern to 15 React components for proper `react-hooks/exhaustive-deps` compliance
+  - Affected components: App, BackupRestoreHub, CloneDatabaseDialog, DatabaseComparison, DatabaseView, DrizzleConsole, ExportDatabaseDialog, FTS5FromTableConverter, FTS5Manager, IndexAnalyzer, JobHistory, JobHistoryDialog, QueryBuilder, R2RestoreDialog, TableView
+  - The `react-refresh/only-export-components` rule is handled via `eslint.config.js` configuration (`allowConstantExport: true`)
+  - Zero eslint-disable comments remaining in source code
+
+### Fixed
+
+- **Query Builder Results Display**: Fixed bug where clicking Execute in the Query Builder tab produced no visual feedback despite the query executing successfully on the backend
+  - Results panel was gated on `results.length > 0`, hiding the panel entirely for zero-row results and providing no execution feedback
+  - Now displays Results panel after every successful execution with row count, execution time, and served-by region/replica metadata
+  - Handles zero-result queries with "Query returned no results" or "X row(s) affected" messaging
+  - Added CSV export button for result data (matching SQL Editor feature parity)
 
 ### Security
 
@@ -187,24 +190,7 @@ All notable changes to the D1 Database Manager are documented here.
 - **CVE-2026-23950** (tar Unicode handling): Updated tar to 7.5.7 in Dockerfile npm patching and package.json override
 - **CodeQL js/stack-trace-exposure**: Replaced error sanitization with `classifySqlError` allowlist function that returns only predefined static strings - no data from original error flows to response, fully breaking taint tracking
 
-### CI/CD
-
-- **Fixed Docker Security Gate**: Restructured `docker-publish.yml` to properly gate Docker Hub publishing on security scan results
-  - Previous: Platform images were pushed during `build-platform` before security scan ran
-  - Now: Images are built in `build-platform` (no push), scanned in `security-scan`, then pushed in new `push-platform` job only after scan passes
-  - Ensures no Docker images are published if security vulnerabilities are detected
-
-### Code Quality
-
-- **ESLint Remediation**: Eliminated all `eslint-disable` comments from the codebase
-  - Applied `useCallback` memoization pattern to 15 React components for proper `react-hooks/exhaustive-deps` compliance
-  - Affected components: App, BackupRestoreHub, CloneDatabaseDialog, DatabaseComparison, DatabaseView, DrizzleConsole, ExportDatabaseDialog, FTS5FromTableConverter, FTS5Manager, IndexAnalyzer, JobHistory, JobHistoryDialog, QueryBuilder, R2RestoreDialog, TableView
-  - The `react-refresh/only-export-components` rule is handled via `eslint.config.js` configuration (`allowConstantExport: true`)
-  - Zero eslint-disable comments remaining in source code
-
----
-
-## [2.4.0] - January 13, 2026
+## [2.4.0] - 2026-01-13
 
 ### Added
 
@@ -218,15 +204,9 @@ All notable changes to the D1 Database Manager are documented here.
   - Handles SQLite-specific constraints (table recreation for column modifications)
   - New backend endpoint: `GET /api/tables/:dbId/schema-full` for comprehensive schema introspection
 
-### Fixed
+### Changed
 
-- **Local Development Server**: Fixed "Cannot read properties of undefined (reading 'fetch')" error when running `npx wrangler dev --config wrangler.dev.toml` - Worker now properly handles missing ASSETS binding in local dev (ASSETS is only available in production, Vite serves frontend locally)
-
-### Security
-
-- **Documented** CVE-2026-22184 (zlib buffer overflow in untgz) - NOT EXPLOITABLE (D1 Manager does not use untgz utility); awaiting zlib 1.3.1.3 from Alpine
-
-### Dependencies
+**Dependencies**
 
 - **Types Group**: Updated `@types/node` 25.0.7 → 25.0.8
 - **wrangler**: Updated 4.58.0 → 4.59.1
@@ -235,9 +215,15 @@ All notable changes to the D1 Database Manager are documented here.
 - **diff**: Updated 8.0.2 → 8.0.3
 - **esbuild**: Held at 0.25.12 (pinned in overrides for Wrangler compatibility)
 
----
+### Fixed
 
-## [2.3.0] - January 7, 2026
+- **Local Development Server**: Fixed "Cannot read properties of undefined (reading 'fetch')" error when running `npx wrangler dev --config wrangler.dev.toml` - Worker now properly handles missing ASSETS binding in local dev (ASSETS is only available in production, Vite serves frontend locally)
+
+### Security
+
+- **Documented** CVE-2026-22184 (zlib buffer overflow in untgz) - NOT EXPLOITABLE (D1 Manager does not use untgz utility); awaiting zlib 1.3.1.3 from Alpine
+
+## [2.3.0] - 2026-01-07
 
 ### Added
 
@@ -249,14 +235,14 @@ All notable changes to the D1 Database Manager are documented here.
   - Visual performance badges with color-coded severity indicators
   - Tabbed interface: "Overview" for existing charts, "Query Insights" for slow queries
 
-### Dependencies
+### Changed
+
+**Dependencies**
 
 - **@cloudflare/workers-types**: Updated 4.20260103.0 → 4.20260107.1
 - **@radix-ui/react-tabs**: Added for Query Insights tabbed interface
 
----
-
-## [2.2.0] - January 7, 2026
+## [2.2.0] - 2026-01-07
 
 ### Added
 
@@ -277,15 +263,24 @@ All notable changes to the D1 Database Manager are documented here.
   - Progress indicator shows current database name, completed count, and progress bar
   - Rate limiting with 300ms delay between databases prevents API throttling
 
-### Improved
+### Changed
+
+**Improved**
 
 - **Export Rate Limiting**: Increased inter-table delay from 100ms to 300ms with exponential backoff retry (2s→4s→8s) for 429 errors
 - **Import Cache Refresh**: Database list now automatically refreshes after successful import (no page reload needed)
-
-### Developer Experience
+**Developer Experience**
 
 - **Auto-detect local vs production**: Environment configuration simplified with `.env.development` auto-loaded by Vite during `npm run dev`. No more manually commenting/uncommenting `.env` to switch between dev and prod.
 - **Simplified** Wrangler config - `wrangler.toml` now committed to repo; removed `wrangler.toml.example` and `wrangler.jsonc`
+**CI/CD**
+
+- **Fixed** Docker gating to properly block on CodeQL security alerts - Added `fail-on: error` to CodeQL analyze step
+- **Improved** Docker Scout scanning to use official `docker/scout-action@v1` with `only-fixed: true` filter - Only blocks on fixable critical/high vulnerabilities, uploads SARIF to GitHub Security tab
+**Dependencies**
+
+- **wrangler**: Updated 4.54.0 → 4.57.0
+- **vite**: Updated 7.3.0 → 7.3.1
 
 ### Security
 
@@ -294,24 +289,7 @@ All notable changes to the D1 Database Manager are documented here.
 - **Upgraded** curl 8.17.0-r1 → 8.18.0-r0 - Fixes CVE-2025-14819, CVE-2025-14017, CVE-2025-14524 (various curl vulnerabilities)
 - **Documented** CVE-2025-60876 (busybox wget) - Not exploitable (D1 Manager uses curl); awaiting Alpine patch
 
-### CI/CD
-
-- **Fixed** Docker gating to properly block on CodeQL security alerts - Added `fail-on: error` to CodeQL analyze step
-- **Improved** Docker Scout scanning to use official `docker/scout-action@v1` with `only-fixed: true` filter - Only blocks on fixable critical/high vulnerabilities, uploads SARIF to GitHub Security tab
-
-### Dependencies
-
-- **wrangler**: Updated 4.54.0 → 4.57.0
-- **vite**: Updated 7.3.0 → 7.3.1
-
----
-
-## [2.1.0] - January 7, 2026
-
-### Documentation
-
-- **Added** [[Upgrade Guide]] to wiki - Comprehensive documentation for the automated in-app upgrade system covering all 5 schema migrations
-- **Updated** [[Webhooks]] wiki page - Complete rewrite for 13-event webhook engine with streamlined event categories
+## [2.1.0] - 2026-01-07
 
 ### Added
 
@@ -345,22 +323,13 @@ All notable changes to the D1 Database Manager are documented here.
   - 2-minute cache TTL matching Metrics Dashboard
   - Navigation tab between Metrics and Webhooks
 
-### Security
+### Changed
 
-- **jspdf Local File Inclusion/Path Traversal**: Updated jspdf from 3.0.4 to 4.0.0 to address path traversal vulnerability
-  - Affected methods: `loadFile`, `addImage`, `html`, `addFont` in node.js builds
-  - User-controlled paths could retrieve arbitrary local file contents and embed them in generated PDFs
-  - jsPDF 4.0.0 restricts file system access by default
-  - D1 Manager uses jspdf in browser context (unaffected), but update applied as best practice
-  - See [GitHub Advisory GHSA-jspdf-path-traversal](https://github.com/parallax/jsPDF/security/advisories) for details
-- **CVE-2025-64756 (glob CLI Command Injection)**: Proactively addressed potential command injection vulnerability in glob dependency
-  - Added `"glob": "^11.1.0"` to package.json overrides to force patched version across all dependencies
-  - Vulnerability affects glob CLI's `-c/--cmd` option (versions 10.2.0-10.4.x and 11.0.0-11.0.3)
-  - D1 Manager does not directly use glob CLI, but override protects against future transitive dependencies
-  - Patched version 11.1.0 prevents arbitrary command execution via malicious filenames
-  - See [GitHub Advisory CVE-2025-64756](https://github.com/advisories/GHSA-xj72-wvfv-8985) for details
+**Documentation**
 
-### CI/CD
+- **Added** [[Upgrade Guide]] to wiki - Comprehensive documentation for the automated in-app upgrade system covering all 5 schema migrations
+- **Updated** [[Webhooks]] wiki page - Complete rewrite for 13-event webhook engine with streamlined event categories
+**CI/CD**
 
 - **Explicit Docker Gating**: Docker image publishing is now gated on lint and CodeQL verification
   - Added `lint` prerequisite job to `docker-publish.yml` (ESLint, frontend build, worker dry-run)
@@ -376,15 +345,11 @@ All notable changes to the D1 Database Manager are documented here.
   - `actions/checkout`: v5 → v6
   - `actions/upload-artifact`: v4 → v6
   - `actions/download-artifact`: v4 → v7
-
-### Dependencies
+**Dependencies**
 
 - **ESLint Group**: Updated `eslint` 9.36.0 → 9.39.2, `eslint-plugin-react-refresh` 0.4.14 → 0.4.26, `typescript-eslint` 8.50.1 → 8.52.0, `globals` 16.4.0 → 17.0.0
 - **Types Group**: Updated `@types/node` 24.9.1 → 24.9.3, `@types/react` 19.2.2 → 19.2.3, `@types/react-dom` 19.2.2 → 19.2.3
 - **sql-formatter**: Updated 15.6.10 → 15.6.12
-
-### Changed
-
 - **TailwindCSS v4 Upgrade**: Migrated from TailwindCSS 3.4.19 to 4.1.17
   - Replaced `tailwindcss` PostCSS plugin with `@tailwindcss/postcss`
   - Added `@tailwindcss/vite` for Vite integration
@@ -414,9 +379,22 @@ All notable changes to the D1 Database Manager are documented here.
 - **TypeScript Fix**: Fixed `getOrdinalSuffix` function returning `string | undefined` instead of `string`
   - Array fallback now uses literal `'th'` instead of `s[0]` to satisfy `noUncheckedIndexedAccess`
 
----
+### Security
 
-## [2.0.0] - December 5, 2025
+- **jspdf Local File Inclusion/Path Traversal**: Updated jspdf from 3.0.4 to 4.0.0 to address path traversal vulnerability
+  - Affected methods: `loadFile`, `addImage`, `html`, `addFont` in node.js builds
+  - User-controlled paths could retrieve arbitrary local file contents and embed them in generated PDFs
+  - jsPDF 4.0.0 restricts file system access by default
+  - D1 Manager uses jspdf in browser context (unaffected), but update applied as best practice
+  - See [GitHub Advisory GHSA-jspdf-path-traversal](https://github.com/parallax/jsPDF/security/advisories) for details
+- **CVE-2025-64756 (glob CLI Command Injection)**: Proactively addressed potential command injection vulnerability in glob dependency
+  - Added `"glob": "^11.1.0"` to package.json overrides to force patched version across all dependencies
+  - Vulnerability affects glob CLI's `-c/--cmd` option (versions 10.2.0-10.4.x and 11.0.0-11.0.3)
+  - D1 Manager does not directly use glob CLI, but override protects against future transitive dependencies
+  - Patched version 11.1.0 prevents arbitrary command execution via malicious filenames
+  - See [GitHub Advisory CVE-2025-64756](https://github.com/advisories/GHSA-xj72-wvfv-8985) for details
+
+## [2.0.0] - 2025-12-05
 
 This major release transforms D1 Database Manager into an enterprise-ready solution with Drizzle ORM integration, scheduled R2 backups, a comprehensive metrics dashboard, and dramatic performance improvements. No breaking changes - all new features are additive.
 
@@ -493,77 +471,6 @@ This major release transforms D1 Database Manager into an enterprise-ready solut
   - Output log panel showing command execution history
   - Automatic cache invalidation after push (table list refreshes without page reload)
   - Uses D1 HTTP API with existing credentials (no additional configuration)
-
-### Changed
-
-- **Query Console UI**: Moved Clear button to the left side of the card header for better visual hierarchy
-
-### Removed
-
-- **Table View Row Filters**: Removed the "Filter Rows" feature from Table View
-  - The existing client-side row search (in the toolbar) remains available for quick filtering
-  - Simplifies the UI and reduces complexity
-
-### Fixed
-
-- **SQL Validator False Positives**: Fixed keyword misspelling detection showing incorrect suggestions
-  - Removed `INTO` from its own misspellings list (was showing "Did you mean 'INTO'? Found 'INTO'")
-  - Removed `VALUE` from `VALUES` misspellings (common column name was being flagged)
-- **Database Name Validation**: Create Database dialog now validates names before submission
-  - Enforces D1 naming rules: 3-63 characters, lowercase letters/numbers/hyphens only
-  - Shows character count with warning when approaching limit
-  - Input limited to 63 characters max
-  - Clear error messages for invalid names
-- **Table Rename Validation**: Improved validation when renaming tables
-  - Checks if target table name already exists before attempting rename
-  - Validates table name format (letters, numbers, underscores only)
-  - Clear error messages with suggestions for invalid names
-
-### Performance
-
-- **ER Diagram Load Optimization**: ER Diagram now loads with a single API call instead of N+1 calls
-  - Added `includeSchemas` parameter to `/api/tables/{dbId}/foreign-keys` endpoint
-  - Backend returns full column schemas for all tables in one request
-  - Eliminates per-table `getTableSchema` calls that caused slow load times on large databases
-  - ER Diagram load time now matches Foreign Key Editor performance
-  - Schemas are cached alongside FK graph data with 30-second TTL
-- **Performance Tab (Index Analyzer) Optimization**: Index analysis now runs significantly faster
-  - Parallel batch processing: Processes 5 tables at a time instead of sequential
-  - Within each batch, fetches columns, FKs, and indexes in parallel (Promise.all)
-  - Index column info also fetched in parallel for all indexes per table
-  - Client-side caching with 60-second TTL to avoid redundant API calls
-  - Cache automatically invalidated when creating new indexes
-  - "Re-analyze" button forces fresh analysis (bypasses cache)
-- **Tables Tab Caching**: Table list now cached for instant tab switching
-  - Client-side caching with 30-second TTL for `listTables` API calls
-  - Instant re-rendering when switching back to Tables tab within cache window
-  - Cache automatically invalidated on table modifications (rename, delete, clone, STRICT mode, FTS5 conversion)
-  - Refresh button explicitly bypasses cache to fetch fresh data
-  - Reduces unnecessary API calls when navigating between tabs
-- **Unified Relationship Tabs Caching**: All relationship views now share a single cache entry
-  - Foreign Key Editor, ER Diagram, and Circular Dependencies all use the same API call
-  - First view to load fetches FK graph + cycles + schemas in one request
-  - Subsequent views use cached data instantly (no additional API calls)
-  - Single cache key (`cycles+schemas`) ensures maximum cache reuse
-  - Switching between any relationship sub-tabs is now instant after first load
-- **Extended Cache TTL**: All client-side caches now persist for 5 minutes (up from 30-60 seconds)
-  - Table list, FK data, and index analysis caches all use 5-minute TTL
-  - Cache persists throughout typical database browsing sessions
-  - Safe because caches are explicitly invalidated on any data modifications
-  - Allows navigating between tabs (Performance, Time Travel, etc.) without losing cached data
-- **FTS5, Time Travel, and Replication Tab Caching**: Added caching for remaining database tabs
-  - FTS5 Manager: FTS5 table list cached for 5 minutes, invalidated on create/delete
-  - Time Travel: Bookmark and history data cached for 5 minutes, invalidated on capture/delete
-  - Replication: Database info cached for 5 minutes, invalidated on replication mode change
-  - All tabs now support instant switching after first load within the same database
-- **Metrics Dashboard Caching**: Added caching for the main Metrics page
-  - Metrics data cached for 2 minutes per time range (24h, 7d, 30d)
-  - Instant page revisits within cache window
-  - Refresh button forces fresh data fetch
-  - Shorter TTL (2 min) since metrics data updates more frequently
-
-### Added
-
 - **Unified Backup & Restore Hub**: Centralized dialog for managing both undo history and R2 backups
   - Replaces separate Undo History and R2 Restore dialogs with a single, tabbed interface
   - **Quick Restore Tab**: Undo recent destructive operations (last 10 dropped tables, columns, deleted rows)
@@ -616,68 +523,6 @@ This major release transforms D1 Database Manager into an enterprise-ready solut
   - Progress indicator shows real-time creation status
   - Detailed results showing succeeded and failed indexes
   - Small delay between index creations to avoid rate limits
-
-### Optimized
-
-- **Table Schema Caching**: Added 5-minute client-side caching
-  - Schema fetched once per table per session
-  - Cache invalidated on column add/rename/modify/delete
-- **Table Foreign Keys Caching**: Added 5-minute client-side caching
-  - FK data fetched once per table per session
-  - Cache invalidated on FK modifications
-- **R2 Backup Status Caching**: Added 10-minute cache
-  - Status checked once and shared across all components
-- **Cascade Impact Simulation**: Added 5-minute client-side caching
-  - Reopening the same cascade impact dialog uses cached results
-  - Cache invalidated on table deletion or FK modifications
-- **Table Dependencies**: Added 5-minute client-side caching
-  - Repeated dependency checks for same tables use cached data
-  - Cache invalidated on table deletion or FK modifications
-- **Unified Cache Invalidation**: All FK/schema-related operations now properly invalidate related caches
-
-### Removed
-
-- **Production Badge**: Removed the "production" badge from database cards and list view as it always shows "production" (D1 doesn't have development mode) and provided no useful information
-
-### Fixed
-
-- **Database Rename D1 Eventual Consistency**: Fixed rename failures caused by D1's eventual consistency
-  - Added 3-second delay before verification to allow data to become visible
-  - Added retry logic (up to 3 attempts with delays) for verification step
-  - Resolves "Table count mismatch" errors after successful import
-- **R2 Backup Dialog Navigation**: Fixed issue where Delete Database and Rename Database dialogs would close permanently after initiating an R2 backup
-  - Dialogs now properly return to the original context after backup completes
-  - Users can complete the delete/rename operation without re-opening the dialog
-  - Progress dialog now tracks which parent dialog to return to
-- **Undo Restore Table Refresh**: Fixed issue where restored tables from undo history didn't appear in the table list without a page refresh
-  - Now properly triggers table list reload after undo restore from both the database view dialog and the database picker dialog
-- **STRICT Mode Conversion Reliability**: Major fixes to the "Enable STRICT Mode" feature
-  - Fixed D1 REST API request body missing required `params` field (caused 500 errors)
-  - Fixed index recreation bug where index column info was lost after dropping original table (caused syntax errors)
-  - Fixed `DEFAULT CURRENT_TIMESTAMP` syntax for STRICT tables (now correctly wrapped in parentheses)
-  - Foreign key constraints now properly preserved during table recreation
-  - Virtual tables (FTS5, FTS4, rtree) and generated columns now blocked with helpful error messages
-  - Added pre-conversion validation endpoint (`/api/tables/:dbId/:tableName/strict-check`)
-  - Enable STRICT Mode dialog now shows blockers (red), warnings (amber), and compatibility status before conversion
-- **Table Creation Not Updating UI**: Fixed issue where creating a table in Schema Designer didn't immediately show the new table in the list (was using cached data)
-- **Table Operations Not Refreshing**: Fixed all table mutations (rename, clone, delete, STRICT mode, FTS5 convert) to properly skip cache and show updated results immediately
-- **Database List Caching**: Added 5-minute cache for database list (includes FTS5 count, replication status); properly invalidated on create/delete/rename operations
-- **TableView Instant Schema Loading**: Optimized TableView to show cached schema immediately while loading rows
-  - Schema loads from cache (instant on revisit)
-  - Subtle overlay shows while rows refresh (always fresh)
-  - Column operations (add/rename/modify/delete) properly skip cache for fresh schema
-  - Refresh button shows spinning indicator during reload
-- **Improved Rate Limit Error Messages**: Now displays user-friendly messages for Cloudflare rate limits
-  - 429 errors: "Rate limit exceeded. Cloudflare limits API requests - please wait a moment and try again."
-  - 503 errors: "Service temporarily unavailable. Cloudflare may be experiencing issues - please try again shortly."
-  - 504 errors: "Request timed out. The database may be under heavy load - please try again."
-- **Time Travel Cache Fix**: Fixed issue where Time Travel tab would hard-load on every revisit
-  - Added `bookmarkLoaded` and `historyLoaded` flags to properly track cached state
-  - Cache now correctly returns data even when bookmark is null or history is empty
-  - Uses `in` operator to detect explicitly provided values vs missing properties
-
-### Added
-
 - **Fullscreen Mode for Relationship Diagrams**: View Foreign Key Editor and ER Diagram in fullscreen
   - Maximize button in toolbar expands diagram to fill entire viewport
   - Press Escape or click minimize button to exit fullscreen
@@ -842,6 +687,66 @@ This major release transforms D1 Database Manager into an enterprise-ready solut
 
 ### Changed
 
+- **Query Console UI**: Moved Clear button to the left side of the card header for better visual hierarchy
+**Performance**
+
+- **ER Diagram Load Optimization**: ER Diagram now loads with a single API call instead of N+1 calls
+  - Added `includeSchemas` parameter to `/api/tables/{dbId}/foreign-keys` endpoint
+  - Backend returns full column schemas for all tables in one request
+  - Eliminates per-table `getTableSchema` calls that caused slow load times on large databases
+  - ER Diagram load time now matches Foreign Key Editor performance
+  - Schemas are cached alongside FK graph data with 30-second TTL
+- **Performance Tab (Index Analyzer) Optimization**: Index analysis now runs significantly faster
+  - Parallel batch processing: Processes 5 tables at a time instead of sequential
+  - Within each batch, fetches columns, FKs, and indexes in parallel (Promise.all)
+  - Index column info also fetched in parallel for all indexes per table
+  - Client-side caching with 60-second TTL to avoid redundant API calls
+  - Cache automatically invalidated when creating new indexes
+  - "Re-analyze" button forces fresh analysis (bypasses cache)
+- **Tables Tab Caching**: Table list now cached for instant tab switching
+  - Client-side caching with 30-second TTL for `listTables` API calls
+  - Instant re-rendering when switching back to Tables tab within cache window
+  - Cache automatically invalidated on table modifications (rename, delete, clone, STRICT mode, FTS5 conversion)
+  - Refresh button explicitly bypasses cache to fetch fresh data
+  - Reduces unnecessary API calls when navigating between tabs
+- **Unified Relationship Tabs Caching**: All relationship views now share a single cache entry
+  - Foreign Key Editor, ER Diagram, and Circular Dependencies all use the same API call
+  - First view to load fetches FK graph + cycles + schemas in one request
+  - Subsequent views use cached data instantly (no additional API calls)
+  - Single cache key (`cycles+schemas`) ensures maximum cache reuse
+  - Switching between any relationship sub-tabs is now instant after first load
+- **Extended Cache TTL**: All client-side caches now persist for 5 minutes (up from 30-60 seconds)
+  - Table list, FK data, and index analysis caches all use 5-minute TTL
+  - Cache persists throughout typical database browsing sessions
+  - Safe because caches are explicitly invalidated on any data modifications
+  - Allows navigating between tabs (Performance, Time Travel, etc.) without losing cached data
+- **FTS5, Time Travel, and Replication Tab Caching**: Added caching for remaining database tabs
+  - FTS5 Manager: FTS5 table list cached for 5 minutes, invalidated on create/delete
+  - Time Travel: Bookmark and history data cached for 5 minutes, invalidated on capture/delete
+  - Replication: Database info cached for 5 minutes, invalidated on replication mode change
+  - All tabs now support instant switching after first load within the same database
+- **Metrics Dashboard Caching**: Added caching for the main Metrics page
+  - Metrics data cached for 2 minutes per time range (24h, 7d, 30d)
+  - Instant page revisits within cache window
+  - Refresh button forces fresh data fetch
+  - Shorter TTL (2 min) since metrics data updates more frequently
+**Optimized**
+
+- **Table Schema Caching**: Added 5-minute client-side caching
+  - Schema fetched once per table per session
+  - Cache invalidated on column add/rename/modify/delete
+- **Table Foreign Keys Caching**: Added 5-minute client-side caching
+  - FK data fetched once per table per session
+  - Cache invalidated on FK modifications
+- **R2 Backup Status Caching**: Added 10-minute cache
+  - Status checked once and shared across all components
+- **Cascade Impact Simulation**: Added 5-minute client-side caching
+  - Reopening the same cascade impact dialog uses cached results
+  - Cache invalidated on table deletion or FK modifications
+- **Table Dependencies**: Added 5-minute client-side caching
+  - Repeated dependency checks for same tables use cached data
+  - Cache invalidated on table deletion or FK modifications
+- **Unified Cache Invalidation**: All FK/schema-related operations now properly invalidate related caches
 - **Foreign Key Editor Alphabetization**: Tables and columns are now sorted alphabetically in dropdown lists
   - Source Table and Target Table lists sorted by name
   - Source Column and Target Column lists sorted by name
@@ -927,8 +832,61 @@ This major release transforms D1 Database Manager into an enterprise-ready solut
   - Added `consistent-indexed-object-style` (`Record<K,V>` preferred)
   - Configured `no-console: warn` for frontend, `off` for worker
 
+### Removed
+
+- **Table View Row Filters**: Removed the "Filter Rows" feature from Table View
+  - The existing client-side row search (in the toolbar) remains available for quick filtering
+  - Simplifies the UI and reduces complexity
+- **Production Badge**: Removed the "production" badge from database cards and list view as it always shows "production" (D1 doesn't have development mode) and provided no useful information
+
 ### Fixed
 
+- **SQL Validator False Positives**: Fixed keyword misspelling detection showing incorrect suggestions
+  - Removed `INTO` from its own misspellings list (was showing "Did you mean 'INTO'? Found 'INTO'")
+  - Removed `VALUE` from `VALUES` misspellings (common column name was being flagged)
+- **Database Name Validation**: Create Database dialog now validates names before submission
+  - Enforces D1 naming rules: 3-63 characters, lowercase letters/numbers/hyphens only
+  - Shows character count with warning when approaching limit
+  - Input limited to 63 characters max
+  - Clear error messages for invalid names
+- **Table Rename Validation**: Improved validation when renaming tables
+  - Checks if target table name already exists before attempting rename
+  - Validates table name format (letters, numbers, underscores only)
+  - Clear error messages with suggestions for invalid names
+- **Database Rename D1 Eventual Consistency**: Fixed rename failures caused by D1's eventual consistency
+  - Added 3-second delay before verification to allow data to become visible
+  - Added retry logic (up to 3 attempts with delays) for verification step
+  - Resolves "Table count mismatch" errors after successful import
+- **R2 Backup Dialog Navigation**: Fixed issue where Delete Database and Rename Database dialogs would close permanently after initiating an R2 backup
+  - Dialogs now properly return to the original context after backup completes
+  - Users can complete the delete/rename operation without re-opening the dialog
+  - Progress dialog now tracks which parent dialog to return to
+- **Undo Restore Table Refresh**: Fixed issue where restored tables from undo history didn't appear in the table list without a page refresh
+  - Now properly triggers table list reload after undo restore from both the database view dialog and the database picker dialog
+- **STRICT Mode Conversion Reliability**: Major fixes to the "Enable STRICT Mode" feature
+  - Fixed D1 REST API request body missing required `params` field (caused 500 errors)
+  - Fixed index recreation bug where index column info was lost after dropping original table (caused syntax errors)
+  - Fixed `DEFAULT CURRENT_TIMESTAMP` syntax for STRICT tables (now correctly wrapped in parentheses)
+  - Foreign key constraints now properly preserved during table recreation
+  - Virtual tables (FTS5, FTS4, rtree) and generated columns now blocked with helpful error messages
+  - Added pre-conversion validation endpoint (`/api/tables/:dbId/:tableName/strict-check`)
+  - Enable STRICT Mode dialog now shows blockers (red), warnings (amber), and compatibility status before conversion
+- **Table Creation Not Updating UI**: Fixed issue where creating a table in Schema Designer didn't immediately show the new table in the list (was using cached data)
+- **Table Operations Not Refreshing**: Fixed all table mutations (rename, clone, delete, STRICT mode, FTS5 convert) to properly skip cache and show updated results immediately
+- **Database List Caching**: Added 5-minute cache for database list (includes FTS5 count, replication status); properly invalidated on create/delete/rename operations
+- **TableView Instant Schema Loading**: Optimized TableView to show cached schema immediately while loading rows
+  - Schema loads from cache (instant on revisit)
+  - Subtle overlay shows while rows refresh (always fresh)
+  - Column operations (add/rename/modify/delete) properly skip cache for fresh schema
+  - Refresh button shows spinning indicator during reload
+- **Improved Rate Limit Error Messages**: Now displays user-friendly messages for Cloudflare rate limits
+  - 429 errors: "Rate limit exceeded. Cloudflare limits API requests - please wait a moment and try again."
+  - 503 errors: "Service temporarily unavailable. Cloudflare may be experiencing issues - please try again shortly."
+  - 504 errors: "Request timed out. The database may be under heavy load - please try again."
+- **Time Travel Cache Fix**: Fixed issue where Time Travel tab would hard-load on every revisit
+  - Added `bookmarkLoaded` and `historyLoaded` flags to properly track cached state
+  - Cache now correctly returns data even when bookmark is null or history is empty
+  - Uses `in` operator to detect explicitly provided values vs missing properties
 - **Foreign Key Graph API Optimization**: Significantly reduced API calls and improved responsiveness for the Relationships tab
   - Previous: Sequential API calls (3N calls for N tables: table_info, COUNT, foreign_key_list each)
   - Now: Parallel batch processing with controlled concurrency (batches of 5 tables, 3 queries each in parallel)
@@ -1036,16 +994,15 @@ This major release transforms D1 Database Manager into an enterprise-ready solut
   - Improved query parser with consistent type definitions
   - Fixed job tracking nullish coalescing operators
   - Updated time travel utilities with proper type annotations
-
-[Unreleased]: https://github.com/neverinfamous/d1-manager/compare/v2.6.4...HEAD
-[2.6.4]: https://github.com/neverinfamous/d1-manager/compare/v2.6.3...v2.6.4
-[2.6.3]: https://github.com/neverinfamous/d1-manager/compare/v2.6.2...v2.6.3
-[2.6.2]: https://github.com/neverinfamous/d1-manager/compare/v2.6.1...v2.6.2
-[2.6.1]: https://github.com/neverinfamous/d1-manager/compare/v2.6.0...v2.6.1
-[2.6.0]: https://github.com/neverinfamous/d1-manager/compare/v2.5.0...v2.6.0
-[2.5.0]: https://github.com/neverinfamous/d1-manager/compare/v2.4.0...v2.5.0
-[2.4.0]: https://github.com/neverinfamous/d1-manager/compare/v2.3.0...v2.4.0
-[2.3.0]: https://github.com/neverinfamous/d1-manager/compare/v2.2.0...v2.3.0
-[2.2.0]: https://github.com/neverinfamous/d1-manager/compare/v2.1.0...v2.2.0
-[2.1.0]: https://github.com/neverinfamous/d1-manager/compare/v2.0.0...v2.1.0
-[2.0.0]: https://github.com/neverinfamous/d1-manager/compare/v1.1.1...v2.0.0
+    [Unreleased]: https://github.com/neverinfamous/d1-manager/compare/v2.6.4...HEAD
+    [2.6.4]: https://github.com/neverinfamous/d1-manager/compare/v2.6.3...v2.6.4
+    [2.6.3]: https://github.com/neverinfamous/d1-manager/compare/v2.6.2...v2.6.3
+    [2.6.2]: https://github.com/neverinfamous/d1-manager/compare/v2.6.1...v2.6.2
+    [2.6.1]: https://github.com/neverinfamous/d1-manager/compare/v2.6.0...v2.6.1
+    [2.6.0]: https://github.com/neverinfamous/d1-manager/compare/v2.5.0...v2.6.0
+    [2.5.0]: https://github.com/neverinfamous/d1-manager/compare/v2.4.0...v2.5.0
+    [2.4.0]: https://github.com/neverinfamous/d1-manager/compare/v2.3.0...v2.4.0
+    [2.3.0]: https://github.com/neverinfamous/d1-manager/compare/v2.2.0...v2.3.0
+    [2.2.0]: https://github.com/neverinfamous/d1-manager/compare/v2.1.0...v2.2.0
+    [2.1.0]: https://github.com/neverinfamous/d1-manager/compare/v2.0.0...v2.1.0
+    [2.0.0]: https://github.com/neverinfamous/d1-manager/compare/v1.1.1...v2.0.0
