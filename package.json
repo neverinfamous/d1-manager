@@ -26,7 +26,7 @@
     "@radix-ui/react-tabs": "^1.1.13",
     "class-variance-authority": "^0.7.1",
     "dagre": "^0.8.5",
-    "diff": "^8.0.3",
+    "diff": "^9.0.0",
     "drizzle-orm": "^0.45.1",
     "html2canvas": "^1.4.1",
     "jose": "^6.1.3",
