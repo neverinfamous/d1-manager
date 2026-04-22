@@ -401,8 +401,8 @@ export function ScheduledBackupManager({
   }, []);
 
   useEffect(() => {
-    void checkR2Status();
-    void loadSchedules();
+    void Promise.resolve().then(() => checkR2Status());
+    void Promise.resolve().then(() => loadSchedules());
   }, [checkR2Status, loadSchedules]);
 
   const resetForm = (): void => {

@@ -387,7 +387,7 @@ function formatSqlValue(value: unknown): string {
  * Generate a structured JSON export
  */
 function generateJsonExport(result: ExportResult): Blob {
-  const output: Record<string, unknown> = {
+  const output = {
     meta: {
       format: "d1-manager-export",
       version: "1.0.0",
@@ -399,7 +399,7 @@ function generateJsonExport(result: ExportResult): Blob {
     tables: {} as Record<string, unknown>,
   };
 
-  const tables = output["tables"] as Record<string, unknown>;
+  const tables = output.tables;
 
   for (const table of result.tables) {
     tables[table.name] = {

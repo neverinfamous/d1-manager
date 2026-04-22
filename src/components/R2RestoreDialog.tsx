@@ -75,7 +75,7 @@ export function R2RestoreDialog({
   // Load backups on open
   useEffect(() => {
     if (open) {
-      void loadBackups();
+      void Promise.resolve().then(() => loadBackups());
     }
   }, [open, loadBackups]);
 

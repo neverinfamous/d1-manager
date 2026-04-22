@@ -220,8 +220,10 @@ export function CrossDatabaseSearch({
   // Load FTS5 tables when database changes
   useEffect(() => {
     if (!fts5DatabaseId) {
-      setFts5Tables([]);
-      setFts5TableName("");
+      void Promise.resolve().then(() => {
+        setFts5Tables([]);
+        setFts5TableName("");
+      });
       return;
     }
 
@@ -416,7 +418,7 @@ export function CrossDatabaseSearch({
                     } else if (typeof value === "string") {
                       stringValue = value;
                     } else {
-                      stringValue = String(value as string | number | boolean);
+                      stringValue = `${value as string | number | boolean}`;
                     }
                     return stringValue
                       .toLowerCase()

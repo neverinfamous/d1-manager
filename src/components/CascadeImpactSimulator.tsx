@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import ReactFlow, {
-  type Node,
   type Edge,
   Background,
   useNodesState,
@@ -145,7 +144,7 @@ export function CascadeImpactSimulator({
       // Calculate layout and set nodes/edges
       const { nodes: flowNodes, edges: flowEdges } =
         simEngine.calculateLayout();
-      setNodes(flowNodes as Node[]);
+      setNodes(flowNodes);
       setEdges(flowEdges as Edge[]);
     } catch (err) {
       setError(
@@ -161,7 +160,7 @@ export function CascadeImpactSimulator({
   // Load simulation on mount
   useEffect(() => {
     if (open) {
-      void loadSimulation();
+      void Promise.resolve().then(() => loadSimulation());
     }
   }, [open, loadSimulation]);
 

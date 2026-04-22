@@ -994,24 +994,27 @@ export async function handleAISearchRoutes(
               return new Response(
                 JSON.stringify({
                   error: "AI Search Stream Error",
-                  details: "Failed to initialize standard ReadableStream payload",
+                  details:
+                    "Failed to initialize standard ReadableStream payload",
                 }),
                 {
                   status: 500,
-                  headers: { "Content-Type": "application/json", ...corsHeaders },
-                }
+                  headers: {
+                    "Content-Type": "application/json",
+                    ...corsHeaders,
+                  },
+                },
               );
             }
 
             return new Response(responseBody, {
-                headers: {
-                  "Content-Type": "text/event-stream",
-                  "Cache-Control": "no-cache",
-                  Connection: "keep-alive",
-                  ...corsHeaders,
-                },
+              headers: {
+                "Content-Type": "text/event-stream",
+                "Cache-Control": "no-cache",
+                Connection: "keep-alive",
+                ...corsHeaders,
               },
-            );
+            });
           } else {
             // Non-streaming response
             // eslint-disable-next-line @typescript-eslint/no-deprecated

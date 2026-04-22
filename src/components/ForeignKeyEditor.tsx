@@ -95,28 +95,32 @@ export function ForeignKeyEditor({
   // Initialize from existing constraint if in edit mode
   useEffect(() => {
     if (open && mode === "edit" && existingConstraint) {
-      setSourceTable(existingConstraint.source);
-      setSourceColumn(existingConstraint.sourceColumn);
-      setTargetTable(existingConstraint.target);
-      setTargetColumn(existingConstraint.targetColumn);
-      setOnDelete(existingConstraint.onDelete);
-      setOnUpdate(existingConstraint.onUpdate);
+      void Promise.resolve().then(() => {
+        setSourceTable(existingConstraint.source);
+        setSourceColumn(existingConstraint.sourceColumn);
+        setTargetTable(existingConstraint.target);
+        setTargetColumn(existingConstraint.targetColumn);
+        setOnDelete(existingConstraint.onDelete);
+        setOnUpdate(existingConstraint.onUpdate);
+      });
     } else if (open && mode === "add") {
       // Reset for add mode
-      setSourceTable("");
-      setSourceColumn("");
-      setTargetTable("");
-      setTargetColumn("");
-      setOnDelete("NO ACTION");
-      setOnUpdate("NO ACTION");
-      setConstraintName("");
+      void Promise.resolve().then(() => {
+        setSourceTable("");
+        setSourceColumn("");
+        setTargetTable("");
+        setTargetColumn("");
+        setOnDelete("NO ACTION");
+        setOnUpdate("NO ACTION");
+        setConstraintName("");
+      });
     }
   }, [open, mode, existingConstraint]);
 
   // Load source table columns
   useEffect(() => {
     if (!sourceTable) {
-      setSourceColumns([]);
+      void Promise.resolve().then(() => setSourceColumns([]));
       return;
     }
 
@@ -138,7 +142,7 @@ export function ForeignKeyEditor({
   // Load target table columns
   useEffect(() => {
     if (!targetTable) {
-      setTargetColumns([]);
+      void Promise.resolve().then(() => setTargetColumns([]));
       return;
     }
 
@@ -197,14 +201,16 @@ export function ForeignKeyEditor({
     }
 
     if (mode !== "add" || !sourceTable || !targetTable) {
-      setCycleWarning(null);
-      setAcknowledgedCycle(false);
-      setCheckingCycle(false);
+      void Promise.resolve().then(() => {
+        setCycleWarning(null);
+        setAcknowledgedCycle(false);
+        setCheckingCycle(false);
+      });
       return;
     }
 
     // Debounce the cycle check by 500ms to avoid rapid API calls
-    setCheckingCycle(true); // Show loading state immediately
+    void Promise.resolve().then(() => setCheckingCycle(true)); // Show loading state immediately
     cycleCheckTimerRef.current = setTimeout(() => {
       void checkForCycles(sourceTable, targetTable);
     }, 500);
@@ -226,7 +232,7 @@ export function ForeignKeyEditor({
       sourceColumns.length === 0 ||
       targetColumns.length === 0
     ) {
-      setWarnings([]);
+      void Promise.resolve().then(() => setWarnings([]));
       return;
     }
 
@@ -263,7 +269,7 @@ export function ForeignKeyEditor({
       );
     }
 
-    setWarnings(newWarnings);
+    void Promise.resolve().then(() => setWarnings(newWarnings));
   }, [
     sourceColumn,
     targetColumn,

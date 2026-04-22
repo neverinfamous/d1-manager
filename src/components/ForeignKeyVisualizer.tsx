@@ -203,7 +203,7 @@ function ForeignKeyVisualizerContent({
   }, [databaseId]);
 
   useEffect(() => {
-    void loadForeignKeys();
+    void Promise.resolve().then(() => loadForeignKeys());
   }, [loadForeignKeys]);
 
   // Apply layout when data or layout type changes

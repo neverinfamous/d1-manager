@@ -308,7 +308,7 @@ export function TableView({
   );
 
   useEffect(() => {
-    void loadTableData();
+    void Promise.resolve().then(() => loadTableData());
   }, [loadTableData]);
 
   // Memoize formatValue to prevent recreation on each render
@@ -316,7 +316,7 @@ export function TableView({
     if (value === null) return "NULL";
     if (value === undefined) return "";
     if (typeof value === "object") return JSON.stringify(value);
-    return String(value as string | number | boolean);
+    return `${value as string | number | boolean}`;
   }, []);
 
   // Calculate pagination info
@@ -367,7 +367,7 @@ export function TableView({
           } else if (typeof value === "string") {
             strValue = value;
           } else {
-            strValue = String(value as string | number | boolean);
+            strValue = `${value as string | number | boolean}`;
           }
           return strValue.toLowerCase().includes(query);
         });
@@ -395,11 +395,11 @@ export function TableView({
           const aStr =
             typeof aVal === "object"
               ? JSON.stringify(aVal)
-              : String(aVal as string | number | boolean);
+              : `${aVal as string | number | boolean}`;
           const bStr =
             typeof bVal === "object"
               ? JSON.stringify(bVal)
-              : String(bVal as string | number | boolean);
+              : `${bVal as string | number | boolean}`;
           comparison = aStr.localeCompare(bStr);
         }
 
@@ -412,7 +412,7 @@ export function TableView({
 
   // Clear row selection when data changes
   useEffect(() => {
-    setSelectedRows([]);
+    void Promise.resolve().then(() => setSelectedRows([]));
   }, [data]);
 
   // Row selection handlers
@@ -537,7 +537,7 @@ export function TableView({
         value !== null && value !== undefined
           ? typeof value === "object"
             ? JSON.stringify(value)
-            : String(value as string | number | boolean)
+            : `${value as string | number | boolean}`
           : "";
     });
     setEditValues(stringValues);
@@ -938,7 +938,7 @@ export function TableView({
           const str =
             typeof cell === "object"
               ? JSON.stringify(cell)
-              : String(cell as string | number | boolean);
+              : `${cell as string | number | boolean}`;
           // Escape quotes and wrap in quotes if contains comma, quote, or newline
           if (str.includes(",") || str.includes('"') || str.includes("\n")) {
             return `"${str.replace(/"/g, '""')}"`;

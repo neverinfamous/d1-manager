@@ -221,7 +221,7 @@ function ERDiagramContent({
   }, [databaseId]);
 
   useEffect(() => {
-    void loadDiagramData();
+    void Promise.resolve().then(() => loadDiagramData());
   }, [loadDiagramData]);
 
   // Apply layout when data or layout type changes

@@ -136,7 +136,7 @@ export function FTS5Manager({
   );
 
   useEffect(() => {
-    void loadFTS5Tables();
+    void Promise.resolve().then(() => loadFTS5Tables());
   }, [loadFTS5Tables]);
 
   const handleCreateFTS5Table = async (
