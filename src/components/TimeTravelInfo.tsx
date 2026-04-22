@@ -80,7 +80,7 @@ export function TimeTravelInfo({
   );
 
   useEffect(() => {
-    void loadData();
+    void Promise.resolve().then(() => loadData());
   }, [loadData]);
 
   const handleRefresh = async (): Promise<void> => {

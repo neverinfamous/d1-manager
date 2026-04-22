@@ -54,7 +54,7 @@ export function JobHistoryDialog({
 
   useEffect(() => {
     if (open && jobId) {
-      void loadEvents();
+      void Promise.resolve().then(() => loadEvents());
     }
   }, [open, jobId, loadEvents]);
 

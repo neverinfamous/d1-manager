@@ -22,7 +22,7 @@ export function ForeignKeyBadge({
   const displayValue =
     typeof value === "object"
       ? JSON.stringify(value)
-      : String(value as string | number | boolean);
+      : `${value as string | number | boolean}`;
   const tooltip = `References ${refTable}.${refColumn}`;
 
   return (

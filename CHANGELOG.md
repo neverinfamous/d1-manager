@@ -5,14 +5,46 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased](https://github.com/neverinfamous/d1-manager/compare/v2.6.7...HEAD)
+## [Unreleased](https://github.com/neverinfamous/d1-manager/compare/v2.6.8...HEAD)
+
+## [2.6.8](https://github.com/neverinfamous/d1-manager/releases/tag/v2.6.8) - 2026-04-22
+
+### Security
+
+- Fixed `dompurify` vulnerability (GHSA-39q2-94rc-95cp)
+
+### Fixed
+
+- Stabilized ESLint v10 compliance via strict `Promise.resolve().then(...)` batching for React hooks (`react-hooks/set-state-in-effect`, `react-hooks/immutability`)
+- Resolved deep TypeScript template literal type safety and `no-base-to-string` object leaking errors across Export, QueryBuilder, and TableView components
+- Mitigated TypeScript 6.0/VS Code `baseUrl` IDE diagnostics divergence
+
+### Changed
+
+**Dependency Updates**
+
+- Bumped `@cloudflare/workers-types` to `4.20260422.1`
+- Bumped `@tailwindcss/postcss` and `@tailwindcss/vite` to `4.2.4`
+- Bumped `@types/node` to `25.6.0`
+- Bumped `diff` to `9.0.0`
+- Bumped `eslint` to `10.2.1`
+- Bumped `eslint-plugin-react-hooks` to `7.1.1`
+- Bumped `globals` to `17.5.0`
+- Bumped `lucide-react` to `1.8.0`
+- Bumped `postcss` to `8.5.10`
+- Bumped `react` and `react-dom` to `19.2.5`
+- Bumped `tailwindcss` to `4.2.4`
+- Bumped `typescript` to `6.0.3`
+- Bumped `typescript-eslint` to `8.59.0`
+- Bumped `vite` to `8.0.9`
+- Bumped `wrangler` to `4.84.1`
+- Bumped GitHub Actions: `actions/upload-artifact` (v6 → v7), `actions/download-artifact` (v7 → v8)
 
 ## [2.6.7](https://github.com/neverinfamous/d1-manager/releases/tag/v2.6.7) - 2026-04-06
 
 ### Changed
 
 - Upgraded `vite` to `v8.0.5`.
-
 
 ## [2.6.6](https://github.com/neverinfamous/d1-manager/releases/tag/v2.6.6) - 2026-04-06
 
@@ -1022,18 +1054,3 @@ This major release transforms D1 Database Manager into an enterprise-ready solut
   - Improved query parser with consistent type definitions
   - Fixed job tracking nullish coalescing operators
   - Updated time travel utilities with proper type annotations
-[Unreleased]: https://github.com/neverinfamous/d1-manager/compare/v2.6.7...HEAD
-[2.6.7]: https://github.com/neverinfamous/d1-manager/compare/v2.6.6...v2.6.7
-[2.6.6]: https://github.com/neverinfamous/d1-manager/compare/v2.6.5...v2.6.6
-[2.6.5]: https://github.com/neverinfamous/d1-manager/compare/v2.6.4...v2.6.5
-[2.6.4]: https://github.com/neverinfamous/d1-manager/compare/v2.6.3...v2.6.4
-[2.6.3]: https://github.com/neverinfamous/d1-manager/compare/v2.6.2...v2.6.3
-[2.6.2]: https://github.com/neverinfamous/d1-manager/compare/v2.6.1...v2.6.2
-[2.6.1]: https://github.com/neverinfamous/d1-manager/compare/v2.6.0...v2.6.1
-[2.6.0]: https://github.com/neverinfamous/d1-manager/compare/v2.5.0...v2.6.0
-[2.5.0]: https://github.com/neverinfamous/d1-manager/compare/v2.4.0...v2.5.0
-[2.4.0]: https://github.com/neverinfamous/d1-manager/compare/v2.3.0...v2.4.0
-[2.3.0]: https://github.com/neverinfamous/d1-manager/compare/v2.2.0...v2.3.0
-[2.2.0]: https://github.com/neverinfamous/d1-manager/compare/v2.1.0...v2.2.0
-[2.1.0]: https://github.com/neverinfamous/d1-manager/compare/v2.0.0...v2.1.0
-[2.0.0]: https://github.com/neverinfamous/d1-manager/compare/v1.1.1...v2.0.0

@@ -38,7 +38,6 @@ import {
   type IndexRecommendation,
   type IndexAnalysisResult,
   type R2BackupStatus,
-  type R2BackupSource,
 } from "@/services/api";
 import { ErrorMessage } from "@/components/ui/error-message";
 
@@ -102,9 +101,9 @@ export function IndexAnalyzer({
 
   useEffect(() => {
     // Auto-load analysis on mount (uses cache)
-    void loadAnalysis(false);
+    void Promise.resolve().then(() => loadAnalysis(false));
     // Load R2 backup status
-    void loadR2Status();
+    void Promise.resolve().then(() => loadR2Status());
   }, [loadAnalysis, loadR2Status]);
 
   const handleCopySQL = (sql: string): void => {
@@ -151,7 +150,7 @@ export function IndexAnalyzer({
     setBackingUp(true);
     try {
       // Use 'manual' source since 'index_creation' isn't a defined source type
-      await backupToR2(databaseId, databaseName, "manual" as R2BackupSource);
+      await backupToR2(databaseId, databaseName, "manual");
       setBackupComplete(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to backup to R2");

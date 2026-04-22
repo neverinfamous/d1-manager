@@ -131,7 +131,7 @@ export function MetricsDashboard(): React.JSX.Element {
   );
 
   useEffect(() => {
-    void loadMetrics(false); // Use cache on initial load
+    void Promise.resolve().then(() => loadMetrics(false)); // Use cache on initial load
   }, [loadMetrics]);
 
   const handleTimeRangeChange = (value: string): void => {

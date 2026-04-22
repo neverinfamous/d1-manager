@@ -194,7 +194,7 @@ export function JobHistory({ databases }: JobHistoryProps): React.JSX.Element {
   );
 
   useEffect(() => {
-    void loadJobs(true);
+    void Promise.resolve().then(() => loadJobs(true));
   }, [
     statusFilter,
     operationFilter,

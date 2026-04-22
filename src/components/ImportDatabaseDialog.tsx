@@ -96,20 +96,22 @@ export function ImportDatabaseDialog({
   // Reset state when dialog opens
   useEffect(() => {
     if (open) {
-      setStep("upload");
-      setFile(null);
-      setFileContent("");
-      setDetectedFormat("sql");
-      setPreview(null);
-      setImportMode("create");
-      setNewDbName("");
-      setTargetDbId("");
-      setIncludeSchema(true);
-      setDeferForeignKeys(true);
-      setImporting(false);
-      setCompleted(false);
-      setError(null);
-      setWarnings([]);
+      void Promise.resolve().then(() => {
+        setStep("upload");
+        setFile(null);
+        setFileContent("");
+        setDetectedFormat("sql");
+        setPreview(null);
+        setImportMode("create");
+        setNewDbName("");
+        setTargetDbId("");
+        setIncludeSchema(true);
+        setDeferForeignKeys(true);
+        setImporting(false);
+        setCompleted(false);
+        setError(null);
+        setWarnings([]);
+      });
     }
   }, [open]);
 

@@ -83,13 +83,15 @@ export function ReadReplicationInfo({
 
   useEffect(() => {
     if (!initialReplicationMode) {
-      void loadData();
+      void Promise.resolve().then(() => loadData());
     }
   }, [loadData, initialReplicationMode]);
 
   useEffect(() => {
     if (initialReplicationMode) {
-      setReplicationMode(initialReplicationMode);
+      void Promise.resolve().then(() =>
+        setReplicationMode(initialReplicationMode),
+      );
     }
   }, [initialReplicationMode]);
 

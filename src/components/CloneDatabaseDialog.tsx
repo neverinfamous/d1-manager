@@ -119,19 +119,21 @@ export function CloneDatabaseDialog({
   // Reset state when dialog opens/closes
   useEffect(() => {
     if (open) {
-      setStep("target");
-      setTargetMode("new");
-      setNewDbName(`${database.name}-copy`);
-      setExistingDbId("");
-      setSelectedTables([]);
-      setCopySchema(true);
-      setCopyData(true);
-      setDropExisting(false);
-      setError(null);
-      setTasks([]);
-      setFullCloneProgress(null);
-      setCloning(false);
-      void loadTables();
+      void Promise.resolve().then(() => {
+        setStep("target");
+        setTargetMode("new");
+        setNewDbName(`${database.name}-copy`);
+        setExistingDbId("");
+        setSelectedTables([]);
+        setCopySchema(true);
+        setCopyData(true);
+        setDropExisting(false);
+        setError(null);
+        setTasks([]);
+        setFullCloneProgress(null);
+        setCloning(false);
+        void loadTables();
+      });
     }
   }, [open, database.name, loadTables]);
 

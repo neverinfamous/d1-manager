@@ -250,18 +250,18 @@ export function QueryBuilder({
   ]);
 
   useEffect(() => {
-    void loadTables();
-    void loadSavedQueries();
+    void Promise.resolve().then(() => loadTables());
+    void Promise.resolve().then(() => loadSavedQueries());
   }, [loadTables, loadSavedQueries]);
 
   useEffect(() => {
     if (selectedTable) {
-      void loadTableSchema();
+      void Promise.resolve().then(() => loadTableSchema());
     }
   }, [selectedTable, loadTableSchema]);
 
   useEffect(() => {
-    generateSQL();
+    void Promise.resolve().then(() => generateSQL());
   }, [generateSQL]);
 
   // Sync editedSQL with generatedSQL when it changes (unless manually edited)
@@ -269,7 +269,7 @@ export function QueryBuilder({
     if (generatedSQL !== lastGeneratedSQL.current) {
       lastGeneratedSQL.current = generatedSQL;
       if (!isManuallyEdited) {
-        setEditedSQL(generatedSQL);
+        void Promise.resolve().then(() => setEditedSQL(generatedSQL));
       }
     }
   }, [generatedSQL, isManuallyEdited]);
@@ -625,7 +625,7 @@ export function QueryBuilder({
     if (value === null) return "NULL";
     if (value === undefined) return "";
     if (typeof value === "object") return JSON.stringify(value);
-    return String(value as string | number | boolean);
+    return `${value as string | number | boolean}`;
   };
 
   return (
@@ -1083,7 +1083,7 @@ export function QueryBuilder({
                             const str =
                               typeof cell === "object"
                                 ? JSON.stringify(cell)
-                                : String(cell as string | number | boolean);
+                                : `${cell as string | number | boolean}`;
                             if (
                               str.includes(",") ||
                               str.includes('"') ||

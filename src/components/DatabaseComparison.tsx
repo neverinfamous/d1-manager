@@ -188,8 +188,10 @@ export function DatabaseComparison({
   // Auto-run comparison when pre-selected databases are provided
   React.useEffect(() => {
     if (preSelectedDatabases?.[0] && preSelectedDatabases[1] && !autoRan) {
-      setAutoRan(true);
-      void handleCompare();
+      void Promise.resolve().then(() => {
+        setAutoRan(true);
+        void handleCompare();
+      });
     }
   }, [preSelectedDatabases, autoRan, handleCompare]);
 

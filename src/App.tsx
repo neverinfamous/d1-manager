@@ -338,17 +338,6 @@ export default function App(): React.JSX.Element {
   const [migrationError, setMigrationError] = useState<string | null>(null);
   const [migrationSuccess, setMigrationSuccess] = useState(false);
 
-  // Load databases on mount - run in parallel for faster initial load
-  useEffect(() => {
-    // Run both loads in parallel - colors are non-blocking
-    void Promise.all([
-      loadDatabases(),
-      loadDatabaseColors(),
-      loadR2BackupStatus(),
-      checkMigrationStatus(),
-    ]);
-  }, []);
-
   const loadR2BackupStatus = async (): Promise<void> => {
     try {
       const status = await getR2BackupStatus();
@@ -527,10 +516,10 @@ export default function App(): React.JSX.Element {
   // Load undo count when viewing a specific database or globally
   useEffect(() => {
     if (currentView.type !== "list" && "databaseId" in currentView) {
-      void loadUndoCount(currentView.databaseId);
+      void Promise.resolve().then(() => loadUndoCount(currentView.databaseId));
     } else {
       // On list view, load undo counts for all databases
-      void loadAllUndoCounts(databases);
+      void Promise.resolve().then(() => loadAllUndoCounts(databases));
     }
   }, [currentView, databases]);
 
@@ -546,9 +535,9 @@ export default function App(): React.JSX.Element {
   useEffect(() => {
     if (showUndoDatabasePicker && r2BackupStatus?.configured) {
       if (databases.length > 0) {
-        void loadAllR2BackupCounts(databases);
+        void Promise.resolve().then(() => loadAllR2BackupCounts(databases));
       }
-      void loadOrphanedBackups();
+      void Promise.resolve().then(() => loadOrphanedBackups());
     }
   }, [
     showUndoDatabasePicker,
@@ -581,6 +570,19 @@ export default function App(): React.JSX.Element {
       // Colors are optional, silently ignore failures
     }
   };
+
+  // Load databases on mount - run in parallel for faster initial load
+  useEffect(() => {
+    // Run both loads in parallel - colors are non-blocking
+    void Promise.resolve().then(() => {
+      void Promise.all([
+        loadDatabases(),
+        loadDatabaseColors(),
+        loadR2BackupStatus(),
+        checkMigrationStatus(),
+      ]);
+    });
+  }, []);
 
   const handleColorChange = async (
     databaseId: string,

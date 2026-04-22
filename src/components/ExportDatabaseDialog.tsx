@@ -104,19 +104,21 @@ export function ExportDatabaseDialog({
   // Reset state when dialog opens
   useEffect(() => {
     if (open) {
-      setStep("format");
-      setFormat("sql");
-      setSelectedTables([]);
-      setSelectAll(true);
-      setIncludeSchema(true);
-      setIncludeData(true);
-      setRowLimit(50000);
-      setDeferForeignKeys(true);
-      setExporting(false);
-      setProgress(null);
-      setCompleted(false);
-      setError(null);
-      void loadTables();
+      void Promise.resolve().then(() => {
+        setStep("format");
+        setFormat("sql");
+        setSelectedTables([]);
+        setSelectAll(true);
+        setIncludeSchema(true);
+        setIncludeData(true);
+        setRowLimit(50000);
+        setDeferForeignKeys(true);
+        setExporting(false);
+        setProgress(null);
+        setCompleted(false);
+        setError(null);
+        void loadTables();
+      });
     }
   }, [open, loadTables]);
 

@@ -79,7 +79,7 @@ export function BackupRestoreHub({
   // Reset tab to initialTab when dialog opens
   useEffect(() => {
     if (open) {
-      setActiveTab(initialTab);
+      void Promise.resolve().then(() => setActiveTab(initialTab));
     }
   }, [open, initialTab]);
 
@@ -104,7 +104,9 @@ export function BackupRestoreHub({
   const [isR2Restoring, setIsR2Restoring] = useState(false);
   const [deleteTargets, setDeleteTargets] = useState<R2BackupListItem[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [downloadingTimestamps, setDownloadingTimestamps] = useState(new Set<number>());
+  const [downloadingTimestamps, setDownloadingTimestamps] = useState(
+    new Set<number>(),
+  );
 
   // Info panel state
   const [showInfoPanel, setShowInfoPanel] = useState(false);
@@ -168,16 +170,18 @@ export function BackupRestoreHub({
   // Load data when dialog opens
   useEffect(() => {
     if (open) {
-      void loadUndoHistory();
-      void checkR2Status();
-      void loadScheduledBackup();
+      void Promise.resolve().then(() => {
+        void loadUndoHistory();
+        void checkR2Status();
+        void loadScheduledBackup();
+      });
     }
   }, [open, loadUndoHistory, checkR2Status, loadScheduledBackup]);
 
   // Load R2 backups when dialog opens (regardless of tab) so count shows in tab label
   useEffect(() => {
     if (open && r2Configured) {
-      void loadR2Backups();
+      void Promise.resolve().then(() => loadR2Backups());
     }
   }, [open, r2Configured, loadR2Backups]);
 

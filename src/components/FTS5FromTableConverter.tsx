@@ -104,18 +104,18 @@ export function FTS5FromTableConverter({
 
   useEffect(() => {
     if (open) {
-      void loadTables();
+      void Promise.resolve().then(() => loadTables());
     }
   }, [open, loadTables]);
 
   useEffect(() => {
     if (sourceTable) {
-      void loadColumns(sourceTable);
+      void Promise.resolve().then(() => loadColumns(sourceTable));
       // Auto-generate FTS table name
       const ftsName = sourceTable.endsWith("_fts")
         ? sourceTable
         : `${sourceTable}_fts`;
-      setFtsTableName(ftsName);
+      void Promise.resolve().then(() => setFtsTableName(ftsName));
     }
   }, [sourceTable, loadColumns]);
 

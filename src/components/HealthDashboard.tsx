@@ -50,7 +50,7 @@ export function HealthDashboard(): React.ReactElement {
   }, []);
 
   useEffect(() => {
-    void loadHealth();
+    void Promise.resolve().then(() => loadHealth());
   }, [loadHealth]);
 
   const formatBytes = (bytes: number): string => {

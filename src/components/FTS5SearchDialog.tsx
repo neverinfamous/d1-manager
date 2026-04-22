@@ -63,9 +63,11 @@ export function FTS5SearchDialog({
   useEffect(() => {
     if (open) {
       // Reset form when dialog opens
-      setQuery("");
-      setSearchResponse(null);
-      setError("");
+      void Promise.resolve().then(() => {
+        setQuery("");
+        setSearchResponse(null);
+        setError("");
+      });
     }
   }, [open]);
 
@@ -153,7 +155,7 @@ export function FTS5SearchDialog({
               str =
                 typeof val === "object"
                   ? JSON.stringify(val)
-                  : String(val as string | number | boolean);
+                  : `${val as string | number | boolean}`;
             }
             return str.includes(",") ? `"${str.replace(/"/g, '""')}"` : str;
           })

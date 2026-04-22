@@ -110,7 +110,7 @@ export function AISearchPanel({
   );
 
   useEffect(() => {
-    void loadData();
+    void Promise.resolve().then(() => loadData());
   }, [loadData]);
 
   // Handle export

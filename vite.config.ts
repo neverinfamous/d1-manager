@@ -31,12 +31,18 @@ export default defineConfig({
               normalizedId.includes("dagre")
             )
               return "vendor-reactflow";
-            if (normalizedId.includes("jspdf") || normalizedId.includes("html2canvas"))
+            if (
+              normalizedId.includes("jspdf") ||
+              normalizedId.includes("html2canvas")
+            )
               return "vendor-pdf";
             if (normalizedId.includes("jszip")) return "vendor-zip";
             if (normalizedId.includes("@radix-ui")) return "vendor-ui";
             if (normalizedId.includes("lucide-react")) return "vendor-icons";
-            if (normalizedId.includes("sql-formatter") || normalizedId.includes("prismjs"))
+            if (
+              normalizedId.includes("sql-formatter") ||
+              normalizedId.includes("prismjs")
+            )
               return "vendor-sql";
             if (
               normalizedId.includes("diff") ||

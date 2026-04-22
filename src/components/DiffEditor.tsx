@@ -140,7 +140,9 @@ export function DiffEditor({
       rightSource.type === "saved" &&
       !rightSource.savedQueryId
     ) {
-      setRightSource({ type: "saved", savedQueryId: firstQuery.id });
+      void Promise.resolve().then(() =>
+        setRightSource({ type: "saved", savedQueryId: firstQuery.id }),
+      );
     }
   }, [savedQueries, rightSource]);
 

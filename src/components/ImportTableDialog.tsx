@@ -443,7 +443,7 @@ export function ImportTableDialog({
               const strVal =
                 typeof val === "object" && val !== null
                   ? JSON.stringify(val)
-                  : String(val as string | number);
+                  : `${val as string | number | boolean}`;
               return `'${strVal.replace(/'/g, "''")}'`;
             });
 
@@ -757,7 +757,7 @@ export function ImportTableDialog({
                           if (val === null || val === undefined) return "NULL";
                           if (typeof val === "object")
                             return JSON.stringify(val);
-                          return String(val as string | number | boolean);
+                          return `${val as string | number | boolean}`;
                         })
                         .join(", ")}
                     </div>

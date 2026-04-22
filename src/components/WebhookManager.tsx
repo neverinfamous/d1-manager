@@ -306,7 +306,7 @@ export function WebhookManager(): React.ReactElement {
   }, []);
 
   useEffect(() => {
-    void loadWebhooks();
+    void Promise.resolve().then(() => loadWebhooks());
   }, [loadWebhooks]);
 
   const resetForm = (): void => {

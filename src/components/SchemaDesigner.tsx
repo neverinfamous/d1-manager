@@ -658,7 +658,7 @@ export function SchemaDesigner({
                                 updateColumn(
                                   column.id,
                                   "generatedType",
-                                  e.target.value as "STORED" | "VIRTUAL",
+                                  e.target.value,
                                 )
                               }
                             >

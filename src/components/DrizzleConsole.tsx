@@ -220,7 +220,7 @@ export function DrizzleConsole({
 
   // Auto-run introspect on mount
   useEffect(() => {
-    void handleIntrospect(false);
+    void Promise.resolve().then(() => handleIntrospect(false));
   }, [handleIntrospect]);
 
   const handleMigrationStatus = async (): Promise<void> => {

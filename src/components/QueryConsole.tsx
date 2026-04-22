@@ -357,7 +357,7 @@ export function QueryConsole({
     if (value === null) return "NULL";
     if (value === undefined) return "";
     if (typeof value === "object") return JSON.stringify(value);
-    return String(value as string | number | boolean);
+    return `${value as string | number | boolean}`;
   };
 
   // Handle keyboard events for autocomplete and execution
@@ -529,7 +529,7 @@ export function QueryConsole({
           const str =
             typeof cell === "object"
               ? JSON.stringify(cell)
-              : String(cell as string | number | boolean);
+              : `${cell as string | number | boolean}`;
           // Escape quotes and wrap in quotes if contains comma, quote, or newline
           if (str.includes(",") || str.includes('"') || str.includes("\n")) {
             return `"${str.replace(/"/g, '""')}"`;

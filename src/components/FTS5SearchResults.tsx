@@ -87,7 +87,7 @@ export function FTS5SearchResults({
                           {value !== null && value !== undefined
                             ? typeof value === "object"
                               ? JSON.stringify(value)
-                              : String(value as string | number | boolean)
+                              : `${value as string | number | boolean}`
                             : "-"}
                         </td>
                       ),
@@ -162,7 +162,7 @@ export function FTS5SearchResults({
                             {value !== null && value !== undefined
                               ? typeof value === "object"
                                 ? JSON.stringify(value)
-                                : String(value as string | number | boolean)
+                                : `${value as string | number | boolean}`
                               : "-"}
                           </span>
                         </div>
