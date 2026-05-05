@@ -1,5 +1,5 @@
 import { useRef, useEffect, useCallback, useMemo, useState } from "react";
-import Prism from "prismjs";
+import Prism from "@/lib/prism";
 import "prismjs/components/prism-sql";
 import { WrapText } from "lucide-react";
 import { FindReplaceBar } from "./FindReplaceBar";
