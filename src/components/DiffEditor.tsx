@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { type SavedQuery } from "@/services/api";
-import Prism from "prismjs";
+import Prism from "@/lib/prism";
 import "prismjs/components/prism-sql";
 
 interface DiffEditorProps {

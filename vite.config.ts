@@ -18,6 +18,11 @@ export default defineConfig({
         // Manual chunks for better code splitting - split large vendor deps
         manualChunks(id) {
           const normalizedId = id.replace(/\\/g, "/");
+          // Route the prism wrapper (src/lib/prism.ts) into the same chunk
+          // as prismjs from node_modules. The wrapper sets globalThis.Prism
+          // which is required by prism-sql's bare Prism reference in Rolldown.
+          if (normalizedId.includes("/src/lib/prism"))
+            return "vendor-prism";
           if (normalizedId.includes("node_modules")) {
             if (
               normalizedId.includes("/node_modules/react/") ||
@@ -39,10 +44,8 @@ export default defineConfig({
             if (normalizedId.includes("jszip")) return "vendor-zip";
             if (normalizedId.includes("@radix-ui")) return "vendor-ui";
             if (normalizedId.includes("lucide-react")) return "vendor-icons";
-            if (
-              normalizedId.includes("sql-formatter") ||
-              normalizedId.includes("prismjs")
-            )
+            if (normalizedId.includes("prismjs")) return "vendor-prism";
+            if (normalizedId.includes("sql-formatter"))
               return "vendor-sql";
             if (
               normalizedId.includes("diff") ||

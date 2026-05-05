@@ -1,5 +1,10 @@
 ## [Unreleased]
 
+### Fixed
+
+- Fixed Query Console blank page with `Uncaught ReferenceError: Prism is not defined` in production builds since v2.6.5 ([#124](https://github.com/neverinfamous/d1-manager/issues/124))
+  - Split `prismjs` into its own `vendor-prism` chunk to prevent Rolldown from reordering module initialization when co-bundled with `sql-formatter` in the `vendor-sql` chunk
+
 ### Changed
 **Dependency Updates**
 - Bump `@cloudflare/workers-types` from 4.20260422.1 to 4.20260505.1
