@@ -41,7 +41,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.29.0",
-    "@cloudflare/workers-types": "^4.20260505.1",
+    "@cloudflare/workers-types": "^4.20260511.1",
     "@eslint/js": "^10.0.1",
     "@tailwindcss/postcss": "^4.2.4",
     "@tailwindcss/vite": "^4.2.4",
@@ -64,7 +64,7 @@
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.59.2",
     "vite": "^8.0.10",
-    "wrangler": "^4.88.0"
+    "wrangler": "^4.90.0"
   },
   "overrides": {
     "esbuild": "$esbuild",
