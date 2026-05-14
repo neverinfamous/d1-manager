@@ -34,6 +34,7 @@ RUN cd /tmp && \
     cp -r package /usr/local/lib/node_modules/npm/node_modules/glob && \
     (mkdir -p /usr/local/lib/node_modules/npm/node_modules/node-gyp/node_modules && \
      cp -r package /usr/local/lib/node_modules/npm/node_modules/node-gyp/node_modules/glob || true) && \
+    rm -rf package && \
     tar -xzf tar-7.5.15.tgz && \
     mv package /usr/local/lib/node_modules/npm/node_modules/tar && \
     tar -xzf isaacs-brace-expansion-5.0.1.tgz && \
@@ -93,6 +94,7 @@ RUN cd /tmp && \
     cp -r package /usr/local/lib/node_modules/npm/node_modules/glob && \
     (mkdir -p /usr/local/lib/node_modules/npm/node_modules/node-gyp/node_modules && \
      cp -r package /usr/local/lib/node_modules/npm/node_modules/node-gyp/node_modules/glob || true) && \
+    rm -rf package && \
     tar -xzf tar-7.5.15.tgz && \
     mv package /usr/local/lib/node_modules/npm/node_modules/tar && \
     tar -xzf isaacs-brace-expansion-5.0.1.tgz && \

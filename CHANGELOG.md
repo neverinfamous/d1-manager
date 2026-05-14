@@ -5,7 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased](https://github.com/neverinfamous/d1-manager/compare/v2.6.9...HEAD)
+## [Unreleased](https://github.com/neverinfamous/d1-manager/compare/v2.6.10...HEAD)
+
+## [2.6.10](https://github.com/neverinfamous/d1-manager/releases/tag/v2.6.10) - 2026-05-14
+
+### Changed
+
+**Dependency Updates**
+
+- Bumped `@cloudflare/workers-types` to `4.20260514.1`
+- Bumped `@tailwindcss/postcss` and `@tailwindcss/vite` to `4.3.0`
+- Bumped `@types/node` to `25.8.0`
+- Bumped `@vitejs/plugin-react` to `6.0.2`
+- Bumped `lucide-react` to `1.16.0`
+- Bumped `react` and `react-dom` to `19.2.6`
+- Bumped `sql-formatter` to `15.7.4`
+- Bumped `tailwind-merge` to `3.6.0`
+- Bumped `tailwindcss` to `4.3.0`
+- Bumped `typescript-eslint` to `8.59.3`
+- Bumped `vite` to `8.0.13`
+- Bumped Dockerfile pinned transitive dependency `tar` to `7.5.15`
 
 ## [2.6.9](https://github.com/neverinfamous/d1-manager/releases/tag/v2.6.9) - 2026-05-05
 
