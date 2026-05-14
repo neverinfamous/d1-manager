@@ -20,7 +20,7 @@ RUN npm install -g npm@latest
 # We download patched versions first, then replace all vulnerable ones
 RUN cd /tmp && \
     npm pack glob@11.1.0 && \
-    npm pack tar@7.5.13 && \
+    npm pack tar@7.5.15 && \
     npm pack @isaacs/brace-expansion@5.0.1 && \
     npm pack minimatch@10.2.5 && \
     npm pack picomatch@4.0.4 && \
@@ -34,7 +34,8 @@ RUN cd /tmp && \
     cp -r package /usr/local/lib/node_modules/npm/node_modules/glob && \
     (mkdir -p /usr/local/lib/node_modules/npm/node_modules/node-gyp/node_modules && \
      cp -r package /usr/local/lib/node_modules/npm/node_modules/node-gyp/node_modules/glob || true) && \
-    tar -xzf tar-7.5.13.tgz && \
+    rm -rf package && \
+    tar -xzf tar-7.5.15.tgz && \
     mv package /usr/local/lib/node_modules/npm/node_modules/tar && \
     tar -xzf isaacs-brace-expansion-5.0.1.tgz && \
     mkdir -p /usr/local/lib/node_modules/npm/node_modules/@isaacs && \
@@ -79,7 +80,7 @@ RUN npm install -g npm@latest
 # We download patched versions first, then replace all vulnerable ones
 RUN cd /tmp && \
     npm pack glob@11.1.0 && \
-    npm pack tar@7.5.13 && \
+    npm pack tar@7.5.15 && \
     npm pack @isaacs/brace-expansion@5.0.1 && \
     npm pack minimatch@10.2.5 && \
     npm pack picomatch@4.0.4 && \
@@ -93,7 +94,8 @@ RUN cd /tmp && \
     cp -r package /usr/local/lib/node_modules/npm/node_modules/glob && \
     (mkdir -p /usr/local/lib/node_modules/npm/node_modules/node-gyp/node_modules && \
      cp -r package /usr/local/lib/node_modules/npm/node_modules/node-gyp/node_modules/glob || true) && \
-    tar -xzf tar-7.5.13.tgz && \
+    rm -rf package && \
+    tar -xzf tar-7.5.15.tgz && \
     mv package /usr/local/lib/node_modules/npm/node_modules/tar && \
     tar -xzf isaacs-brace-expansion-5.0.1.tgz && \
     mkdir -p /usr/local/lib/node_modules/npm/node_modules/@isaacs && \
@@ -107,8 +109,8 @@ RUN cd /tmp && \
 
 # Install runtime dependencies and upgrade to fix CVEs
 # Security Notes:
-# - Application dependencies: minimatch@10.2.5 (patched via package.json override); overrides for glob@11.1.0, tar@7.5.13, and @isaacs/brace-expansion@5.0.1 are precautionary and may not currently appear in the installed dependency graph.
-# - npm CLI bundled dependencies: glob@11.1.0, tar@7.5.13, @isaacs/brace-expansion@5.0.1, minimatch@10.2.5 (manually patched in npm's installation)
+# - Application dependencies: minimatch@10.2.5 (patched via package.json override); overrides for glob@11.1.0, tar@7.5.15, and @isaacs/brace-expansion@5.0.1 are precautionary and may not currently appear in the installed dependency graph.
+# - npm CLI bundled dependencies: glob@11.1.0, tar@7.5.15, @isaacs/brace-expansion@5.0.1, minimatch@10.2.5 (manually patched in npm's installation)
 # - curl 8.18.0-r0 (from edge): CVE-2025-14819, CVE-2025-14017, CVE-2025-14524 (curl vulnerabilities)
 # - busybox: CVE-2025-60876 (wget CRLF injection) - not exploitable (D1 Manager uses curl, not wget)
 # - zlib: CVE-2026-22184 (buffer overflow in untgz) - NOT EXPLOITABLE (D1 Manager does not use untgz utility)
