@@ -50,7 +50,7 @@
     "@types/prismjs": "^1.26.6",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^6.0.1",
+    "@vitejs/plugin-react": "^6.0.3",
     "clsx": "^2.1.1",
     "drizzle-kit": "^0.31.9",
     "esbuild": "^0.28.0",
@@ -63,7 +63,7 @@
     "tailwindcss": "^4.2.4",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.59.2",
-    "vite": "^8.0.10",
+    "vite": "^8.1.0",
     "wrangler": "^4.88.0"
   },
   "overrides": {
