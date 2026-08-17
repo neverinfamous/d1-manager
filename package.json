@@ -63,7 +63,7 @@
     "tailwind-merge": "^3.6.0",
     "tailwindcss": "^4.3.3",
     "ts-pattern": "^5.9.0",
-    "typescript": "^7.0.2",
+    "typescript": "^6.0.3",
     "typescript-eslint": "^8.67.0",
     "vite": "^6.4.3",
     "wrangler": "^4.123.0",
