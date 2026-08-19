@@ -1,4 +1,4 @@
-import type { ReactElement, FormEvent } from "react";
+import type { ReactElement, SyntheticEvent } from "react";
 import { useState, useEffect } from "react";
 import {
   getMonitoringThresholds,
@@ -8,7 +8,7 @@ import {
   createMonitoringThreshold,
 } from "../services/monitoringApi";
 import { api } from "../services/api";
-import type { MonitoringThreshold } from "../types/monitoring";
+import type { MonitoringThreshold, MonitoringThresholdInput } from "../types/monitoring";
 import type { D1Database } from "../services/api";
 import { METRIC_TYPE_LABELS } from "../types/monitoring";
 import { Trash2, Plus, AlertCircle, Save } from "lucide-react";
@@ -74,7 +74,7 @@ export function MonitoringThresholds(): ReactElement {
     }
   };
 
-  const handleAddCustom = async (e: FormEvent): Promise<void> => {
+  const handleAddCustom = async (e: SyntheticEvent): Promise<void> => {
     e.preventDefault();
     if (!selectedDbId) return;
     const db = databases.find(d => d.uuid === selectedDbId);
@@ -85,12 +85,10 @@ export function MonitoringThresholds(): ReactElement {
       await createMonitoringThreshold({
         database_id: db.uuid,
         database_name: db.name,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        metric_type: newThreshold.metric_type as any,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        comparison: newThreshold.comparison as any,
-        threshold_value: Number(newThreshold.threshold_value),
-        cooldown_hours: Number(newThreshold.cooldown_hours),
+        metric_type: newThreshold.metric_type as MonitoringThresholdInput["metric_type"],
+        comparison: newThreshold.comparison as MonitoringThresholdInput["comparison"],
+        threshold_value: newThreshold.threshold_value,
+        cooldown_hours: newThreshold.cooldown_hours,
         enabled: true
       });
       setShowAddForm(false);
@@ -138,6 +136,9 @@ export function MonitoringThresholds(): ReactElement {
         <div className="flex flex-col items-end gap-3">
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <select 
+              id="database-select"
+              name="database-select"
+              aria-label="Select database"
               value={selectedDbId} 
               onChange={(e) => setSelectedDbId(e.target.value)}
               className="flex h-9 w-full sm:w-[200px] items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
@@ -175,8 +176,10 @@ export function MonitoringThresholds(): ReactElement {
           <h4 className="font-medium text-sm">Create Custom Threshold</h4>
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
             <div className="space-y-1">
-              <label className="text-xs font-medium">Metric</label>
+              <label htmlFor="metric_type" className="text-xs font-medium">Metric</label>
               <select
+                id="metric_type"
+                name="metric_type"
                 value={newThreshold.metric_type}
                 onChange={(e) => setNewThreshold({...newThreshold, metric_type: e.target.value})}
                 className="flex h-9 w-full rounded-md border bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
@@ -187,8 +190,10 @@ export function MonitoringThresholds(): ReactElement {
               </select>
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-medium">Comparison</label>
+              <label htmlFor="comparison" className="text-xs font-medium">Comparison</label>
               <select
+                id="comparison"
+                name="comparison"
                 value={newThreshold.comparison}
                 onChange={(e) => setNewThreshold({...newThreshold, comparison: e.target.value})}
                 className="flex h-9 w-full rounded-md border bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
@@ -199,8 +204,10 @@ export function MonitoringThresholds(): ReactElement {
               </select>
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-medium">Value</label>
+              <label htmlFor="threshold_value" className="text-xs font-medium">Value</label>
               <input
+                id="threshold_value"
+                name="threshold_value"
                 type="number"
                 required
                 value={newThreshold.threshold_value}
@@ -209,8 +216,10 @@ export function MonitoringThresholds(): ReactElement {
               />
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-medium">Cooldown (Hours)</label>
+              <label htmlFor="cooldown_hours" className="text-xs font-medium">Cooldown (Hours)</label>
               <input
+                id="cooldown_hours"
+                name="cooldown_hours"
                 type="number"
                 required
                 min="0"
