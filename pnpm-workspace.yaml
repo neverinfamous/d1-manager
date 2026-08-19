@@ -11,3 +11,5 @@ overrides:
   brace-expansion: "5.0.9"
   ip-address: "10.3.1"
   undici: "^6.28.0"
+packages:
+  - "."
