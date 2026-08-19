@@ -18,18 +18,14 @@ const COMPARISON_LABELS: Record<string, string> = {
   lte: "<=",
 };
 
-export function MonitoringThresholds() {
+export function MonitoringThresholds(): JSX.Element {
   const [thresholds, setThresholds] = useState<MonitoringThreshold[]>([]);
   const [databases, setDatabases] = useState<D1Database[]>([]);
   const [selectedDbId, setSelectedDbId] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
+  const fetchData = async (): Promise<void> => {
     try {
       setLoading(true);
       const [thData, dbData] = await Promise.all([
@@ -48,6 +44,12 @@ export function MonitoringThresholds() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleQuickSetup = async (): Promise<void> => {
     if (!selectedDbId) return;
