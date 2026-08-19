@@ -39,7 +39,7 @@ export function MonitoringThresholds() {
       setThresholds(thData);
       setDatabases(dbData);
       if (dbData.length > 0 && !selectedDbId) {
-        setSelectedDbId(dbData[0].uuid);
+        setSelectedDbId(dbData[0]?.uuid || "");
       }
       setError(null);
     } catch (err: any) {
