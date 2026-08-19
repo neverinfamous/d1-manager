@@ -128,6 +128,8 @@ export function DataTable({
                   )}
                 </button>
                 <Input
+                  id={`filter-${col.name}`}
+                  name={`filter-${col.name}`}
                   placeholder="Filter..."
                   value={filterValue}
                   onChange={(e) => onColumnFilterChange(col.name, e.target.value)}
