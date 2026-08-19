@@ -75,30 +75,40 @@ export function EditableCell({
   };
 
   const renderPreview = (val: string): ReactNode => {
-    if (/^https?:\/\//.test(val)) {
-      const isImage = /\.(jpeg|jpg|gif|png|webp|svg)(\?.*)?$/i.test(val);
+    let safeUrl = "";
+    try {
+      const url = new URL(val);
+      if (url.protocol === "http:" || url.protocol === "https:") {
+        safeUrl = url.toString();
+      }
+    } catch {
+      // Ignore invalid URLs
+    }
+
+    if (safeUrl) {
+      const isImage = /\.(jpeg|jpg|gif|png|webp|svg)(\?.*)?$/i.test(safeUrl);
       if (isImage) {
         return (
           <a
-            href={val}
+            href={safeUrl}
             target="_blank"
             rel="noreferrer"
             onClick={(e) => e.stopPropagation()}
             className="block h-8 max-w-[100px] overflow-hidden rounded border border-border/50 hover:opacity-80 transition-opacity"
-            title={val}
+            title={safeUrl}
           >
-            <img src={val} alt="Preview" className="w-full h-full object-cover" />
+            <img src={safeUrl} alt="Preview" className="w-full h-full object-cover" />
           </a>
         );
       }
       return (
         <a
-          href={val}
+          href={safeUrl}
           target="_blank"
           rel="noreferrer"
           onClick={(e) => e.stopPropagation()}
           className="text-blue-500 hover:underline truncate block"
-          title={val}
+          title={safeUrl}
         >
           {val}
         </a>
