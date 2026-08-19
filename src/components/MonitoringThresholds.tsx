@@ -11,7 +11,7 @@ import { api } from "../services/api";
 import type { MonitoringThreshold } from "../types/monitoring";
 import type { D1Database } from "../services/api";
 import { METRIC_TYPE_LABELS } from "../types/monitoring";
-import { Trash2, Plus, AlertCircle, Save, X } from "lucide-react";
+import { Trash2, Plus, AlertCircle, Save } from "lucide-react";
 
 const COMPARISON_LABELS: Record<string, string> = {
   gt: ">",
