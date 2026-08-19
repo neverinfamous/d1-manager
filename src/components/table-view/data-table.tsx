@@ -6,6 +6,7 @@ import {
   rowSelectionFeature,
 } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ArrowUp, ArrowDown, ArrowUpDown, Edit, Trash2, Plus, Loader2 } from "lucide-react";
 import { ForeignKeyBadge } from "@/components/ForeignKeyBadge";
@@ -25,6 +26,8 @@ interface DataTableProps {
   dataSortDirection: "asc" | "desc";
   onDataSort: (column: string) => void;
   foreignKeys: Record<string, { refTable: string; refColumn: string }>;
+  columnFilters: { id: string; value: string }[];
+  onColumnFilterChange: (id: string, value: string) => void;
   onNavigateToRelatedTable?: ((refTable: string, refColumn: string, value: unknown) => void) | undefined;
   onEditRow: (row: Record<string, unknown>) => void;
   onDeleteRow: (row: Record<string, unknown>) => void;
@@ -51,6 +54,8 @@ export function DataTable({
   dataSortDirection,
   onDataSort,
   foreignKeys,
+  columnFilters,
+  onColumnFilterChange,
   onNavigateToRelatedTable,
   onEditRow,
   onDeleteRow,
@@ -103,23 +108,34 @@ export function DataTable({
         const isFK = foreignKeys[col.name];
         return helper.accessor((row) => row[col.name], {
           id: col.name,
-          header: () => (
-            <button
-              onClick={() => onDataSort(col.name)}
-              className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors whitespace-nowrap"
-            >
-              {col.name}
-              {dataSortColumn === col.name ? (
-                dataSortDirection === "asc" ? (
-                  <ArrowUp className="h-3 w-3" />
-                ) : (
-                  <ArrowDown className="h-3 w-3" />
-                )
-              ) : (
-                <ArrowUpDown className="h-3 w-3 opacity-50" />
-              )}
-            </button>
-          ),
+          header: () => {
+            const filterValue = columnFilters?.find((f) => f.id === col.name)?.value ?? "";
+            return (
+              <div className="flex flex-col gap-2 p-1 min-w-[120px]">
+                <button
+                  onClick={() => onDataSort(col.name)}
+                  className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors whitespace-nowrap w-full text-left"
+                >
+                  <span className="truncate">{col.name}</span>
+                  {dataSortColumn === col.name ? (
+                    dataSortDirection === "asc" ? (
+                      <ArrowUp className="h-3 w-3 shrink-0" />
+                    ) : (
+                      <ArrowDown className="h-3 w-3 shrink-0" />
+                    )
+                  ) : (
+                    <ArrowUpDown className="h-3 w-3 opacity-50 shrink-0" />
+                  )}
+                </button>
+                <Input
+                  placeholder="Filter..."
+                  value={filterValue}
+                  onChange={(e) => onColumnFilterChange(col.name, e.target.value)}
+                  className="h-7 w-full text-xs font-normal"
+                />
+              </div>
+            );
+          },
           cell: ({ row, getValue }) => {
             const val = getValue();
             if (isFK && onNavigateToRelatedTable) {

@@ -1,6 +1,12 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { getTableSchema, getTableForeignKeys, executeQuery } from "@/services/api";
+import { getTableSchema, getTableForeignKeys, getTableData } from "@/services/api";
+import type { FilterCondition } from "@/services/api";
 import type { ColumnInfo } from "./types";
+
+interface ColumnFilterState {
+  id: string;
+  value: string;
+}
 
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 export function useTableData({
@@ -9,6 +15,8 @@ export function useTableData({
   fkFilter,
   page,
   rowsPerPage,
+  dataSortColumn,
+  dataSortDirection,
   setError,
 }: {
   databaseId: string;
@@ -16,6 +24,8 @@ export function useTableData({
   fkFilter?: string | undefined;
   page: number;
   rowsPerPage: number;
+  dataSortColumn: string | null;
+  dataSortDirection: "asc" | "desc";
   setError: (error: string | null) => void;
 }) {
   const [schema, setSchema] = useState<ColumnInfo[]>([]);
@@ -26,6 +36,33 @@ export function useTableData({
   const [foreignKeys, setForeignKeys] = useState<
     Record<string, { refTable: string; refColumn: string }>
   >({});
+
+  // Column Filters stored in state and localStorage
+  const filtersStorageKey = `d1-manager-filters-${databaseId}-${tableName}`;
+  const [columnFilters, setColumnFilters] = useState<ColumnFilterState[]>(() => {
+    try {
+      const stored = localStorage.getItem(filtersStorageKey);
+      if (stored) {
+        return JSON.parse(stored) as ColumnFilterState[];
+      }
+    } catch {
+      // Ignore parse errors
+    }
+    return [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem(filtersStorageKey, JSON.stringify(columnFilters));
+  }, [columnFilters, filtersStorageKey]);
+
+  // Debounce column filters to prevent spamming API on every keystroke
+  const [debouncedFilters, setDebouncedFilters] = useState<ColumnFilterState[]>(columnFilters);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedFilters(columnFilters);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [columnFilters]);
 
   // Load foreign keys on mount
   useEffect(() => {
@@ -53,33 +90,6 @@ export function useTableData({
       try {
         setError(null);
 
-        let fkColumn: string | null = null;
-        let fkValue: string | null = null;
-        if (fkFilter) {
-          const colonIndex = fkFilter.indexOf(":");
-          if (colonIndex > 0) {
-            fkColumn = fkFilter.substring(0, colonIndex);
-            fkValue = fkFilter.substring(colonIndex + 1);
-          }
-        }
-
-        const buildWhereClause = (): string => {
-          if (fkColumn && fkValue !== null) {
-            const escapedValue = fkValue.replace(/'/g, "''");
-            return ` WHERE "${fkColumn}" = '${escapedValue}'`;
-          }
-          return "";
-        };
-
-        const buildCountQuery = (): string => {
-          return `SELECT COUNT(*) as count FROM "${tableName}"${buildWhereClause()}`;
-        };
-
-        const buildDataQuery = (): string => {
-          const offset = (page - 1) * rowsPerPage;
-          return `SELECT * FROM "${tableName}"${buildWhereClause()} LIMIT ${rowsPerPage} OFFSET ${offset}`;
-        };
-
         const schemaResult = await getTableSchema(databaseId, tableName, skipSchemaCache);
         setSchema(schemaResult);
 
@@ -92,19 +102,46 @@ export function useTableData({
           return prev;
         });
 
-        const [dataResult, countResult] = await Promise.all([
-          executeQuery(databaseId, buildDataQuery(), [], true),
-          executeQuery(databaseId, buildCountQuery(), [], true).catch(() => null),
-        ]);
+        const offset = (page - 1) * rowsPerPage;
+        
+        // Build API filters from column filters and fkFilter
+        const apiFilters: Record<string, FilterCondition> = {};
+        
+        // If there's an fkFilter, add it as an equals condition
+        if (fkFilter) {
+          const colonIndex = fkFilter.indexOf(":");
+          if (colonIndex > 0) {
+            const fkColumn = fkFilter.substring(0, colonIndex);
+            const fkValue = fkFilter.substring(colonIndex + 1);
+            apiFilters[fkColumn] = {
+              type: "equals",
+              value: fkValue,
+            };
+          }
+        }
+
+        // Add predicate column filters
+        for (const f of debouncedFilters) {
+          if (f.value.trim() !== "") {
+            apiFilters[f.id] = {
+              type: "contains",
+              value: f.value,
+            };
+          }
+        }
+
+        const dataResult = await getTableData(
+          databaseId,
+          tableName,
+          rowsPerPage,
+          offset,
+          apiFilters,
+          dataSortColumn || undefined,
+          dataSortColumn ? dataSortDirection : undefined
+        );
 
         setData(dataResult.results);
-
-        if (countResult?.results[0]) {
-          const countRow = countResult.results[0];
-          setTotalCount(Number(countRow["count"]) || null);
-        } else {
-          setTotalCount(null);
-        }
+        setTotalCount(dataResult.totalCount ?? null);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load table data");
       } finally {
@@ -112,7 +149,17 @@ export function useTableData({
         setLoadingRows(false);
       }
     },
-    [databaseId, tableName, page, fkFilter, rowsPerPage, setError],
+    [
+      databaseId,
+      tableName,
+      page,
+      fkFilter,
+      rowsPerPage,
+      dataSortColumn,
+      dataSortDirection,
+      debouncedFilters,
+      setError,
+    ],
   );
 
   useEffect(() => {
@@ -135,6 +182,8 @@ export function useTableData({
     loading,
     loadingRows,
     foreignKeys,
+    columnFilters,
+    setColumnFilters,
     loadTableData,
     paginationInfo,
   };

@@ -68,6 +68,8 @@ export function TableView({
     loading,
     loadingRows,
     foreignKeys,
+    columnFilters,
+    setColumnFilters,
     loadTableData,
     paginationInfo,
   } = useTableData({
@@ -76,6 +78,8 @@ export function TableView({
     fkFilter,
     page,
     rowsPerPage,
+    dataSortColumn,
+    dataSortDirection,
     setError,
   });
 
@@ -101,29 +105,8 @@ export function TableView({
       });
     }
 
-    if (dataSortColumn) {
-      result = [...result].sort((a, b) => {
-        const aVal = a[dataSortColumn];
-        const bVal = b[dataSortColumn];
-
-        if (aVal === null || aVal === undefined) return dataSortDirection === "asc" ? -1 : 1;
-        if (bVal === null || bVal === undefined) return dataSortDirection === "asc" ? 1 : -1;
-
-        let comparison: number;
-        if (typeof aVal === "number" && typeof bVal === "number") {
-          comparison = aVal - bVal;
-        } else {
-          const aStr = typeof aVal === "object" ? JSON.stringify(aVal) : `${aVal as string | number | boolean}`;
-          const bStr = typeof bVal === "object" ? JSON.stringify(bVal) : `${bVal as string | number | boolean}`;
-          comparison = aStr.localeCompare(bStr);
-        }
-
-        return dataSortDirection === "asc" ? comparison : -comparison;
-      });
-    }
-
     return result;
-  }, [data, rowSearchQuery, schema, dataSortColumn, dataSortDirection]);
+  }, [data, rowSearchQuery, schema]);
 
   useEffect(() => {
     void Promise.resolve().then(() => setSelectedRows([]));
@@ -314,6 +297,16 @@ export function TableView({
             }
           }}
           foreignKeys={foreignKeys}
+          columnFilters={columnFilters}
+          onColumnFilterChange={(id, value) => {
+            setColumnFilters(prev => {
+              const existing = prev.find(f => f.id === id);
+              if (existing) {
+                return prev.map(f => f.id === id ? { ...f, value } : f);
+              }
+              return [...prev, { id, value }];
+            });
+          }}
           onNavigateToRelatedTable={onNavigateToRelatedTable}
           onEditRow={tableEditing.handleOpenEditDialog}
           onDeleteRow={tableEditing.handleOpenDeleteDialog}
