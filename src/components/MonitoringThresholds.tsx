@@ -42,14 +42,14 @@ export function MonitoringThresholds() {
         setSelectedDbId(dbData[0]?.uuid || "");
       }
       setError(null);
-    } catch (err: any) {
-      setError(err.message || "Failed to load monitoring data");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to load monitoring data");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleQuickSetup = async () => {
+  const handleQuickSetup = async (): Promise<void> => {
     if (!selectedDbId) return;
     const db = databases.find(d => d.uuid === selectedDbId);
     if (!db) return;
@@ -57,29 +57,29 @@ export function MonitoringThresholds() {
       setLoading(true);
       await createDefaultThresholds(db.uuid, db.name, 5 * 1024 * 1024 * 1024); // default 5GB
       await fetchData();
-    } catch (err: any) {
-      setError(err.message || "Failed to create default thresholds");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to create default thresholds");
       setLoading(false);
     }
   };
 
-  const handleToggle = async (t: MonitoringThreshold) => {
+  const handleToggle = async (t: MonitoringThreshold): Promise<void> => {
     try {
       const newEnabled = t.enabled ? 0 : 1;
       await updateMonitoringThreshold(t.id, { enabled: newEnabled === 1 });
       setThresholds((prev) => prev.map((th) => th.id === t.id ? { ...th, enabled: newEnabled } : th));
-    } catch (err: any) {
-      setError(err.message || "Failed to update threshold");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to update threshold");
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string): Promise<void> => {
     if (!window.confirm("Delete this threshold?")) return;
     try {
       await deleteMonitoringThreshold(id);
       setThresholds((prev) => prev.filter((th) => th.id !== id));
-    } catch (err: any) {
-      setError(err.message || "Failed to delete threshold");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to delete threshold");
     }
   };
 
@@ -143,7 +143,7 @@ export function MonitoringThresholds() {
                 <div className="text-sm text-muted-foreground mt-1.5 flex items-center gap-3">
                   <span>Trigger when: {COMPARISON_LABELS[t.comparison]} {t.threshold_value}{t.metric_type === "storage_usage" ? "%" : t.metric_type === "query_latency" ? "ms" : ""}</span>
                   <span className="w-1 h-1 rounded-full bg-border"></span>
-                  <span>Last value: {t.last_value !== null ? Number(t.last_value).toFixed(1) : "Unknown"}</span>
+                  <span>Last value: {t.last_value !== null ? t.last_value.toFixed(1) : "Unknown"}</span>
                   <span className="w-1 h-1 rounded-full bg-border"></span>
                   <span>Cooldown: {t.cooldown_hours}h</span>
                 </div>

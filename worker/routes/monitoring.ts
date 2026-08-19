@@ -71,14 +71,14 @@ export async function handleMonitoringRoutes(
         .bind(...params)
         .all<MonitoringThreshold>();
 
-      return jsonResponse({ thresholds: results || [] }, corsHeaders);
+      return jsonResponse({ thresholds: results }, corsHeaders);
     } catch (err) {
       return errorResponse(`Failed to fetch thresholds: ${String(err)}`, corsHeaders);
     }
   }
 
   // GET /api/monitoring/:id
-  if (method === "GET" && url.pathname.match(/^\/api\/monitoring\/mon_[a-z0-9_]+$/)) {
+  if (method === "GET" && (/^\/api\/monitoring\/mon_[a-z0-9_]+$/.exec(url.pathname))) {
     const id = url.pathname.split("/").pop();
     if (!id) return errorResponse("Missing ID", corsHeaders, 400);
 
@@ -91,7 +91,7 @@ export async function handleMonitoringRoutes(
         .bind(id)
         .all<MonitoringThreshold>();
 
-      if (!results || results.length === 0) {
+      if (results.length === 0) {
         return errorResponse("Threshold not found", corsHeaders, 404);
       }
       return jsonResponse({ threshold: results[0] }, corsHeaders);
@@ -110,7 +110,7 @@ export async function handleMonitoringRoutes(
         return errorResponse("Missing required fields", corsHeaders, 400);
       }
 
-      if (input.metric_type === "storage_usage" && !input.storage_limit_bytes) {
+      if (input.metric_type === "storage_usage" && (input.storage_limit_bytes == null || input.storage_limit_bytes === 0)) {
         return errorResponse("Storage usage metric requires storage_limit_bytes", corsHeaders, 400);
       }
 
@@ -132,19 +132,19 @@ export async function handleMonitoringRoutes(
         input.threshold_value,
         comparison,
         cooldown,
-        input.storage_limit_bytes || null,
+        input.storage_limit_bytes ?? null,
         enabled
       ).run();
 
       const { results } = await env.METADATA.prepare(`SELECT * FROM monitoring_thresholds WHERE id = ?`).bind(id).all<MonitoringThreshold>();
-      return jsonResponse({ threshold: results?.[0] }, corsHeaders, 201);
+      return jsonResponse({ threshold: results[0] }, corsHeaders, 201);
     } catch (err) {
       return errorResponse(`Failed to create threshold: ${String(err)}`, corsHeaders);
     }
   }
 
   // PUT /api/monitoring/:id
-  if (method === "PUT" && url.pathname.match(/^\/api\/monitoring\/mon_[a-z0-9_]+$/)) {
+  if (method === "PUT" && (/^\/api\/monitoring\/mon_[a-z0-9_]+$/.exec(url.pathname))) {
     const id = url.pathname.split("/").pop();
     if (!id) return errorResponse("Missing ID", corsHeaders, 400);
 
@@ -153,13 +153,15 @@ export async function handleMonitoringRoutes(
       if (isLocalDev) return jsonResponse({ threshold: { id, ...input } }, corsHeaders);
 
       const { results: existing } = await env.METADATA.prepare(`SELECT * FROM monitoring_thresholds WHERE id = ?`).bind(id).all<MonitoringThreshold>();
-      if (!existing || existing.length === 0) return errorResponse("Not found", corsHeaders, 404);
+      if (existing.length === 0) return errorResponse("Not found", corsHeaders, 404);
 
-      const current = existing[0] as MonitoringThreshold;
+      const current = existing[0];
+      if (!current) return errorResponse("Not found", corsHeaders, 404);
+      
       const metricType = input.metric_type ?? current.metric_type;
       const storageLimit = input.storage_limit_bytes !== undefined ? input.storage_limit_bytes : current.storage_limit_bytes;
 
-      if (metricType === "storage_usage" && !storageLimit) {
+      if (metricType === "storage_usage" && (storageLimit == null || storageLimit === 0)) {
         return errorResponse("Storage usage metric requires storage_limit_bytes", corsHeaders, 400);
       }
 
@@ -172,20 +174,20 @@ export async function handleMonitoringRoutes(
         input.threshold_value ?? current.threshold_value,
         input.comparison ?? current.comparison,
         input.cooldown_hours ?? current.cooldown_hours,
-        storageLimit || null,
+        storageLimit ?? null,
         input.enabled !== undefined ? (input.enabled ? 1 : 0) : current.enabled,
         id
       ).run();
 
       const { results } = await env.METADATA.prepare(`SELECT * FROM monitoring_thresholds WHERE id = ?`).bind(id).all<MonitoringThreshold>();
-      return jsonResponse({ threshold: results?.[0] }, corsHeaders);
+      return jsonResponse({ threshold: results[0] }, corsHeaders);
     } catch (err) {
       return errorResponse(`Failed to update threshold: ${String(err)}`, corsHeaders);
     }
   }
 
   // DELETE /api/monitoring/:id
-  if (method === "DELETE" && url.pathname.match(/^\/api\/monitoring\/mon_[a-z0-9_]+$/)) {
+  if (method === "DELETE" && (/^\/api\/monitoring\/mon_[a-z0-9_]+$/.exec(url.pathname))) {
     const id = url.pathname.split("/").pop();
     if (!id) return errorResponse("Missing ID", corsHeaders, 400);
 
@@ -199,7 +201,7 @@ export async function handleMonitoringRoutes(
   }
 
   // POST /api/monitoring/:id/test
-  if (method === "POST" && url.pathname.match(/^\/api\/monitoring\/mon_[a-z0-9_]+\/test$/)) {
+  if (method === "POST" && (/^\/api\/monitoring\/mon_[a-z0-9_]+\/test$/.exec(url.pathname))) {
     return jsonResponse({
       success: true,
       breached: false,
@@ -209,7 +211,7 @@ export async function handleMonitoringRoutes(
   }
 
   // POST /api/monitoring/defaults/:databaseId
-  if (method === "POST" && url.pathname.match(/^\/api\/monitoring\/defaults\/[a-z0-9-]+$/)) {
+  if (method === "POST" && (/^\/api\/monitoring\/defaults\/[a-z0-9-]+$/.exec(url.pathname))) {
     const dbId = url.pathname.split("/").pop();
     if (!dbId) return errorResponse("Missing database ID", corsHeaders, 400);
     
@@ -240,7 +242,7 @@ export async function handleMonitoringRoutes(
         ).run();
         
         const { results } = await env.METADATA.prepare(`SELECT * FROM monitoring_thresholds WHERE id = ?`).bind(id).all<MonitoringThreshold>();
-        if (results && results.length > 0) created.push(results[0]);
+        if (results.length > 0) created.push(results[0]);
       }
       return jsonResponse({ thresholds: created }, corsHeaders, 201);
     } catch (err) {

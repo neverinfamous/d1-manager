@@ -35,7 +35,7 @@ export async function processMonitoring(env: Env): Promise<void> {
       `SELECT * FROM monitoring_thresholds WHERE enabled = 1`,
     ).all<MonitoringThreshold>();
 
-    if (!thresholds || thresholds.length === 0) {
+    if (thresholds.length === 0) {
       return;
     }
 
@@ -43,7 +43,7 @@ export async function processMonitoring(env: Env): Promise<void> {
       `SELECT * FROM monitoring_thresholds WHERE database_id = ? AND metric_type = ?`,
     ).bind(ANALYTICS_SENTINEL_ID, ANALYTICS_SENTINEL_TYPE).all<MonitoringThreshold>();
     
-    const sentinel = sentinels && sentinels.length > 0 ? sentinels[0] : null;
+    const sentinel = sentinels.length > 0 ? sentinels[0] : null;
 
     // 2. Fetch analytics (hourly window for check)
     // Analytics are normally fetched for the past 24h, but we can just use 1h for monitoring or 24h depending on how thresholds are defined.
@@ -56,8 +56,8 @@ export async function processMonitoring(env: Env): Promise<void> {
     const query = buildAnalyticsQuery(env.ACCOUNT_ID, startStr, endStr);
     const analytics = await executeGraphQLQuery(env, query, isLocalDev);
 
-    if (!analytics) {
-      if (sentinel && sentinel.enabled) {
+    if (analytics == null) {
+      if (sentinel !== null && sentinel.enabled === 1) {
         const newFailures = sentinel.consecutive_failures + 1;
         await env.METADATA.prepare(
           `UPDATE monitoring_thresholds SET consecutive_failures = ?, updated_at = datetime('now') WHERE id = ?`,
@@ -75,7 +75,7 @@ export async function processMonitoring(env: Env): Promise<void> {
       return;
     }
 
-    if (sentinel && sentinel.enabled && sentinel.consecutive_failures > 0) {
+    if (sentinel !== null && sentinel.enabled === 1 && sentinel.consecutive_failures > 0) {
       await env.METADATA.prepare(
         `UPDATE monitoring_thresholds SET consecutive_failures = 0, last_alert_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
       ).bind(sentinel.id).run();
