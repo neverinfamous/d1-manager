@@ -6,6 +6,7 @@ import {
   deleteMonitoringThreshold,
   updateMonitoringThreshold,
   createMonitoringThreshold,
+  triggerMonitoringCheck,
 } from "../services/monitoringApi";
 import { api } from "../services/api";
 import type { MonitoringThreshold, ThresholdComparison, MonitoringMetricType } from "../types/monitoring";
@@ -159,7 +160,7 @@ export function MonitoringThresholds(): ReactElement {
               onClick={async () => {
                 try {
                   setLoading(true);
-                  await api.post("/api/monitoring/trigger");
+                  await triggerMonitoringCheck();
                   await fetchData();
                   alert("Monitoring check triggered successfully! Check your webhooks.");
                 } catch (err: unknown) {

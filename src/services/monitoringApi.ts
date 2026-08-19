@@ -130,6 +130,20 @@ export async function createMonitoringThreshold(input: MonitoringThresholdInput)
 }
 
 /**
+ * Trigger manual monitoring evaluation
+ */
+export async function triggerMonitoringCheck(): Promise<{ success: boolean; message: string }> {
+  const response = await fetch(`${WORKER_API}/api/monitoring/trigger`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    credentials: "include",
+  });
+  return handleResponse<{ success: boolean; message: string }>(response);
+}
+
+/**
  * Update an existing monitoring threshold
  */
 export async function updateMonitoringThreshold(id: string, input: Partial<MonitoringThresholdInput>): Promise<MonitoringThreshold> {
