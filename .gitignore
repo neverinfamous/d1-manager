@@ -20,3 +20,5 @@ pnpm-debug.log*
 *~
 .turbo/
 tmp/
+
+.agents/
