@@ -110,8 +110,16 @@ export function EditableCell({
   if (!isEditing && !isSaving && status === "idle") {
     return (
       <div
-        className="px-2 py-1.5 cursor-text min-h-[32px] rounded border border-transparent hover:border-border hover:bg-muted/50 transition-colors truncate"
+        tabIndex={0}
+        role="button"
+        className="px-2 py-1.5 cursor-text min-h-[32px] rounded border border-transparent hover:border-border hover:bg-muted/50 transition-colors truncate focus:outline-none focus:ring-1 focus:ring-ring"
         onClick={() => setIsEditing(true)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            setIsEditing(true);
+          }
+        }}
       >
         {initialValue === null ? (
           <span className="italic text-muted-foreground">NULL</span>

@@ -80,9 +80,9 @@ export function DataTable({
         header: ({ table }) => (
           <Checkbox
             checked={
-              table.getIsAllPageRowsSelected() === true
+              table.getIsAllPageRowsSelected()
                 ? true
-                : table.getIsSomePageRowsSelected() === true
+                : table.getIsSomePageRowsSelected()
                 ? "indeterminate"
                 : false
             }
