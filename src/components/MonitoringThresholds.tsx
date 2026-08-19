@@ -8,7 +8,7 @@ import {
   createMonitoringThreshold,
 } from "../services/monitoringApi";
 import { api } from "../services/api";
-import type { MonitoringThreshold, MonitoringThresholdInput, ThresholdComparison, MonitoringMetricType } from "../types/monitoring";
+import type { MonitoringThreshold, ThresholdComparison, MonitoringMetricType } from "../types/monitoring";
 import type { D1Database } from "../services/api";
 import { METRIC_TYPE_LABELS } from "../types/monitoring";
 import { Trash2, Plus, AlertCircle, Save } from "lucide-react";
