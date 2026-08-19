@@ -204,7 +204,9 @@ export function MonitoringThresholds(): ReactElement {
                 onChange={(e) => setNewThreshold({...newThreshold, metric_type: e.target.value})}
                 className="flex h-9 w-full rounded-md border bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
               >
-                {Object.entries(METRIC_TYPE_LABELS).map(([k, v]) => (
+                {Object.entries(METRIC_TYPE_LABELS)
+                  .filter(([k]) => k !== "analytics_unavailable")
+                  .map(([k, v]) => (
                   <option key={k} value={k}>{v}</option>
                 ))}
               </select>
