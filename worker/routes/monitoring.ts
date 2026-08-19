@@ -1,6 +1,5 @@
 import type { Env, MonitoringThreshold, MonitoringThresholdInput } from "../types";
-import { logWarning } from "../utils/error-logger";
-import { buildAnalyticsQuery, executeGraphQLQuery } from "../utils/analytics";
+// Removed unused imports
 
 type CorsHeaders = HeadersInit;
 
@@ -42,7 +41,7 @@ export async function handleMonitoringRoutes(
   url: URL,
   corsHeaders: CorsHeaders,
   isLocalDev: boolean,
-  userEmail: string | null,
+  _userEmail: string | null,
 ): Promise<Response | null> {
   const method = request.method;
   

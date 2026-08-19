@@ -56,7 +56,8 @@ async function handleResponse<T>(response: Response): Promise<T> {
     return {} as T;
   }
 
-  return response.json();
+  const resultData = (await response.json()) as T;
+  return resultData;
 }
 
 /**
@@ -156,7 +157,7 @@ export async function deleteMonitoringThreshold(id: string): Promise<void> {
     credentials: "omit",
   });
 
-  await handleResponse<void>(response);
+  await handleResponse<Record<string, never>>(response);
   invalidateMonitoringCache();
 }
 
