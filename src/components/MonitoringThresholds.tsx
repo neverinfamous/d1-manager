@@ -8,7 +8,7 @@ import {
   createMonitoringThreshold,
 } from "../services/monitoringApi";
 import { api } from "../services/api";
-import type { MonitoringThreshold, MonitoringThresholdInput } from "../types/monitoring";
+import type { MonitoringThreshold, MonitoringThresholdInput, ThresholdComparison, MonitoringMetricType } from "../types/monitoring";
 import type { D1Database } from "../services/api";
 import { METRIC_TYPE_LABELS } from "../types/monitoring";
 import { Trash2, Plus, AlertCircle, Save } from "lucide-react";
@@ -85,8 +85,8 @@ export function MonitoringThresholds(): ReactElement {
       await createMonitoringThreshold({
         database_id: db.uuid,
         database_name: db.name,
-        metric_type: newThreshold.metric_type as MonitoringThresholdInput["metric_type"],
-        comparison: newThreshold.comparison as MonitoringThresholdInput["comparison"],
+        metric_type: newThreshold.metric_type as MonitoringMetricType,
+        comparison: newThreshold.comparison as ThresholdComparison,
         threshold_value: newThreshold.threshold_value,
         cooldown_hours: newThreshold.cooldown_hours,
         enabled: true
