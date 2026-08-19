@@ -154,5 +154,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8787/health || exit 1
 
 # Default command: Run Wrangler in development mode
-# Override with specific commands for production deployment
-CMD ["npx", "wrangler", "dev", "--ip", "0.0.0.0", "--port", "8787"]
+CMD ["pnpm", "dlx", "wrangler", "dev", "--ip", "0.0.0.0", "--port", "8787"]
