@@ -226,6 +226,12 @@ export type WebhookEventType =
   // Job lifecycle
   | "job_failed"
   | "batch_complete"
+  // Monitoring threshold alerts
+  | "threshold_storage_usage"
+  | "threshold_query_latency"
+  | "threshold_error_rate"
+  | "threshold_row_volume"
+  | "analytics_unavailable"
   // Backward-compatible aliases (legacy)
   | "database_export"
   | "database_import";
@@ -260,6 +266,51 @@ export interface WebhookResult {
   success: boolean;
   statusCode?: number;
   error?: string;
+}
+
+// ============================================
+// Monitoring Types
+// ============================================
+
+/** Metric types for threshold monitoring */
+export type MonitoringMetricType =
+  | "storage_usage"
+  | "query_latency"
+  | "error_rate"
+  | "row_volume"
+  | "analytics_unavailable";
+
+/** Comparison operators for threshold evaluation */
+export type ThresholdComparison = "gt" | "lt" | "gte" | "lte";
+
+/** Monitoring threshold record from D1 metadata database */
+export interface MonitoringThreshold {
+  id: string;
+  database_id: string;
+  database_name: string;
+  metric_type: MonitoringMetricType;
+  threshold_value: number;
+  comparison: ThresholdComparison;
+  cooldown_hours: number;
+  storage_limit_bytes: number | null;
+  enabled: number;
+  last_alert_at: string | null;
+  last_value: number | null;
+  consecutive_failures: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Input for creating/updating a monitoring threshold */
+export interface MonitoringThresholdInput {
+  database_id: string;
+  database_name: string;
+  metric_type: MonitoringMetricType;
+  threshold_value: number;
+  comparison?: ThresholdComparison;
+  cooldown_hours?: number;
+  storage_limit_bytes?: number | null;
+  enabled?: boolean;
 }
 
 // ============================================

@@ -205,3 +205,28 @@ CREATE INDEX IF NOT EXISTS idx_scheduled_backups_database
 -- All dates stored in UTC
 -- ============================================
 
+
+
+-- Monitoring threshold configurations
+CREATE TABLE IF NOT EXISTS monitoring_thresholds (
+  id TEXT PRIMARY KEY,
+  database_id TEXT NOT NULL,
+  database_name TEXT NOT NULL,
+  metric_type TEXT NOT NULL,
+  threshold_value REAL NOT NULL,
+  comparison TEXT NOT NULL DEFAULT \'gt\',
+  cooldown_hours INTEGER NOT NULL DEFAULT 6,
+  storage_limit_bytes INTEGER,
+  enabled INTEGER NOT NULL DEFAULT 1,
+  last_alert_at TEXT,
+  last_value REAL,
+  consecutive_failures INTEGER DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime(\'now\')),
+  updated_at TEXT NOT NULL DEFAULT (datetime(\'now\'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_monitoring_thresholds_database
+  ON monitoring_thresholds(database_id);
+
+CREATE INDEX IF NOT EXISTS idx_monitoring_thresholds_enabled
+  ON monitoring_thresholds(enabled, metric_type);
