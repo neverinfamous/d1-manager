@@ -1,3 +1,4 @@
+import type { ReactElement } from "react";
 import { useState, useEffect } from "react";
 import {
   getMonitoringThresholds,
@@ -18,7 +19,7 @@ const COMPARISON_LABELS: Record<string, string> = {
   lte: "<=",
 };
 
-export function MonitoringThresholds(): JSX.Element {
+export function MonitoringThresholds(): ReactElement {
   const [thresholds, setThresholds] = useState<MonitoringThreshold[]>([]);
   const [databases, setDatabases] = useState<D1Database[]>([]);
   const [selectedDbId, setSelectedDbId] = useState<string>("");
