@@ -20,7 +20,7 @@ RUN npm install -g npm@latest
 # We download patched versions first, then replace all vulnerable ones
 RUN cd /tmp && \
     npm pack glob@11.1.0 && \
-    npm pack tar@7.5.15 && \
+    npm pack tar@7.5.21 && \
     npm pack @isaacs/brace-expansion@5.0.1 && \
     npm pack minimatch@10.2.5 && \
     npm pack picomatch@4.0.4 && \
@@ -35,7 +35,7 @@ RUN cd /tmp && \
     (mkdir -p /usr/local/lib/node_modules/npm/node_modules/node-gyp/node_modules && \
      cp -r package /usr/local/lib/node_modules/npm/node_modules/node-gyp/node_modules/glob || true) && \
     rm -rf package && \
-    tar -xzf tar-7.5.15.tgz && \
+    tar -xzf tar-7.5.21.tgz && \
     mv package /usr/local/lib/node_modules/npm/node_modules/tar && \
     tar -xzf isaacs-brace-expansion-5.0.1.tgz && \
     mkdir -p /usr/local/lib/node_modules/npm/node_modules/@isaacs && \
@@ -54,10 +54,10 @@ RUN apk add --no-cache \
     g++
 
 # Copy package files
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
 # Install ALL dependencies (including devDependencies for build)
-RUN npm install -g pnpm@latest && pnpm install --frozen-lockfile --config.ignore-scripts=true
+RUN npm install -g pnpm@latest && CI=true pnpm install --frozen-lockfile --config.ignore-scripts=true
 
 # Copy source code
 COPY . .
@@ -80,7 +80,7 @@ RUN npm install -g npm@latest
 # We download patched versions first, then replace all vulnerable ones
 RUN cd /tmp && \
     npm pack glob@11.1.0 && \
-    npm pack tar@7.5.15 && \
+    npm pack tar@7.5.21 && \
     npm pack @isaacs/brace-expansion@5.0.1 && \
     npm pack minimatch@10.2.5 && \
     npm pack picomatch@4.0.4 && \
@@ -95,7 +95,7 @@ RUN cd /tmp && \
     (mkdir -p /usr/local/lib/node_modules/npm/node_modules/node-gyp/node_modules && \
      cp -r package /usr/local/lib/node_modules/npm/node_modules/node-gyp/node_modules/glob || true) && \
     rm -rf package && \
-    tar -xzf tar-7.5.15.tgz && \
+    tar -xzf tar-7.5.21.tgz && \
     mv package /usr/local/lib/node_modules/npm/node_modules/tar && \
     tar -xzf isaacs-brace-expansion-5.0.1.tgz && \
     mkdir -p /usr/local/lib/node_modules/npm/node_modules/@isaacs && \
@@ -128,19 +128,20 @@ RUN addgroup -g 1001 app && \
     adduser -D -u 1001 -G app app
 
 # Copy package files
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
 # Install production dependencies only
 RUN npm install -g pnpm@latest && \
-    pnpm install --frozen-lockfile --prod --config.ignore-scripts=true && \
-    pnpm store prune
+    CI=true pnpm install --frozen-lockfile --prod --config.ignore-scripts=true && \
+    pnpm store prune && \
+    rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 
 # Copy built application from builder
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/worker ./worker
 
 # Set ownership to non-root user
-RUN chown -R app:app /app
+# RUN chown -R app:app /app
 
 # Switch to non-root user
 USER app

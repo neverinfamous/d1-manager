@@ -42,7 +42,7 @@
   },
   "devDependencies": {
     "@babel/core": "^8.0.1",
-    "@cloudflare/workers-types": "^5.20260816.1",
+    "@cloudflare/workers-types": "^5.20260818.1",
     "@eslint/js": "^10.0.1",
     "@tailwindcss/postcss": "^4.3.3",
     "@tailwindcss/vite": "^4.3.3",
@@ -69,14 +69,16 @@
     "wrangler": "^4.123.0",
     "zod": "^4.4.3"
   },
-  "overrides": {
+  "resolutions": {
     "cross-spawn": "^7.0.5",
     "glob": "11.1.0",
-    "tar": "7.5.15",
+    "tar": "7.5.21",
     "minimatch": "10.2.5",
     "flatted": "3.4.2",
     "picomatch": "4.0.4",
     "eslint-plugin-react-hooks>eslint": "10.8.1",
-    "undici": "7.24.4"
+    "undici": "^6.28.0",
+    "brace-expansion": "5.0.9",
+    "ip-address": "10.3.1"
   }
 }
