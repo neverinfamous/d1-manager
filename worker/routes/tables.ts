@@ -548,13 +548,28 @@ export async function handleTableRoutes(
         whereClause = clause;
       }
 
-      const query = `SELECT * FROM "${sanitizedTable}"${whereClause} LIMIT ${String(limit)} OFFSET ${String(offset)}`;
+      // Parse sorting
+      const orderBy = url.searchParams.get("orderBy");
+      const orderDir = url.searchParams.get("orderDir")?.toLowerCase() === "desc" ? "DESC" : "ASC";
+      let orderByClause = "";
+      if (orderBy) {
+        orderByClause = ` ORDER BY "${sanitizeIdentifier(orderBy)}" ${orderDir}`;
+      }
+
+      // Execute count query
+      const countQuery = `SELECT COUNT(*) as count FROM "${sanitizedTable}"${whereClause}`;
+      const countResult = await executeQueryViaAPI(dbId, countQuery, env).catch(() => null);
+      const firstRow = countResult?.results?.[0] as Record<string, unknown> | undefined;
+      const totalCount = firstRow ? Number(firstRow["count"]) : null;
+
+      const query = `SELECT * FROM "${sanitizedTable}"${whereClause}${orderByClause} LIMIT ${String(limit)} OFFSET ${String(offset)}`;
       const result = await executeQueryViaAPI(dbId, query, env);
 
       return new Response(
         JSON.stringify({
           result: result.results,
           meta: result.meta,
+          totalCount,
           success: true,
         }),
         {
