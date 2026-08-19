@@ -1027,7 +1027,9 @@ class APIService {
     limit = 100,
     offset = 0,
     filters?: Record<string, FilterCondition>,
-  ): Promise<QueryResult<T>> {
+    orderBy?: string,
+    orderDir?: "asc" | "desc"
+  ): Promise<QueryResult<T> & { totalCount?: number | null }> {
     // Build URL with filter parameters
     const params = new URLSearchParams();
     params.set("limit", String(limit));
@@ -1046,6 +1048,11 @@ class APIService {
           }
         }
       }
+    }
+
+    if (orderBy) {
+      params.set("orderBy", orderBy);
+      if (orderDir) params.set("orderDir", orderDir);
     }
 
     const response = await fetch(
@@ -2061,8 +2068,10 @@ export const getTableData = <T = Record<string, unknown>>(
   limit?: number,
   offset?: number,
   filters?: Record<string, FilterCondition>,
-): Promise<QueryResult<T>> =>
-  api.getTableData<T>(databaseId, tableName, limit, offset, filters);
+  orderBy?: string,
+  orderDir?: "asc" | "desc"
+): Promise<QueryResult<T> & { totalCount?: number | null }> =>
+  api.getTableData<T>(databaseId, tableName, limit, offset, filters, orderBy, orderDir);
 export const executeQuery = <T = Record<string, unknown>>(
   databaseId: string,
   query: string,

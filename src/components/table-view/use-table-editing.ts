@@ -159,6 +159,38 @@ export function useTableEditing({
     }
   };
 
+  const handleUpdateCell = async (
+    row: Record<string, unknown>,
+    column: string,
+    newValue: string
+  ): Promise<void> => {
+    const pkColumns = schema.filter((col) => col.pk > 0);
+    if (pkColumns.length === 0) {
+      throw new Error("Cannot update cell: No primary key found");
+    }
+
+    const setClause = (() => {
+      if (newValue === "") return `"${column}" = NULL`;
+      if (!isNaN(Number(newValue)) && newValue.trim() !== "") return `"${column}" = ${newValue}`;
+      return `"${column}" = '${newValue.replace(/'/g, "''")}'`;
+    })();
+
+    const whereClause = pkColumns
+      .map((col) => {
+        const val = row[col.name];
+        if (val === null || val === undefined) return `"${col.name}" IS NULL`;
+        if (typeof val === "number" || typeof val === "boolean" || typeof val === "string") {
+          return `"${col.name}" = '${String(val).replace(/'/g, "''")}'`;
+        }
+        return `"${col.name}" = '${JSON.stringify(val).replace(/'/g, "''")}'`;
+      })
+      .join(" AND ");
+
+    const query = `UPDATE "${tableName}" SET ${setClause} WHERE ${whereClause}`;
+    await executeQuery(databaseId, query, [], true);
+    await loadTableData();
+  };
+
   const handleOpenDeleteDialog = (row: Record<string, unknown>): void => {
     setDeletingRow(row);
     setShowDeleteDialog(true);
@@ -279,6 +311,7 @@ export function useTableEditing({
     setAllowEditPrimaryKey,
     handleOpenEditDialog,
     handleUpdateRow,
+    handleUpdateCell,
 
     showDeleteDialog,
     setShowDeleteDialog,

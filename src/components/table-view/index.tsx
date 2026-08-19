@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { getR2BackupStatus, type R2BackupStatus } from "@/services/api";
 import { BackupProgressDialog } from "@/components/BackupProgressDialog";
 import { CascadeImpactSimulator } from "@/components/CascadeImpactSimulator";
@@ -10,7 +10,7 @@ import { useTableData } from "./use-table-data";
 import { useTableEditing } from "./use-table-editing";
 import { useColumnManagement } from "./use-column-management";
 import { SchemaPanel } from "./schema-panel";
-import { DataGrid } from "./data-grid";
+import { DataTable } from "./data-table";
 import { TableHeaderToolbar, RowSearchToolbar } from "./toolbar";
 import { Pagination } from "./pagination";
 import { RowDialogs } from "./row-dialogs";
@@ -151,13 +151,6 @@ export function TableView({
     onUndoableOperation,
   });
 
-  const formatValue = useCallback((value: unknown): string => {
-    if (value === null) return "NULL";
-    if (value === undefined) return "";
-    if (typeof value === "object") return JSON.stringify(value);
-    return `${value as string | number | boolean}`;
-  }, []);
-
   const handleExportCSV = (): void => {
     if (data.length === 0) {
       alert("No data to export");
@@ -297,7 +290,7 @@ export function TableView({
       <ErrorMessage error={error} variant="card" />
 
       {!loading && !error && (
-        <DataGrid
+        <DataTable
           schema={schema}
           data={data}
           filteredData={filteredData}
@@ -324,9 +317,9 @@ export function TableView({
           onNavigateToRelatedTable={onNavigateToRelatedTable}
           onEditRow={tableEditing.handleOpenEditDialog}
           onDeleteRow={tableEditing.handleOpenDeleteDialog}
+          onUpdateCell={tableEditing.handleUpdateCell}
           onInsertFirstRow={tableEditing.handleOpenInsertDialog}
           onClearSearch={() => setRowSearchQuery("")}
-          formatValue={formatValue}
         />
       )}
 
