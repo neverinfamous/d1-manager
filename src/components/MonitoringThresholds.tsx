@@ -1,15 +1,22 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   getMonitoringThresholds,
   createDefaultThresholds,
   deleteMonitoringThreshold,
   updateMonitoringThreshold,
 } from "../services/monitoringApi";
-import { getDatabases } from "../services/databaseApi";
+import { api } from "../services/api";
 import type { MonitoringThreshold } from "../types/monitoring";
-import type { D1Database } from "../types";
-import { MONITORING_METRIC_LABELS, MONITORING_COMPARISON_LABELS } from "../types/monitoring";
-import { Trash2, Plus, Edit2, Play, Check, X, AlertCircle } from "lucide-react";
+import type { D1Database } from "../services/api";
+import { METRIC_TYPE_LABELS } from "../types/monitoring";
+import { Trash2, Plus, AlertCircle } from "lucide-react";
+
+const COMPARISON_LABELS: Record<string, string> = {
+  gt: ">",
+  gte: ">=",
+  lt: "<",
+  lte: "<=",
+};
 
 export function MonitoringThresholds() {
   const [thresholds, setThresholds] = useState<MonitoringThreshold[]>([]);
@@ -27,7 +34,7 @@ export function MonitoringThresholds() {
       setLoading(true);
       const [thData, dbData] = await Promise.all([
         getMonitoringThresholds(),
-        getDatabases(),
+        api.listDatabases(),
       ]);
       setThresholds(thData);
       setDatabases(dbData);
@@ -58,8 +65,9 @@ export function MonitoringThresholds() {
 
   const handleToggle = async (t: MonitoringThreshold) => {
     try {
-      await updateMonitoringThreshold(t.id, { enabled: !t.enabled });
-      setThresholds((prev) => prev.map((th) => th.id === t.id ? { ...th, enabled: !th.enabled } : th));
+      const newEnabled = t.enabled ? 0 : 1;
+      await updateMonitoringThreshold(t.id, { enabled: newEnabled === 1 });
+      setThresholds((prev) => prev.map((th) => th.id === t.id ? { ...th, enabled: newEnabled } : th));
     } catch (err: any) {
       setError(err.message || "Failed to update threshold");
     }
@@ -126,14 +134,14 @@ export function MonitoringThresholds() {
               <div className="flex flex-col">
                 <div className="flex items-center gap-2">
                   <span className="font-medium">
-                    {MONITORING_METRIC_LABELS[t.metric_type] || t.metric_type}
+                    {METRIC_TYPE_LABELS[t.metric_type] || t.metric_type}
                   </span>
                   <span className="text-muted-foreground text-sm bg-muted px-2 py-0.5 rounded-full">
                     {t.database_name}
                   </span>
                 </div>
                 <div className="text-sm text-muted-foreground mt-1.5 flex items-center gap-3">
-                  <span>Trigger when: {MONITORING_COMPARISON_LABELS[t.comparison]} {t.threshold_value}{t.metric_type === "storage_usage" ? "%" : t.metric_type === "query_latency" ? "ms" : ""}</span>
+                  <span>Trigger when: {COMPARISON_LABELS[t.comparison]} {t.threshold_value}{t.metric_type === "storage_usage" ? "%" : t.metric_type === "query_latency" ? "ms" : ""}</span>
                   <span className="w-1 h-1 rounded-full bg-border"></span>
                   <span>Last value: {t.last_value !== null ? Number(t.last_value).toFixed(1) : "Unknown"}</span>
                   <span className="w-1 h-1 rounded-full bg-border"></span>
