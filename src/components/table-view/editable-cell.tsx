@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import type { ReactNode } from "react";
 import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
 
@@ -73,6 +74,39 @@ export function EditableCell({
     }
   };
 
+  const renderPreview = (val: string): ReactNode => {
+    if (/^https?:\/\//.test(val)) {
+      const isImage = /\.(jpeg|jpg|gif|png|webp|svg)(\?.*)?$/i.test(val);
+      if (isImage) {
+        return (
+          <a
+            href={val}
+            target="_blank"
+            rel="noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="block h-8 max-w-[100px] overflow-hidden rounded border border-border/50 hover:opacity-80 transition-opacity"
+            title={val}
+          >
+            <img src={val} alt="Preview" className="w-full h-full object-cover" />
+          </a>
+        );
+      }
+      return (
+        <a
+          href={val}
+          target="_blank"
+          rel="noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="text-blue-500 hover:underline truncate block"
+          title={val}
+        >
+          {val}
+        </a>
+      );
+    }
+    return <span className="truncate block">{val}</span>;
+  };
+
   if (!isEditing && !isSaving && status === "idle") {
     return (
       <div
@@ -82,7 +116,7 @@ export function EditableCell({
         {initialValue === null ? (
           <span className="italic text-muted-foreground">NULL</span>
         ) : (
-          <span className="truncate">{value}</span>
+          renderPreview(value)
         )}
       </div>
     );

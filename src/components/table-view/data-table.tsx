@@ -197,7 +197,22 @@ export function DataTable({
         ),
       }),
     ]);
-  }, [schema, foreignKeys, dataSortColumn, dataSortDirection, onDataSort, onSelectAllRows, onClearRowSelection, onToggleRowSelection, onNavigateToRelatedTable, onEditRow, onDeleteRow, onUpdateCell]);
+  }, [
+    schema,
+    foreignKeys,
+    dataSortColumn,
+    dataSortDirection,
+    onDataSort,
+    onSelectAllRows,
+    onClearRowSelection,
+    onToggleRowSelection,
+    onNavigateToRelatedTable,
+    onEditRow,
+    onDeleteRow,
+    onUpdateCell,
+    columnFilters,
+    onColumnFilterChange,
+  ]);
 
   const table = useTable({
     data: filteredData,
