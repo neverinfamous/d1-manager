@@ -5,13 +5,10 @@ import type {
   MetricsDataPoint,
   StorageDataPoint,
   DatabaseMetricsSummary,
-  GraphQLResponse,
   D1AnalyticsResult,
-  D1DatabaseInfo,
   QueryInsight,
 } from "../types";
-import { CF_API } from "../types";
-import { logInfo, logWarning, logError } from "../utils/error-logger";
+import { logInfo } from "../utils/error-logger";
 
 import {
   getDateRange,

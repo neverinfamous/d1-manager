@@ -24,8 +24,6 @@ import { handleDrizzleRoutes } from "./routes/drizzle";
 import { handleHealthRoutes } from "./routes/health";
 import { handleAISearchRoutes } from "./routes/ai-search";
 import { handleMonitoringRoutes } from "./routes/monitoring";
-import { getCacheHeaders, getSecurityHeaders } from "./utils/headers";
-import { BackupDO } from "./utils/backup-do";
 import { processScheduledBackups } from "./utils/scheduled-backup-processor";
 import { processMonitoring } from "./utils/monitoring-processor";
 import { trackDatabaseAccess } from "./utils/database-tracking";
