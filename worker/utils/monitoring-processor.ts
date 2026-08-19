@@ -57,7 +57,7 @@ export async function processMonitoring(env: Env): Promise<void> {
     const analytics = await executeGraphQLQuery(env, query, isLocalDev);
 
     if (analytics == null) {
-      if (sentinel !== undefined && sentinel.enabled === 1) {
+      if (sentinel?.enabled === 1) {
         const newFailures = sentinel.consecutive_failures + 1;
         await env.METADATA.prepare(
           `UPDATE monitoring_thresholds SET consecutive_failures = ?, updated_at = datetime('now') WHERE id = ?`,
@@ -75,7 +75,7 @@ export async function processMonitoring(env: Env): Promise<void> {
       return;
     }
 
-    if (sentinel !== undefined && sentinel.enabled === 1 && sentinel.consecutive_failures > 0) {
+    if (sentinel?.enabled === 1 && sentinel.consecutive_failures > 0) {
       await env.METADATA.prepare(
         `UPDATE monitoring_thresholds SET consecutive_failures = 0, last_alert_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
       ).bind(sentinel.id).run();
