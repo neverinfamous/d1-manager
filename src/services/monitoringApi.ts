@@ -10,6 +10,8 @@ interface ApiError extends Error {
   status?: number;
 }
 
+const WORKER_API = import.meta.env.VITE_WORKER_API || window.location.origin;
+
 // 2-minute TTL cache
 let thresholdsCache: {
   data: MonitoringThreshold[];
@@ -74,11 +76,11 @@ export async function getMonitoringThresholds(databaseId?: string): Promise<Moni
     url += `?databaseId=${encodeURIComponent(databaseId)}`;
   }
 
-  const response = await fetch(url, {
+  const response = await fetch(`${WORKER_API}${url}`, {
     headers: {
       "Content-Type": "application/json",
     },
-    credentials: "omit", // Using omit for simpler auth in this project pattern
+    credentials: "include",
   });
 
   const data = await handleResponse<MonitoringThresholdsResponse>(response);
@@ -98,11 +100,11 @@ export async function getMonitoringThresholds(databaseId?: string): Promise<Moni
  * Fetch a single monitoring threshold
  */
 export async function getMonitoringThreshold(id: string): Promise<MonitoringThreshold> {
-  const response = await fetch(`/api/monitoring/${encodeURIComponent(id)}`, {
+  const response = await fetch(`${WORKER_API}/api/monitoring/${encodeURIComponent(id)}`, {
     headers: {
       "Content-Type": "application/json",
     },
-    credentials: "omit",
+    credentials: "include",
   });
 
   const data = await handleResponse<MonitoringThresholdResponse>(response);
@@ -113,13 +115,13 @@ export async function getMonitoringThreshold(id: string): Promise<MonitoringThre
  * Create a new monitoring threshold
  */
 export async function createMonitoringThreshold(input: MonitoringThresholdInput): Promise<MonitoringThreshold> {
-  const response = await fetch("/api/monitoring", {
+  const response = await fetch(`${WORKER_API}/api/monitoring`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify(input),
-    credentials: "omit",
+    credentials: "include",
   });
 
   const data = await handleResponse<MonitoringThresholdResponse>(response);
@@ -131,13 +133,13 @@ export async function createMonitoringThreshold(input: MonitoringThresholdInput)
  * Update an existing monitoring threshold
  */
 export async function updateMonitoringThreshold(id: string, input: Partial<MonitoringThresholdInput>): Promise<MonitoringThreshold> {
-  const response = await fetch(`/api/monitoring/${encodeURIComponent(id)}`, {
+  const response = await fetch(`${WORKER_API}/api/monitoring/${encodeURIComponent(id)}`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify(input),
-    credentials: "omit",
+    credentials: "include",
   });
 
   const data = await handleResponse<MonitoringThresholdResponse>(response);
@@ -149,12 +151,12 @@ export async function updateMonitoringThreshold(id: string, input: Partial<Monit
  * Delete a monitoring threshold
  */
 export async function deleteMonitoringThreshold(id: string): Promise<void> {
-  const response = await fetch(`/api/monitoring/${encodeURIComponent(id)}`, {
+  const response = await fetch(`${WORKER_API}/api/monitoring/${encodeURIComponent(id)}`, {
     method: "DELETE",
     headers: {
       "Content-Type": "application/json",
     },
-    credentials: "omit",
+    credentials: "include",
   });
 
   await handleResponse<Record<string, never>>(response);
@@ -165,12 +167,12 @@ export async function deleteMonitoringThreshold(id: string): Promise<void> {
  * Test a monitoring threshold against live analytics
  */
 export async function testMonitoringThreshold(id: string): Promise<MonitoringTestResult> {
-  const response = await fetch(`/api/monitoring/${encodeURIComponent(id)}/test`, {
+  const response = await fetch(`${WORKER_API}/api/monitoring/${encodeURIComponent(id)}/test`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    credentials: "omit",
+    credentials: "include",
   });
 
   return handleResponse<MonitoringTestResult>(response);
@@ -180,7 +182,7 @@ export async function testMonitoringThreshold(id: string): Promise<MonitoringTes
  * Create default threshold presets for a database (Quick Setup)
  */
 export async function createDefaultThresholds(databaseId: string, databaseName: string, storageLimitBytes: number): Promise<MonitoringThreshold[]> {
-  const response = await fetch(`/api/monitoring/defaults/${encodeURIComponent(databaseId)}`, {
+  const response = await fetch(`${WORKER_API}/api/monitoring/defaults/${encodeURIComponent(databaseId)}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -189,7 +191,7 @@ export async function createDefaultThresholds(databaseId: string, databaseName: 
       database_name: databaseName,
       storage_limit_bytes: storageLimitBytes,
     }),
-    credentials: "omit",
+    credentials: "include",
   });
 
   const data = await handleResponse<MonitoringThresholdsResponse>(response);
