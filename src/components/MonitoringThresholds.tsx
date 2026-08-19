@@ -89,6 +89,7 @@ export function MonitoringThresholds(): ReactElement {
         comparison: newThreshold.comparison as ThresholdComparison,
         threshold_value: newThreshold.threshold_value,
         cooldown_hours: newThreshold.cooldown_hours,
+        storage_limit_bytes: newThreshold.metric_type === "storage_usage" ? 5368709120 : null,
         enabled: true
       });
       setShowAddForm(false);
