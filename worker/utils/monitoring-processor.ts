@@ -7,6 +7,7 @@ import type {
 import {
   buildAnalyticsQuery,
   executeGraphQLQuery,
+  getDateRange,
 } from "./analytics";
 import { logInfo, logError } from "./error-logger";
 import {
@@ -48,10 +49,7 @@ export async function processMonitoring(env: Env): Promise<void> {
     // 2. Fetch analytics (hourly window for check)
     // Analytics are normally fetched for the past 24h, but we can just use 1h for monitoring or 24h depending on how thresholds are defined.
     // The issue says "hourly cron handler". Let's fetch 24h window for generic stats, or 1h for volume?
-    const end = new Date();
-    const start = new Date(end.getTime() - 60 * 60 * 1000);
-    const startStr = start.toISOString().split(".")[0] + "Z";
-    const endStr = end.toISOString().split(".")[0] + "Z";
+    const { start: startStr, end: endStr } = getDateRange("24h");
 
     const query = buildAnalyticsQuery(env.ACCOUNT_ID, startStr, endStr);
     const analytics = await executeGraphQLQuery(env, query, isLocalDev);

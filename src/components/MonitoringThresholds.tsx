@@ -156,6 +156,24 @@ export function MonitoringThresholds(): ReactElement {
               Quick Setup
             </button>
             <button
+              onClick={async () => {
+                try {
+                  setLoading(true);
+                  await api.post("/api/monitoring/trigger");
+                  await fetchData();
+                  alert("Monitoring check triggered successfully! Check your webhooks.");
+                } catch (err: unknown) {
+                  setError(err instanceof Error ? err.message : "Failed to trigger monitoring check");
+                } finally {
+                  setLoading(false);
+                }
+              }}
+              disabled={loading}
+              className="inline-flex h-9 items-center justify-center rounded-md border border-indigo-500 text-indigo-500 hover:bg-indigo-50 px-4 py-2 text-sm font-medium transition-colors gap-2 whitespace-nowrap"
+            >
+              Trigger Check
+            </button>
+            <button
               onClick={() => setShowAddForm(!showAddForm)}
               disabled={loading || !selectedDbId}
               className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90 transition-colors gap-2 whitespace-nowrap"

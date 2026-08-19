@@ -100,6 +100,19 @@ export async function handleMonitoringRoutes(
     }
   }
 
+  // POST /api/monitoring/trigger
+  if (method === "POST" && url.pathname === "/api/monitoring/trigger") {
+    try {
+      if (isLocalDev) return errorResponse("Not implemented in local dev", corsHeaders, 404);
+      
+      const { processMonitoring } = await import("../utils/monitoring-processor");
+      await processMonitoring(env);
+      return jsonResponse({ success: true, message: "Monitoring evaluation triggered successfully" }, corsHeaders, 200);
+    } catch (err) {
+      return errorResponse(`Failed to trigger monitoring: ${String(err)}`, corsHeaders);
+    }
+  }
+
   // POST /api/monitoring
   if (method === "POST" && url.pathname === "/api/monitoring") {
     try {
