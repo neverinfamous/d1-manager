@@ -42,6 +42,12 @@ export type WebhookEventType =
   // Job lifecycle
   | "job_failed"
   | "batch_complete"
+  // Monitoring threshold alerts
+  | "threshold_storage_usage"
+  | "threshold_query_latency"
+  | "threshold_error_rate"
+  | "threshold_row_volume"
+  | "analytics_unavailable"
   // Backward-compatible aliases (legacy)
   | "database_export"
   | "database_import";
@@ -116,6 +122,12 @@ export const WEBHOOK_EVENT_LABELS: Record<WebhookEventType, string> = {
   // Job lifecycle
   job_failed: "Job Failed",
   batch_complete: "Batch Operation Complete",
+  // Monitoring threshold alerts
+  threshold_storage_usage: "Storage Threshold Breached",
+  threshold_query_latency: "Latency Threshold Breached",
+  threshold_error_rate: "Error Rate Threshold Breached",
+  threshold_row_volume: "Row Volume Threshold Breached",
+  analytics_unavailable: "Analytics API Unavailable",
   // Backward-compatible aliases
   database_export: "Database Exported (Legacy)",
   database_import: "Database Imported (Legacy)",
@@ -145,6 +157,12 @@ export const WEBHOOK_EVENT_DESCRIPTIONS: Record<WebhookEventType, string> = {
   // Job lifecycle
   job_failed: "Triggered when any tracked operation fails",
   batch_complete: "Triggered when a bulk operation completes",
+  // Monitoring threshold alerts
+  threshold_storage_usage: "Triggered when database storage exceeds configured % of plan limit",
+  threshold_query_latency: "Triggered when P90 query latency exceeds configured threshold",
+  threshold_error_rate: "Triggered when query error rate exceeds configured threshold",
+  threshold_row_volume: "Triggered when rows read/written exceed configured threshold",
+  analytics_unavailable: "Triggered when Cloudflare Analytics API is unreachable for 3+ consecutive checks",
   // Backward-compatible aliases
   database_export: "Legacy alias for export_complete",
   database_import: "Legacy alias for import_complete",
@@ -175,6 +193,12 @@ export const ALL_WEBHOOK_EVENTS: WebhookEventType[] = [
   // Job lifecycle
   "job_failed",
   "batch_complete",
+  // Monitoring threshold alerts
+  "threshold_storage_usage",
+  "threshold_query_latency",
+  "threshold_error_rate",
+  "threshold_row_volume",
+  "analytics_unavailable",
 ];
 
 /**

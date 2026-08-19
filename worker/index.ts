@@ -23,7 +23,9 @@ import { handleScheduledBackupRoutes } from "./routes/scheduled-backups";
 import { handleDrizzleRoutes } from "./routes/drizzle";
 import { handleHealthRoutes } from "./routes/health";
 import { handleAISearchRoutes } from "./routes/ai-search";
+import { handleMonitoringRoutes } from "./routes/monitoring";
 import { processScheduledBackups } from "./utils/scheduled-backup-processor";
+import { processMonitoring } from "./utils/monitoring-processor";
 import { trackDatabaseAccess } from "./utils/database-tracking";
 import { logInfo, logWarning } from "./utils/error-logger";
 
@@ -410,6 +412,21 @@ async function handleApiRequest(
     }
   }
 
+  // Monitoring threshold routes
+  if (url.pathname.startsWith("/api/monitoring")) {
+    const monitoringResponse = await handleMonitoringRoutes(
+      request,
+      env,
+      url,
+      corsHeaders,
+      isLocalDev,
+      userEmail,
+    );
+    if (monitoringResponse) {
+      return monitoringResponse;
+    }
+  }
+
   if (url.pathname.startsWith("/api/metrics")) {
     const metricsResponse = await handleMetricsRoutes(
       request,
@@ -604,5 +621,8 @@ export default {
 
     // Process scheduled backups in the background
     ctx.waitUntil(processScheduledBackups(env));
+
+    // Process monitoring threshold checks in the background
+    ctx.waitUntil(processMonitoring(env));
   },
 };

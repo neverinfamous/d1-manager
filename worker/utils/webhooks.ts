@@ -485,6 +485,42 @@ export function createBatchCompletePayload(
 }
 
 // ============================================
+// Monitoring Threshold Alert Payloads
+// ============================================
+
+export function createThresholdBreachPayload(
+  databaseId: string,
+  databaseName: string,
+  metricType: string,
+  currentValue: number,
+  thresholdValue: number,
+  comparison: string,
+  unit: string,
+): Record<string, unknown> {
+  return {
+    database_id: databaseId,
+    database_name: databaseName,
+    metric_type: metricType,
+    current_value: currentValue,
+    threshold_value: thresholdValue,
+    comparison,
+    unit,
+    breached_at: new Date().toISOString(),
+  };
+}
+
+export function createAnalyticsUnavailablePayload(
+  consecutiveFailures: number,
+  lastSuccessAt: string | null,
+): Record<string, unknown> {
+  return {
+    consecutive_failures: consecutiveFailures,
+    last_success_at: lastSuccessAt,
+    detected_at: new Date().toISOString(),
+  };
+}
+
+// ============================================
 // Legacy Alias Payloads (Backward Compatibility)
 // ============================================
 

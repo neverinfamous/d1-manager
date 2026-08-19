@@ -14,6 +14,7 @@ import {
   Globe,
 } from "lucide-react";
 import { Button } from "./ui/button";
+import { MonitoringThresholds } from "./MonitoringThresholds";
 import {
   Card,
   CardContent,
@@ -448,12 +449,16 @@ export function HealthDashboard(): React.ReactElement {
                     className={`h-5 w-5 ${health.databases.withReplication > 0 ? "text-blue-500" : "text-muted-foreground"}`}
                   />
                   <span className="text-sm">
-                    {health.databases.withReplication} replicated
+                    {health.databases.withReplication}/{health.databases.total}{" "}
+                    replicated
                   </span>
                 </div>
               </div>
             </CardContent>
           </Card>
+
+          {/* Monitoring Thresholds */}
+          <MonitoringThresholds />
         </>
       )}
     </div>
