@@ -184,7 +184,7 @@ jobs:
           cache-from: type=gha,scope=linux/amd64
 
       - name: Docker Scout CVE Scan
-        uses: docker/scout-action@481412c8b8de36d0f79e85aa382c60397466feb6 # v1
+        uses: docker/scout-action@bacf462e8d090c09660de30a6ccc718035f961e3 # v1
         with:
           command: cves
           image: local://local-scan:latest
