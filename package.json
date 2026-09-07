@@ -32,7 +32,7 @@
     "dompurify": "^3.4.13",
     "drizzle-orm": "^0.45.2",
     "html2canvas": "^1.4.1",
-    "jose": "^6.2.9",
+    "jose": "^6.2.11",
     "jspdf": "^4.2.1",
     "jszip": "^3.10.1",
     "lucide-react": "^1.32.0",
