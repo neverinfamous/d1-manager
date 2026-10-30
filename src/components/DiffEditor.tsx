@@ -40,11 +40,9 @@ interface DiffSource {
 export function DiffEditor({
   currentQuery,
   savedQueries,
-  databaseName: _databaseName,
   onLoadToEditor,
 }: DiffEditorProps): React.JSX.Element {
   // databaseName is available for future use (e.g., display)
-  void _databaseName;
   // Left and right source selection
   const [leftSource, setLeftSource] = useState<DiffSource>({ type: "current" });
   const [rightSource, setRightSource] = useState<DiffSource>({ type: "saved" });

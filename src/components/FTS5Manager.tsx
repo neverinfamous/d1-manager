@@ -54,12 +54,11 @@ interface FTS5ManagerProps {
 
 export function FTS5Manager({
   databaseId,
-  databaseName: _databaseName,
   onNavigateToTables,
   onConvertFTS5ToTable,
   onUndoableOperation,
 }: FTS5ManagerProps): React.JSX.Element {
-  void _databaseName; // Passed to parent callback via onConvertFTS5ToTable
+  // databaseName is passed to parent callback via onConvertFTS5ToTable
   const [fts5Tables, setFts5Tables] = useState<FTS5TableInfo[]>([]);
   const [canConvertTables, setCanConvertTables] = useState(false);
   const [loading, setLoading] = useState(true);
