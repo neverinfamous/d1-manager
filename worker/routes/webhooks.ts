@@ -109,7 +109,6 @@ export async function handleWebhookRoutes(
   _userEmail: string | null,
 ): Promise<Response | null> {
   // userEmail available for future access control
-  void _userEmail;
 
   const method = request.method;
   const path = url.pathname;

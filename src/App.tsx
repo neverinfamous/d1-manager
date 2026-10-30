@@ -285,7 +285,7 @@ export default function App(): React.JSX.Element {
     isRenaming: boolean;
     currentStep?: string;
     progress?: number;
-    error?: string;
+    error?: string | undefined;
   } | null>(null);
 
   // Optimize operation state
@@ -294,7 +294,7 @@ export default function App(): React.JSX.Element {
     databaseNames: string[];
     isOptimizing: boolean;
     currentProgress?: { current: number; total: number; operation: string };
-    error?: string;
+    error?: string | undefined;
   } | null>(null);
 
   // Clone database state
@@ -1007,9 +1007,7 @@ export default function App(): React.JSX.Element {
 
     setRenameDialogState((prev) => {
       if (!prev) return null;
-      const { error: _error, ...rest } = prev;
-      void _error;
-      return { ...rest, isRenaming: true };
+      return { ...prev, error: undefined, isRenaming: true };
     });
     setError("");
 
@@ -1087,9 +1085,7 @@ export default function App(): React.JSX.Element {
 
     setOptimizeDialogState((prev) => {
       if (!prev) return null;
-      const { error: _error, ...rest } = prev;
-      void _error;
-      return { ...rest, isOptimizing: true };
+      return { ...prev, error: undefined, isOptimizing: true };
     });
     setError("");
 
@@ -2557,9 +2553,11 @@ export default function App(): React.JSX.Element {
                   onChange={(e) =>
                     setRenameDialogState((prev) => {
                       if (!prev) return null;
-                      const { error: _error, ...rest } = prev;
-                      void _error;
-                      return { ...rest, newName: e.target.value.toLowerCase() };
+                      return {
+                        ...prev,
+                        error: undefined,
+                        newName: e.target.value.toLowerCase(),
+                      };
                     })
                   }
                   disabled={renameDialogState.isRenaming}
@@ -2578,9 +2576,11 @@ export default function App(): React.JSX.Element {
                   onCheckedChange={(checked) =>
                     setRenameDialogState((prev) => {
                       if (!prev) return null;
-                      const { error: _error, ...rest } = prev;
-                      void _error;
-                      return { ...rest, backupConfirmed: checked === true };
+                      return {
+                        ...prev,
+                        error: undefined,
+                        backupConfirmed: checked === true,
+                      };
                     })
                   }
                   disabled={renameDialogState.isRenaming}

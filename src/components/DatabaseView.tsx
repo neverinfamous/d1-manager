@@ -163,7 +163,7 @@ export function DatabaseView({
     tableName: string;
     newName: string;
     isRenaming: boolean;
-    error?: string;
+    error?: string | undefined;
   } | null>(null);
 
   // Clone dialog state
@@ -172,7 +172,7 @@ export function DatabaseView({
     cloneNames: Record<string, string>;
     isCloning: boolean;
     progress?: { current: number; total: number };
-    error?: string;
+    error?: string | undefined;
   } | null>(null);
 
   // Export dialog state
@@ -181,7 +181,7 @@ export function DatabaseView({
     format: "sql" | "csv" | "json";
     isExporting: boolean;
     progress?: number;
-    error?: string;
+    error?: string | undefined;
   } | null>(null);
 
   // Delete dialog state
@@ -189,7 +189,7 @@ export function DatabaseView({
     tableNames: string[];
     isDeleting: boolean;
     progress?: { current: number; total: number };
-    error?: string;
+    error?: string | undefined;
     dependencies?: TableDependenciesResponse;
     loadingDependencies?: boolean;
     confirmDependencies?: boolean;
@@ -542,9 +542,7 @@ export function DatabaseView({
 
     setRenameDialogState((prev) => {
       if (!prev) return null;
-      const { error: _error, ...rest } = prev;
-      void _error;
-      return { ...rest, isRenaming: true };
+      return { ...prev, error: undefined, isRenaming: true };
     });
     setError(null);
 
@@ -608,9 +606,7 @@ export function DatabaseView({
 
     setCloneDialogState((prev) => {
       if (!prev) return null;
-      const { error: _error, ...rest } = prev;
-      void _error;
-      return { ...rest, isCloning: true };
+      return { ...prev, error: undefined, isCloning: true };
     });
     setError(null);
 
@@ -676,9 +672,7 @@ export function DatabaseView({
 
     setExportDialogState((prev) => {
       if (!prev) return null;
-      const { error: _error, ...rest } = prev;
-      void _error;
-      return { ...rest, isExporting: true };
+      return { ...prev, error: undefined, isExporting: true };
     });
     setError(null);
 
@@ -1067,9 +1061,7 @@ export function DatabaseView({
 
     setDeleteDialogState((prev) => {
       if (!prev) return null;
-      const { error: _error, ...rest } = prev;
-      void _error;
-      return { ...rest, isDeleting: true };
+      return { ...prev, error: undefined, isDeleting: true };
     });
     setError(null);
 
@@ -2598,9 +2590,11 @@ export function DatabaseView({
                   onChange={(e) =>
                     setRenameDialogState((prev) => {
                       if (!prev) return null;
-                      const { error: _error, ...rest } = prev;
-                      void _error;
-                      return { ...rest, newName: e.target.value };
+                      return {
+                        ...prev,
+                        error: undefined,
+                        newName: e.target.value,
+                      };
                     })
                   }
                   disabled={renameDialogState.isRenaming}
@@ -2662,10 +2656,9 @@ export function DatabaseView({
                     onChange={(e) =>
                       setCloneDialogState((prev) => {
                         if (!prev) return null;
-                        const { error: _error, ...rest } = prev;
-                        void _error;
                         return {
-                          ...rest,
+                          ...prev,
+                          error: undefined,
                           cloneNames: {
                             ...prev.cloneNames,
                             [tableName]: e.target.value,
