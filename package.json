@@ -43,7 +43,7 @@
     "sql-formatter": "^15.9.0"
   },
   "devDependencies": {
-    "@babel/core": "^8.0.10",
+    "@babel/core": "^8.1.0",
     "@cloudflare/workers-types": "^5.20261029.1",
     "@eslint/js": "^10.0.1",
     "@tailwindcss/postcss": "^4.3.3",
