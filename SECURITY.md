@@ -66,6 +66,7 @@ When deploying D1 Database Manager:
 ### Authentication
 
 - **Always use Cloudflare Access (Zero Trust)** in production
+- Ensure your Cloudflare Access policy covers **every** reachable Worker hostname (custom domains as well as any enabled `*.workers.dev` or preview URLs; keep `workers_dev = false` and `preview_urls = false` when using a custom domain)
 - Configure appropriate identity providers (GitHub OAuth, etc.)
 - Set restrictive access policies
 - Never disable authentication checks
@@ -74,7 +75,7 @@ When deploying D1 Database Manager:
 
 - **Protect API tokens**: Never commit tokens to version control
 - Use Cloudflare Workers Secrets for sensitive data
-- Set proper CORS policies
+- **Strict Origin & CORS Enforcement**: Credentialed CORS responses (`Access-Control-Allow-Origin` + `Access-Control-Allow-Credentials: true`) are restricted to same-origin requests by default, or origins explicitly listed in the optional `ALLOWED_ORIGINS` secret. State-changing cross-origin API requests (`POST`, `PUT`, `PATCH`, `DELETE`) from untrusted origins are rejected with `403 Forbidden`.
 - Implement rate limiting if needed
 
 ### Database Access
@@ -99,6 +100,9 @@ npx wrangler secret put ACCOUNT_ID
 npx wrangler secret put API_KEY
 npx wrangler secret put TEAM_DOMAIN
 npx wrangler secret put POLICY_AUD
+
+# Optional: comma-separated list of additional trusted CORS origins
+# npx wrangler secret put ALLOWED_ORIGINS
 ```
 
 ### Network Security
@@ -112,7 +116,7 @@ npx wrangler secret put POLICY_AUD
 
 ### Local Development Mode
 
-- Mock data mode bypasses authentication for `localhost`
+- Mock data mode bypasses authentication **only** when the canonical request URL hostname is `localhost` or `127.0.0.1` **and** neither production D1 credentials (`ACCOUNT_ID`, `API_KEY`) nor Cloudflare Access settings (`TEAM_DOMAIN`, `POLICY_AUD`) are configured (never based on client-supplied headers like `Origin`)
 - **Never deploy** with `VITE_WORKER_API=http://localhost:8787`
 - Ensure environment is properly configured for production
 
@@ -134,10 +138,11 @@ npx wrangler secret put POLICY_AUD
 D1 Database Manager implements several security features:
 
 - **Cloudflare Access Integration**: Enterprise-grade authentication
-- **JWT Validation**: Every API request validated
+- **JWT Validation**: Every production API request validated against Cloudflare Access JWKS
+- **Origin & Cross-Site Request Protection**: Strict allowlist-based credentialed CORS (`ALLOWED_ORIGINS` / same-origin) and `403 Forbidden` rejection of untrusted cross-origin state-changing API requests
 - **Scoped Permissions**: Minimal required access
 - **Audit Logging**: Query history tracking
-- **Secure Defaults**: Production-ready configuration
+- **Secure Defaults**: Production-ready configuration (`workers_dev = false`, `preview_urls = false`)
 - **Input Validation**: SQL injection prevention
 - **Rate Limiting**: Via Cloudflare Workers platform
 

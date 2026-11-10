@@ -3,7 +3,8 @@ import { validateAccessJWT } from "./utils/auth";
 import {
   getCorsHeaders,
   handleCorsPreflightRequest,
-  isLocalDevelopment,
+  isLocalDevEnvironment,
+  validateCrossOriginRequest,
 } from "./utils/cors";
 import { handleDatabaseRoutes } from "./routes/databases";
 import { handleTableRoutes } from "./routes/tables";
@@ -131,16 +132,16 @@ async function handleApiRequest(
     metadata: { method: request.method, path: url.pathname },
   });
 
-  // Get CORS headers
-  const corsHeaders = getCorsHeaders(request);
+  // Check if running in local development environment (localhost without production credentials/Access config)
+  const isLocalDev = isLocalDevEnvironment(request, env);
+
+  // Get CORS headers for trusted origins only
+  const corsHeaders = getCorsHeaders(request, isLocalDev, env.ALLOWED_ORIGINS);
 
   // Handle CORS preflight
   if (request.method === "OPTIONS") {
-    return handleCorsPreflightRequest(corsHeaders);
+    return handleCorsPreflightRequest(request, corsHeaders);
   }
-
-  // Check if local development
-  const isLocalhost = isLocalDevelopment(request);
 
   // Allow static assets without authentication (from Workers Assets binding)
   // These are served by Cloudflare's edge network and don't need auth
@@ -149,8 +150,7 @@ async function handleApiRequest(
     // In local development, ASSETS binding is not available - Vite serves the frontend
     if (!env.ASSETS) {
       // In localhost dev mode, redirect to Vite dev server
-      if (isLocalhost) {
-        const corsHeaders = getCorsHeaders(request);
+      if (isLocalDev) {
         const textHeaders = new Headers(corsHeaders);
         textHeaders.set("Content-Type", "text/plain");
         return new Response("Development: Frontend at http://localhost:5173", {
@@ -185,10 +185,10 @@ async function handleApiRequest(
     });
   }
 
-  // Skip auth for localhost development API requests
+  // Skip auth only in local development without production credentials
   let userEmail: string | null;
-  if (isLocalhost) {
-    logInfo("Localhost detected, skipping JWT validation", {
+  if (isLocalDev) {
+    logInfo("Local development detected, skipping JWT validation", {
       module: "worker",
       operation: "auth",
     });
@@ -204,17 +204,24 @@ async function handleApiRequest(
     }
   }
 
-  // Only use mock data if in local development AND missing credentials
-  const isLocalDev = isLocalhost && (!env.ACCOUNT_ID || !env.API_KEY);
+  // Reject state-changing API requests from untrusted origins (CSRF / cross-origin protection)
+  const crossOriginBlock = validateCrossOriginRequest(
+    request,
+    url,
+    isLocalDev,
+    env.ALLOWED_ORIGINS,
+  );
+  if (crossOriginBlock !== null) {
+    return crossOriginBlock;
+  }
 
   logInfo("Environment configuration", {
     module: "worker",
     operation: "init",
     metadata: {
-      isLocalhost,
+      isLocalDev,
       hasAccountId: !!env.ACCOUNT_ID,
       hasApiKey: !!env.API_KEY,
-      isLocalDev,
       hostname: url.hostname,
     },
   });
@@ -479,7 +486,7 @@ async function handleApiRequest(
   }
 
   // Serve frontend assets
-  if (isLocalhost) {
+  if (isLocalDev) {
     // In development, Vite serves the frontend on port 5173
     const textHeaders = new Headers(corsHeaders);
     textHeaders.set("Content-Type", "text/plain");
@@ -570,8 +577,7 @@ export default {
     } catch (err) {
       // Log full error details on server only
       const url = new URL(request.url);
-      const isLocalhost = isLocalDevelopment(request);
-      const isLocalDev = isLocalhost && (!env.ACCOUNT_ID || !env.API_KEY);
+      const isLocalDev = isLocalDevEnvironment(request, env);
       void import("./utils/error-logger").then(({ logError }) => {
         void logError(
           env,
@@ -588,7 +594,11 @@ export default {
           isLocalDev,
         );
       });
-      const corsHeaders = getCorsHeaders(request);
+      const corsHeaders = getCorsHeaders(
+        request,
+        isLocalDev,
+        env.ALLOWED_ORIGINS,
+      );
       const jsonErrHeaders = new Headers(corsHeaders);
       jsonErrHeaders.set("Content-Type", "application/json");
       // Return generic error to client (security: don't expose stack traces)

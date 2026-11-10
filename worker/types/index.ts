@@ -7,11 +7,13 @@ export interface Env {
   BACKUP_BUCKET?: R2Bucket;
   BACKUP_DO?: DurableObjectNamespace;
   AI?: Ai; // Workers AI binding for AI Search (AutoRAG)
-  CF_EMAIL: string;
+  CF_EMAIL?: string;
   API_KEY: string;
   ACCOUNT_ID: string;
   TEAM_DOMAIN: string;
   POLICY_AUD: string;
+  // Optional comma-separated list of allowed CORS origins (e.g. "https://d1.yourdomain.com,https://admin.yourdomain.com")
+  ALLOWED_ORIGINS?: string;
 }
 
 // CORS headers type

@@ -46,6 +46,7 @@ const ERROR_CODE_PREFIXES: Record<string, string> = {
   backup_do: "BDO",
   health: "HLTH",
   ai_search: "AIS",
+  cors: "CORS",
 };
 
 /**

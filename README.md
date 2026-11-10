@@ -178,7 +178,7 @@ The `wrangler.toml` includes the R2 and Durable Object configuration needed for 
 
 1. Go to [Cloudflare Zero Trust](https://one.dash.cloudflare.com/)
 2. Configure authentication (GitHub OAuth, etc.)
-3. Create an Access Application for your domain
+3. Create an Access Application covering **every** reachable Worker hostname (custom domain, and `*.workers.dev` / preview URLs if enabled; keep `workers_dev = false` and `preview_urls = false` in `wrangler.toml` when using a custom domain)
 4. Copy the **Application Audience (AUD) tag**
 
 ### 6. Create API Token
@@ -193,6 +193,9 @@ npx wrangler secret put ACCOUNT_ID
 npx wrangler secret put API_KEY
 npx wrangler secret put TEAM_DOMAIN
 npx wrangler secret put POLICY_AUD
+
+# Optional: comma-separated list of additional trusted CORS origins (same-origin is allowed by default)
+# npx wrangler secret put ALLOWED_ORIGINS
 ```
 
 ### 8. Deploy
@@ -325,6 +328,10 @@ npx wrangler deploy
 ```bash
 docker pull writenotenow/d1-manager:latest
 
+# Local mock mode (no credentials required - accessible at http://localhost:8787)
+docker run -d -p 8787:8787 writenotenow/d1-manager:latest
+
+# Production mode (requires Cloudflare Access / Tunnel in front of the container)
 docker run -d -p 8787:8787 \
   -e ACCOUNT_ID=your_account_id \
   -e API_KEY=your_api_token \
@@ -333,7 +340,7 @@ docker run -d -p 8787:8787 \
   writenotenow/d1-manager:latest
 ```
 
-See [DOCKER_README.md](DOCKER_README.md) for complete Docker instructions.
+See [DOCKER_README.md](DOCKER_README.md) for complete Docker instructions (including optional `ALLOWED_ORIGINS` configuration).
 
 ---
 

@@ -4,8 +4,19 @@ name = "d1-manager"
 main = "worker/index.ts"
 compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat"]
+# SECURITY: Keep workers_dev and preview_urls disabled when using a custom domain.
+# Enabling either exposes *.workers.dev / preview hostnames that will bypass a
+# custom-domain-only Cloudflare Access policy unless every reachable hostname is
+# explicitly covered by Cloudflare Access.
 workers_dev = false
 preview_urls = false
+
+# Secrets (set via CLI, never commit):
+#   npx wrangler secret put ACCOUNT_ID
+#   npx wrangler secret put API_KEY
+#   npx wrangler secret put TEAM_DOMAIN
+#   npx wrangler secret put POLICY_AUD
+#   npx wrangler secret put ALLOWED_ORIGINS   # Optional comma-separated list of additional trusted CORS origins
 
 [build]
 command = "pnpm run build"
