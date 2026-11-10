@@ -136,6 +136,18 @@ npx wrangler d1 execute d1-manager-metadata --remote --file=worker/schema.sql
 
 ### 3. Run Container
 
+**Local evaluation / mock mode (no credentials required):**
+
+```bash
+docker pull writenotenow/d1-manager:latest
+
+docker run -d -p 8787:8787 --name d1-manager writenotenow/d1-manager:latest
+```
+
+Open **http://localhost:8787** (runs with mock data when no production credentials or Cloudflare Access settings are configured).
+
+**Production mode (behind Cloudflare Access / Cloudflare Tunnel):**
+
 ```bash
 docker pull writenotenow/d1-manager:latest
 
@@ -150,7 +162,7 @@ docker run -d \
   writenotenow/d1-manager:latest
 ```
 
-Open **http://localhost:8787**
+> **Security Note:** When production credentials (`ACCOUNT_ID` + `API_KEY`) or Cloudflare Access settings (`TEAM_DOMAIN` + `POLICY_AUD`) are configured, the Worker strictly enforces Cloudflare Access JWT validation on all `/api/*` requests. Route traffic through Cloudflare Access (for example, via Cloudflare Tunnel on your protected custom domain) rather than browsing directly to an unprotected localhost port.
 
 ---
 
@@ -244,6 +256,8 @@ services:
       - API_KEY=${API_KEY}
       - TEAM_DOMAIN=${TEAM_DOMAIN}
       - POLICY_AUD=${POLICY_AUD}
+      # Optional: comma-separated list of additional trusted CORS origins
+      # - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8787/health"]
@@ -259,6 +273,8 @@ ACCOUNT_ID=your_cloudflare_account_id
 API_KEY=your_cloudflare_api_token
 TEAM_DOMAIN=https://yourteam.cloudflareaccess.com
 POLICY_AUD=your_cloudflare_access_aud_tag
+# Optional: comma-separated list of additional trusted CORS origins (same-origin allowed by default)
+# ALLOWED_ORIGINS=https://d1.yourdomain.com,https://admin.yourdomain.com
 ```
 
 Start:
@@ -277,14 +293,15 @@ docker compose pull && docker compose up -d
 
 ## 📋 Environment Variables
 
-| Variable      | Required | Description                             |
-| ------------- | -------- | --------------------------------------- |
-| `ACCOUNT_ID`  | ✅       | Cloudflare Account ID                   |
-| `API_KEY`     | ✅       | API Token with D1 Edit permission       |
-| `TEAM_DOMAIN` | ✅       | `https://yourteam.cloudflareaccess.com` |
-| `POLICY_AUD`  | ✅       | Cloudflare Access Application AUD tag   |
-| `PORT`        | ❌       | Port (default: `8787`)                  |
-| `NODE_ENV`    | ❌       | Environment (default: `production`)     |
+| Variable          | Required | Description                                                                                     |
+| ----------------- | -------- | ----------------------------------------------------------------------------------------------- |
+| `ACCOUNT_ID`      | ✅       | Cloudflare Account ID                                                                           |
+| `API_KEY`         | ✅       | API Token with D1 Edit permission                                                               |
+| `TEAM_DOMAIN`     | ✅       | `https://yourteam.cloudflareaccess.com`                                                         |
+| `POLICY_AUD`      | ✅       | Cloudflare Access Application AUD tag                                                           |
+| `ALLOWED_ORIGINS` | ❌       | Comma-separated list of additional trusted origins for credentialed CORS (same-origin default) |
+| `PORT`            | ❌       | Port (default: `8787`)                                                                          |
+| `NODE_ENV`        | ❌       | Environment (default: `production`)                                                             |
 
 > **Note:** R2 Backup/Restore is only available when deploying to Cloudflare Workers (not Docker). Docker deployments can still use the Download/Import functionality for local backups.
 

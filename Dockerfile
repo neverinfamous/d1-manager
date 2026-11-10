@@ -22,13 +22,17 @@ RUN cd /tmp && \
     npm pack glob@11.1.0 && \
     npm pack tar@7.5.22 && \
     npm pack @isaacs/brace-expansion@5.0.1 && \
-    npm pack minimatch@10.2.6 && \
+    npm pack brace-expansion@5.0.12 && \
+    npm pack @isaacs/nonrecursive-glob-match@1.1.0 && \
+    npm pack minimatch@11.0.6 && \
     npm pack picomatch@4.0.7 && \
     npm pack undici@6.29.1 && \
-    npm pack ip-address@10.7.5 && \
+    npm pack ip-address@10.7.6 && \
     rm -rf /usr/local/lib/node_modules/npm/node_modules/glob && \
     rm -rf /usr/local/lib/node_modules/npm/node_modules/tar && \
     rm -rf /usr/local/lib/node_modules/npm/node_modules/@isaacs/brace-expansion && \
+    rm -rf /usr/local/lib/node_modules/npm/node_modules/brace-expansion && \
+    rm -rf /usr/local/lib/node_modules/npm/node_modules/@isaacs/nonrecursive-glob-match && \
     rm -rf /usr/local/lib/node_modules/npm/node_modules/node-gyp/node_modules/glob && \
     rm -rf /usr/local/lib/node_modules/npm/node_modules/minimatch && \
     rm -rf /usr/local/lib/node_modules/npm/node_modules/tinyglobby/node_modules/picomatch && \
@@ -42,7 +46,11 @@ RUN cd /tmp && \
     tar -xzf isaacs-brace-expansion-5.0.1.tgz && \
     mkdir -p /usr/local/lib/node_modules/npm/node_modules/@isaacs && \
     mv package /usr/local/lib/node_modules/npm/node_modules/@isaacs/brace-expansion && \
-    tar -xzf minimatch-10.2.6.tgz && \
+    tar -xzf brace-expansion-5.0.12.tgz && \
+    mv package /usr/local/lib/node_modules/npm/node_modules/brace-expansion && \
+    tar -xzf isaacs-nonrecursive-glob-match-1.1.0.tgz && \
+    mv package /usr/local/lib/node_modules/npm/node_modules/@isaacs/nonrecursive-glob-match && \
+    tar -xzf minimatch-11.0.6.tgz && \
     mv package /usr/local/lib/node_modules/npm/node_modules/minimatch && \
     tar -xzf picomatch-4.0.7.tgz && \
     mkdir -p /usr/local/lib/node_modules/npm/node_modules/tinyglobby/node_modules && \
@@ -51,7 +59,7 @@ RUN cd /tmp && \
     tar -xzf undici-6.29.1.tgz && \
     mv package /usr/local/lib/node_modules/npm/node_modules/undici && \
     rm -rf /usr/local/lib/node_modules/npm/node_modules/ip-address && \
-    tar -xzf ip-address-10.7.5.tgz && \
+    tar -xzf ip-address-10.7.6.tgz && \
     mv package /usr/local/lib/node_modules/npm/node_modules/ip-address && \
     rm -rf /tmp/*
 
@@ -90,13 +98,17 @@ RUN cd /tmp && \
     npm pack glob@11.1.0 && \
     npm pack tar@7.5.22 && \
     npm pack @isaacs/brace-expansion@5.0.1 && \
-    npm pack minimatch@10.2.6 && \
+    npm pack brace-expansion@5.0.12 && \
+    npm pack @isaacs/nonrecursive-glob-match@1.1.0 && \
+    npm pack minimatch@11.0.6 && \
     npm pack picomatch@4.0.7 && \
     npm pack undici@6.29.1 && \
-    npm pack ip-address@10.7.5 && \
+    npm pack ip-address@10.7.6 && \
     rm -rf /usr/local/lib/node_modules/npm/node_modules/glob && \
     rm -rf /usr/local/lib/node_modules/npm/node_modules/tar && \
     rm -rf /usr/local/lib/node_modules/npm/node_modules/@isaacs/brace-expansion && \
+    rm -rf /usr/local/lib/node_modules/npm/node_modules/brace-expansion && \
+    rm -rf /usr/local/lib/node_modules/npm/node_modules/@isaacs/nonrecursive-glob-match && \
     rm -rf /usr/local/lib/node_modules/npm/node_modules/node-gyp/node_modules/glob && \
     rm -rf /usr/local/lib/node_modules/npm/node_modules/minimatch && \
     rm -rf /usr/local/lib/node_modules/npm/node_modules/tinyglobby/node_modules/picomatch && \
@@ -110,7 +122,11 @@ RUN cd /tmp && \
     tar -xzf isaacs-brace-expansion-5.0.1.tgz && \
     mkdir -p /usr/local/lib/node_modules/npm/node_modules/@isaacs && \
     mv package /usr/local/lib/node_modules/npm/node_modules/@isaacs/brace-expansion && \
-    tar -xzf minimatch-10.2.6.tgz && \
+    tar -xzf brace-expansion-5.0.12.tgz && \
+    mv package /usr/local/lib/node_modules/npm/node_modules/brace-expansion && \
+    tar -xzf isaacs-nonrecursive-glob-match-1.1.0.tgz && \
+    mv package /usr/local/lib/node_modules/npm/node_modules/@isaacs/nonrecursive-glob-match && \
+    tar -xzf minimatch-11.0.6.tgz && \
     mv package /usr/local/lib/node_modules/npm/node_modules/minimatch && \
     tar -xzf picomatch-4.0.7.tgz && \
     mkdir -p /usr/local/lib/node_modules/npm/node_modules/tinyglobby/node_modules && \
@@ -119,25 +135,25 @@ RUN cd /tmp && \
     tar -xzf undici-6.29.1.tgz && \
     mv package /usr/local/lib/node_modules/npm/node_modules/undici && \
     rm -rf /usr/local/lib/node_modules/npm/node_modules/ip-address && \
-    tar -xzf ip-address-10.7.5.tgz && \
+    tar -xzf ip-address-10.7.6.tgz && \
     mv package /usr/local/lib/node_modules/npm/node_modules/ip-address && \
     rm -rf /tmp/*
 
 # Install runtime dependencies and upgrade to fix CVEs
 # Security Notes:
-# - Application dependencies: minimatch@10.2.6, brace-expansion@5.0.12, tar@7.5.22, picomatch@4.0.7, undici@^6.28.0, ip-address@10.7.5 (pinned via pnpm-workspace.yaml overrides); overrides for glob@11.1.0 and @isaacs/brace-expansion@5.0.1 are precautionary and may not currently appear in the installed dependency graph.
-# - npm CLI bundled dependencies: glob@11.1.0, tar@7.5.22, @isaacs/brace-expansion@5.0.1, minimatch@10.2.6, picomatch@4.0.7, undici@6.29.1, ip-address@10.7.5 (manually patched in npm's installation)
+# - Application dependencies: minimatch@11.0.6, brace-expansion@5.0.12, tar@7.5.22, picomatch@4.0.7, undici@^6.28.0, ip-address@10.7.6 (pinned via pnpm-workspace.yaml overrides); overrides for glob@11.1.0 and @isaacs/brace-expansion@5.0.1 are precautionary and may not currently appear in the installed dependency graph.
+# - npm CLI bundled dependencies: glob@11.1.0, tar@7.5.22, @isaacs/brace-expansion@5.0.1, brace-expansion@5.0.12, @isaacs/nonrecursive-glob-match@1.1.0, minimatch@11.0.6, picomatch@4.0.7, undici@6.29.1, ip-address@10.7.6 (manually patched in npm's installation)
 # - curl 8.18.0-r0 (from edge): CVE-2025-14819, CVE-2025-14017, CVE-2025-14524 (curl vulnerabilities)
 # - busybox: CVE-2025-60876 (wget CRLF injection) - not exploitable (D1 Manager uses curl, not wget)
 # - zlib: CVE-2026-22184 (buffer overflow in untgz) - NOT EXPLOITABLE (D1 Manager does not use untgz utility)
-#   Fixed via apk upgrade below: zlib 1.3.2-r1 (and openssl/libcrypto3/libssl3 3.5.9-r0) from the Alpine v3.24 repository
+#   Fixed via apk upgrade below: zlib 1.3.2-r1 (and openssl/libcrypto3/libssl3 3.5.9-r0, musl/musl-utils 1.2.6-r6) from the Alpine repository
 # - pnpm self-managed copy: pnpm downloads @pnpm/exe into /root/.local/share/pnpm during install; its bundled tar@7.5.16 and undici@6.27.0 are vulnerable, so that directory is removed after install (the runtime user never uses it)
-# curl 8.18.0 is only available in Alpine edge, so we add edge/main repo temporarily
+# curl 8.18.0 and musl 1.2.6-r6 (CVE-2026-107891) are in Alpine edge/main, so we add edge/main repo temporarily
 RUN apk update && \
     echo "http://dl-cdn.alpinelinux.org/alpine/edge/main" >> /etc/apk/repositories && \
     apk add --no-cache ca-certificates && \
     apk add --no-cache curl --repository=http://dl-cdn.alpinelinux.org/alpine/edge/main && \
-    apk upgrade --no-cache busybox busybox-binsh libcrypto3 libssl3 zlib
+    apk upgrade --no-cache busybox busybox-binsh libcrypto3 libssl3 musl musl-utils zlib
 
 # Create non-root user for security
 # Note: Alpine Linux uses GID 1000 for 'users' group, so we use a different GID
