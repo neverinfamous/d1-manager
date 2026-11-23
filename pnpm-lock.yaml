@@ -94,8 +94,8 @@ importers:
         specifier: ^11.11.4
         version: 11.11.4(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       sql-formatter:
-        specifier: ^15.9.0
-        version: 15.9.0
+        specifier: ^15.10.0
+        version: 15.10.0
     devDependencies:
       '@babel/core':
         specifier: ^8.1.0
@@ -2668,8 +2668,8 @@ packages:
     resolution: {integrity: sha512-UjgapumWlbMhkBgzT7Ykc5YXUT46F0iKu8SGXq0bcwP5dz/h0Plj6enJqjz1Zbq2l5WaqYnrVbwWOWMyF3F47g==}
     engines: {node: '>=0.10.0'}
 
-  sql-formatter@15.9.0:
-    resolution: {integrity: sha512-3A/N+v+mA5/PDU+FlO4uTFE0L/Mmg63c/Ny161Qv2b1Mxp9IX8War+LLmq17LA/Kgu4KXAR7iutK2JaHWJMMtw==}
+  sql-formatter@15.10.0:
+    resolution: {integrity: sha512-9cdsDFzPQukym8i9Eedc72L9y/2wEi2pQZVE/3eXthFjDOnvvmzCIk+N6miWbBixdWXU2qdV92V7PLnvlNgEfA==}
     hasBin: true
 
   stackblur-canvas@2.7.0:
@@ -5163,7 +5163,7 @@ snapshots:
 
   source-map@0.6.1: {}
 
-  sql-formatter@15.9.0:
+  sql-formatter@15.10.0:
     dependencies:
       argparse: 2.0.1
       nearley: 2.20.1
