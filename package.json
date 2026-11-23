@@ -40,7 +40,7 @@
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "reactflow": "^11.11.4",
-    "sql-formatter": "^15.9.0"
+    "sql-formatter": "^15.10.0"
   },
   "devDependencies": {
     "@babel/core": "^8.1.0",
